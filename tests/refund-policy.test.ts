@@ -50,7 +50,7 @@ test("returns eligible for paid unfulfilled orders that can be canceled before s
   assert.equal(result.decision, RefundDecision.Eligible);
   assert.ok(
     result.reasons.some(
-      (reason) => reason.code === RefundReasonCode.CancelableBeforeFulfillment,
+      (reason) => reason.code === RefundReasonCode.WithinCancelWindow,
     ),
   );
   assert.ok(
@@ -156,6 +156,7 @@ test("returns eligible for stale unfulfilled orders when merchant policy allows 
     }),
     {
       refundWindowDays: 30,
+      cancelWindowDays: 30,
       unfulfilledOutsideWindowDecision: RefundDecision.Eligible,
       alreadyFullyRefundedDecision: RefundDecision.Ineligible,
     },
@@ -166,6 +167,11 @@ test("returns eligible for stale unfulfilled orders when merchant policy allows 
     result.reasons.some(
       (reason) =>
         reason.code === RefundReasonCode.UnfulfilledOutsideWindowAllowed,
+    ),
+  );
+  assert.ok(
+    result.reasons.some(
+      (reason) => reason.code === RefundReasonCode.OutsideCancelWindow,
     ),
   );
 });
@@ -179,6 +185,7 @@ test("returns ineligible for stale unfulfilled orders when merchant policy force
     }),
     {
       refundWindowDays: 30,
+      cancelWindowDays: 30,
       unfulfilledOutsideWindowDecision: RefundDecision.Ineligible,
       alreadyFullyRefundedDecision: RefundDecision.Ineligible,
     },
@@ -187,7 +194,7 @@ test("returns ineligible for stale unfulfilled orders when merchant policy force
   assert.equal(result.decision, RefundDecision.Ineligible);
   assert.ok(
     result.reasons.some(
-      (reason) => reason.code === RefundReasonCode.OutsideRefundWindow,
+      (reason) => reason.code === RefundReasonCode.OutsideCancelWindow,
     ),
   );
 });
@@ -201,6 +208,7 @@ test("returns manual_review for stale unfulfilled orders when merchant policy fo
     }),
     {
       refundWindowDays: 30,
+      cancelWindowDays: 30,
       unfulfilledOutsideWindowDecision: RefundDecision.ManualReview,
       alreadyFullyRefundedDecision: RefundDecision.Ineligible,
     },

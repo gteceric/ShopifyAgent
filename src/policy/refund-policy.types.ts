@@ -9,6 +9,8 @@ export type RefundDecision =
 
 export const RefundReasonCode = {
   ManualReviewRequired: "manual_review_required",
+  WithinCancelWindow: "within_cancel_window",
+  OutsideCancelWindow: "outside_cancel_window",
   PreFulfillmentCancellationReviewRequired:
     "pre_fulfillment_cancellation_review_required",
   PreFulfillmentFinalSaleReviewRequired:
@@ -56,6 +58,7 @@ export type FulfillmentStatus =
 // the persisted merchant-configurable policy contract later.
 export interface RefundPolicyConfig {
   refundWindowDays: number;
+  cancelWindowDays?: number;
   finalSaleUnfulfilledDecision?:
     | typeof RefundDecision.Eligible
     | typeof RefundDecision.Ineligible
@@ -91,6 +94,7 @@ export interface RefundPolicyInput {
 export interface RefundPolicyEvidence {
   orderAgeDays: number;
   refundWindowDays: number;
+  cancelWindowDays: number;
   financialStatus: FinancialStatus;
   fulfillmentStatus: FulfillmentStatus;
   hasReturnableFulfillments: boolean;

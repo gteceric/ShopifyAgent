@@ -93,7 +93,7 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     ),
     expectedDecision: RefundDecision.Eligible,
     expectedReasonCodes: [
-      RefundReasonCode.WithinRefundWindow,
+      RefundReasonCode.WithinCancelWindow,
       RefundReasonCode.CancelableBeforeFulfillment,
     ],
     expectedAgentBehavior:
@@ -116,6 +116,7 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     ),
     config: {
       refundWindowDays: 30,
+      cancelWindowDays: 30,
       finalSaleUnfulfilledDecision: RefundDecision.Eligible,
       alreadyFullyRefundedDecision: RefundDecision.Ineligible,
     },
@@ -185,6 +186,7 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     ),
     config: {
       refundWindowDays: 30,
+      cancelWindowDays: 30,
       finalSaleUnfulfilledDecision: RefundDecision.ManualReview,
       alreadyFullyRefundedDecision: RefundDecision.Ineligible,
     },
@@ -233,6 +235,7 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     ),
     config: {
       refundWindowDays: 30,
+      cancelWindowDays: 30,
       alreadyFullyRefundedDecision: RefundDecision.ManualReview,
     },
     expectedDecision: RefundDecision.ManualReview,

@@ -28,6 +28,7 @@ function makeContext(): RefundAgentResponseContext {
       evidence: {
         orderAgeDays: 7,
         refundWindowDays: 30,
+        cancelWindowDays: 30,
         financialStatus: "paid",
         fulfillmentStatus: "fulfilled",
         hasReturnableFulfillments: true,

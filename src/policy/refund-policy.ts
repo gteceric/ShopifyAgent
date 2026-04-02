@@ -12,8 +12,9 @@ import type {
   RefundPolicyResult,
 } from "./refund-policy.types.js";
 
-const DEFAULT_POLICY: RefundPolicyConfig = {
+const DEFAULT_POLICY: Required<RefundPolicyConfig> = {
   refundWindowDays: 30,
+  cancelWindowDays: 30,
   finalSaleUnfulfilledDecision: RefundDecision.Ineligible,
   unfulfilledOutsideWindowDecision: RefundDecision.ManualReview,
   alreadyFullyRefundedDecision: RefundDecision.Ineligible,
@@ -40,7 +41,7 @@ const REFUND_POLICY_REASON_COPY = {
   cancelableBeforeFulfillment:
     "Order has not been fulfilled yet, so it can be canceled before shipment.",
   unfulfilledOutsideWindowAllowed:
-    "Order has not been fulfilled yet, and merchant policy allows cancellation outside the standard refund window.",
+    "Order has not been fulfilled yet, and merchant policy allows cancellation outside the standard cancellation window.",
   returnableFulfillmentsAvailable:
     "Order has returnable fulfillments available.",
 } as const;
@@ -53,14 +54,22 @@ function outsideRefundWindowMessage(refundWindowDays: number): string {
   return `Order is outside the ${refundWindowDays}-day refund window.`;
 }
 
+function withinCancelWindowMessage(cancelWindowDays: number): string {
+  return `Order is within the ${cancelWindowDays}-day cancellation window.`;
+}
+
+function outsideCancelWindowMessage(cancelWindowDays: number): string {
+  return `Order is outside the ${cancelWindowDays}-day cancellation window.`;
+}
+
 function vipOverrideOutsideRefundWindowMessage(refundWindowDays: number): string {
   return `VIP override allows a refund outside the ${refundWindowDays}-day refund window.`;
 }
 
 function preFulfillmentCancellationReviewRequiredMessage(
-  refundWindowDays: number,
+  cancelWindowDays: number,
 ): string {
-  return `Order is unfulfilled but older than the ${refundWindowDays}-day cancellation window and requires human review.`;
+  return `Order is unfulfilled but older than the ${cancelWindowDays}-day cancellation window and requires human review.`;
 }
 
 function normalizeFlags(
@@ -81,7 +90,7 @@ export function evaluateRefundPolicy(
   input: RefundPolicyInput,
   config: RefundPolicyConfig = DEFAULT_POLICY,
 ): RefundPolicyResult {
-  const effectiveConfig = {
+  const effectiveConfig: Required<RefundPolicyConfig> = {
     ...DEFAULT_POLICY,
     ...config,
   };
@@ -93,6 +102,7 @@ export function evaluateRefundPolicy(
   const evidence: RefundPolicyEvidence = {
     orderAgeDays: input.orderAgeDays,
     refundWindowDays: effectiveConfig.refundWindowDays,
+    cancelWindowDays: effectiveConfig.cancelWindowDays,
     financialStatus: input.financialStatus,
     fulfillmentStatus: input.fulfillmentStatus,
     hasReturnableFulfillments: input.hasReturnableFulfillments,
@@ -196,7 +206,7 @@ export function evaluateRefundPolicy(
 
   if (
     isUnfulfilledOrder &&
-    input.orderAgeDays > effectiveConfig.refundWindowDays &&
+    input.orderAgeDays > effectiveConfig.cancelWindowDays &&
     !flags.vipOverride
   ) {
     switch (effectiveConfig.unfulfilledOutsideWindowDecision) {
@@ -208,14 +218,18 @@ export function evaluateRefundPolicy(
               RefundReasonCode.UnfulfilledOutsideWindowAllowed,
               REFUND_POLICY_REASON_COPY.unfulfilledOutsideWindowAllowed,
             ),
+            makeReason(
+              RefundReasonCode.OutsideCancelWindow,
+              outsideCancelWindowMessage(effectiveConfig.cancelWindowDays),
+            ),
           ],
           evidence,
         };
       case RefundDecision.Ineligible:
         blockingReasons.push(
           makeReason(
-            RefundReasonCode.OutsideRefundWindow,
-            outsideRefundWindowMessage(effectiveConfig.refundWindowDays),
+            RefundReasonCode.OutsideCancelWindow,
+            outsideCancelWindowMessage(effectiveConfig.cancelWindowDays),
           ),
         );
         break;
@@ -224,7 +238,7 @@ export function evaluateRefundPolicy(
           makeReason(
             RefundReasonCode.PreFulfillmentCancellationReviewRequired,
             preFulfillmentCancellationReviewRequiredMessage(
-              effectiveConfig.refundWindowDays,
+              effectiveConfig.cancelWindowDays,
             ),
           ),
         );
@@ -299,8 +313,8 @@ export function evaluateRefundPolicy(
         : isUnfulfilledOrder
           ? [
             makeReason(
-              RefundReasonCode.WithinRefundWindow,
-              withinRefundWindowMessage(effectiveConfig.refundWindowDays),
+              RefundReasonCode.WithinCancelWindow,
+              withinCancelWindowMessage(effectiveConfig.cancelWindowDays),
             ),
             makeReason(
               RefundReasonCode.CancelableBeforeFulfillment,
