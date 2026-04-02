@@ -1,0 +1,22 @@
+{
+  "name": "shopify-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "clean": "node --input-type=module -e \"import { rmSync } from 'node:fs'; rmSync('build', { recursive: true, force: true });\"",
+    "build": "tsc -p tsconfig.json",
+    "cleanbuild": "npm run clean && tsc -p tsconfig.json",
+    "check": "npm run build",
+    "dev": "node --env-file=.env --enable-source-maps build/src/index.js",
+    "scenario-matrix": "npm run build && node --env-file=.env build/src/tools/run-refund-scenario-matrix.js",
+    "test": "npm run build && node --test build/tests/**/*.test.js"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.0"
+  }
+}

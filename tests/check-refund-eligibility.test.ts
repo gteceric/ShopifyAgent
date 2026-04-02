@@ -1,0 +1,74 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+import { checkRefundEligibility } from "../src/tools/check-refund-eligibility.js";
+import {
+  FinancialStatus,
+  FulfillmentStatus,
+  RefundDecision,
+  RefundReasonCode,
+} from "../src/policy/refund-policy.types.js";
+import type { RefundPolicyInput } from "../src/policy/refund-policy.types.js";
+
+function makeContext(
+  overrides: Partial<RefundPolicyInput> = {},
+): RefundPolicyInput {
+  return {
+    orderId: "gid://shopify/Order/test",
+    orderName: "#2001",
+    orderCreatedAt: "2026-03-01T00:00:00.000Z",
+    orderAgeDays: 5,
+    financialStatus: FinancialStatus.Paid,
+    fulfillmentStatus: FulfillmentStatus.Fulfilled,
+    hasReturnableFulfillments: true,
+    alreadyFullyRefunded: false,
+    allItemsFinalSale: false,
+    flags: {},
+    ...overrides,
+  };
+}
+
+test("uses injected loadContext and returns structured eligibility result", async () => {
+  const result = await checkRefundEligibility(
+    { orderId: "gid://shopify/Order/custom" },
+    {
+      loadContext: async (input) =>
+        makeContext({
+          orderId: input.orderId,
+          orderName: "#2002",
+        }),
+    },
+  );
+
+  assert.equal(result.orderId, "gid://shopify/Order/custom");
+  assert.equal(result.decision, RefundDecision.Eligible);
+  assert.ok(
+    result.reasons.some(
+      (reason) => reason.code === RefundReasonCode.WithinRefundWindow,
+    ),
+  );
+});
+
+test("uses injected merchant config when evaluating refunded orders", async () => {
+  const result = await checkRefundEligibility(
+    { orderId: "gid://shopify/Order/refunded-review" },
+    {
+      config: {
+        refundWindowDays: 30,
+        alreadyFullyRefundedDecision: RefundDecision.ManualReview,
+      },
+      loadContext: async (input) =>
+        makeContext({
+          orderId: input.orderId,
+          alreadyFullyRefunded: true,
+        }),
+    },
+  );
+
+  assert.equal(result.decision, RefundDecision.ManualReview);
+  assert.ok(
+    result.reasons.some(
+      (reason) => reason.code === RefundReasonCode.AlreadyFullyRefunded,
+    ),
+  );
+});
