@@ -125,6 +125,26 @@ test("formats a manual review result without auto-approving it", async () => {
   assert.match(response, /human reviewer/i);
 });
 
+test("formats a partially fulfilled order as a manual-review response", async () => {
+  const response = await getFormattedResponse(
+    RefundScenarioId.ManualReviewPartialFulfillment,
+  );
+
+  assert.match(response, /^Not automatically\./);
+  assert.match(
+    response,
+    new RegExp(
+      escapeRegExp(REFUND_RESPONSE_COPY.manualReviewPartialFulfillment),
+      "i",
+    ),
+  );
+  assert.match(response, /partially fulfilled/i);
+  assert.match(
+    response,
+    new RegExp(escapeRegExp(REFUND_RESPONSE_COPY.followupReviewStandard), "i"),
+  );
+});
+
 test("formats a stale unfulfilled order as a manual-review cancellation response", async () => {
   const response = await getFormattedResponse(
     RefundScenarioId.ManualReviewUnfulfilledOutsideWindow,

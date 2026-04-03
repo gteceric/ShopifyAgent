@@ -18,6 +18,7 @@ export const RefundScenarioId = {
   IneligibleOutsideWindow: "ineligible_outside_window",
   IneligibleFinalSale: "ineligible_final_sale",
   ManualReviewFraudHold: "manual_review_fraud_hold",
+  ManualReviewPartialFulfillment: "manual_review_partial_fulfillment",
   ManualReviewUnfulfilledFinalSaleByConfig:
     "manual_review_unfulfilled_final_sale_by_config",
   ManualReviewUnfulfilledOutsideWindow:
@@ -168,6 +169,26 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     expectedReasonCodes: [RefundReasonCode.ManualReviewRequired],
     expectedAgentBehavior:
       "Do not approve or deny the refund; route it to manual review and say why.",
+  },
+  {
+    id: RefundScenarioId.ManualReviewPartialFulfillment,
+    description:
+      "Partially fulfilled order should be reviewed by a human because fulfillment is mixed.",
+    agentQuestion: "This order only shipped partially. Can we approve the refund automatically?",
+    toolInput: { orderId: "gid://shopify/Order/manual-review-partial-fulfillment" },
+    context: makeContext(
+      "gid://shopify/Order/manual-review-partial-fulfillment",
+      "#3011",
+      {
+        fulfillmentStatus: FulfillmentStatus.Partial,
+      },
+    ),
+    expectedDecision: RefundDecision.ManualReview,
+    expectedReasonCodes: [
+      RefundReasonCode.PartialFulfillmentReviewRequired,
+    ],
+    expectedAgentBehavior:
+      "Do not auto-approve the refund; mixed fulfillment means a human should review the order first.",
   },
   {
     id: RefundScenarioId.ManualReviewUnfulfilledFinalSaleByConfig,

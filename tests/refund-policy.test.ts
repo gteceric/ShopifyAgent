@@ -61,6 +61,23 @@ test("returns eligible for paid unfulfilled orders that can be canceled before s
   );
 });
 
+test("returns manual_review for partially fulfilled orders", () => {
+  const result = evaluateRefundPolicy(
+    makeInput({
+      fulfillmentStatus: FulfillmentStatus.Partial,
+      hasReturnableFulfillments: true,
+    }),
+  );
+
+  assert.equal(result.decision, RefundDecision.ManualReview);
+  assert.ok(
+    result.reasons.some(
+      (reason) =>
+        reason.code === RefundReasonCode.PartialFulfillmentReviewRequired,
+    ),
+  );
+});
+
 test("returns ineligible for unfulfilled final-sale orders by default", () => {
   const result = evaluateRefundPolicy(
     makeInput({
