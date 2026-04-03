@@ -25,6 +25,8 @@ export const REFUND_RESPONSE_COPY = {
     "This final-sale unfulfilled order needs human review before a cancellation refund is approved.",
   manualReviewPartialFulfillment:
     "This partially fulfilled order needs human review before any refund decision is approved.",
+  manualReviewPartialRefund:
+    "This order has already been partially refunded and needs human review before any additional refund decision is approved.",
   manualReviewStandard:
     "This order should be routed to manual review.",
   followupNoteOverride:
@@ -145,6 +147,11 @@ export function formatRefundEligibilityResponse(
         hasReason(result, RefundReasonCode.PartialFulfillmentReviewRequired)
       ) {
         return `${opening} ${REFUND_RESPONSE_COPY.manualReviewPartialFulfillment} ${reasonSummary} ${REFUND_RESPONSE_COPY.followupReviewStandard}`
+          .trim();
+      }
+
+      if (hasReason(result, RefundReasonCode.PartialRefundReviewRequired)) {
+        return `${opening} ${REFUND_RESPONSE_COPY.manualReviewPartialRefund} ${reasonSummary} ${REFUND_RESPONSE_COPY.followupReviewStandard}`
           .trim();
       }
 

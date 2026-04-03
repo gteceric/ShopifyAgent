@@ -19,6 +19,7 @@ export const RefundScenarioId = {
   IneligibleFinalSale: "ineligible_final_sale",
   ManualReviewFraudHold: "manual_review_fraud_hold",
   ManualReviewPartialFulfillment: "manual_review_partial_fulfillment",
+  ManualReviewPartialRefund: "manual_review_partial_refund",
   ManualReviewUnfulfilledFinalSaleByConfig:
     "manual_review_unfulfilled_final_sale_by_config",
   ManualReviewUnfulfilledOutsideWindow:
@@ -189,6 +190,26 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     ],
     expectedAgentBehavior:
       "Do not auto-approve the refund; mixed fulfillment means a human should review the order first.",
+  },
+  {
+    id: RefundScenarioId.ManualReviewPartialRefund,
+    description:
+      "Partially refunded order should be reviewed by a human before any additional refund is approved.",
+    agentQuestion: "This order already has a partial refund. Can we approve another refund automatically?",
+    toolInput: { orderId: "gid://shopify/Order/manual-review-partial-refund" },
+    context: makeContext(
+      "gid://shopify/Order/manual-review-partial-refund",
+      "#3012",
+      {
+        financialStatus: FinancialStatus.PartiallyRefunded,
+      },
+    ),
+    expectedDecision: RefundDecision.ManualReview,
+    expectedReasonCodes: [
+      RefundReasonCode.PartialRefundReviewRequired,
+    ],
+    expectedAgentBehavior:
+      "Do not auto-approve another refund; the order already has refund history and needs human review.",
   },
   {
     id: RefundScenarioId.ManualReviewUnfulfilledFinalSaleByConfig,

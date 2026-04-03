@@ -145,6 +145,26 @@ test("formats a partially fulfilled order as a manual-review response", async ()
   );
 });
 
+test("formats a partially refunded order as a manual-review response", async () => {
+  const response = await getFormattedResponse(
+    RefundScenarioId.ManualReviewPartialRefund,
+  );
+
+  assert.match(response, /^Not automatically\./);
+  assert.match(
+    response,
+    new RegExp(
+      escapeRegExp(REFUND_RESPONSE_COPY.manualReviewPartialRefund),
+      "i",
+    ),
+  );
+  assert.match(response, /already been partially refunded/i);
+  assert.match(
+    response,
+    new RegExp(escapeRegExp(REFUND_RESPONSE_COPY.followupReviewStandard), "i"),
+  );
+});
+
 test("formats a stale unfulfilled order as a manual-review cancellation response", async () => {
   const response = await getFormattedResponse(
     RefundScenarioId.ManualReviewUnfulfilledOutsideWindow,

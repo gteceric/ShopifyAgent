@@ -1,4 +1,5 @@
 import {
+  FinancialStatus,
   FulfillmentStatus,
   RefundDecision,
   RefundReasonCode,
@@ -24,6 +25,8 @@ const REFUND_POLICY_REASON_COPY = {
   manualReviewRequired: "Order is flagged for manual review.",
   partialFulfillmentReviewRequired:
     "Order is partially fulfilled, so it requires human review before a refund decision is approved.",
+  partialRefundReviewRequired:
+    "Order has already been partially refunded, so it requires human review before any additional refund is approved.",
   alreadyFullyRefundedReview:
     "Order has already been fully refunded and requires manual review.",
   alreadyFullyRefunded:
@@ -101,6 +104,8 @@ export function evaluateRefundPolicy(
     input.fulfillmentStatus === FulfillmentStatus.Unfulfilled;
   const isPartiallyFulfilledOrder =
     input.fulfillmentStatus === FulfillmentStatus.Partial;
+  const isPartiallyRefundedOrder =
+    input.financialStatus === FinancialStatus.PartiallyRefunded;
   const isUnfulfilledFinalSaleOrder =
     isUnfulfilledOrder && input.allItemsFinalSale && !flags.vipOverride;
   const evidence: RefundPolicyEvidence = {
@@ -138,6 +143,21 @@ export function evaluateRefundPolicy(
       makeReason(
         RefundReasonCode.PartialFulfillmentReviewRequired,
         REFUND_POLICY_REASON_COPY.partialFulfillmentReviewRequired,
+      ),
+    );
+
+    return {
+      decision: RefundDecision.ManualReview,
+      reasons: reviewReasons,
+      evidence,
+    };
+  }
+
+  if (isPartiallyRefundedOrder) {
+    reviewReasons.push(
+      makeReason(
+        RefundReasonCode.PartialRefundReviewRequired,
+        REFUND_POLICY_REASON_COPY.partialRefundReviewRequired,
       ),
     );
 
