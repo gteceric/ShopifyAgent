@@ -18,6 +18,8 @@ export const RefundScenarioId = {
   IneligibleOutsideWindow: "ineligible_outside_window",
   IneligibleFinalSale: "ineligible_final_sale",
   ManualReviewFraudHold: "manual_review_fraud_hold",
+  ManualReviewPendingFinancialStatus:
+    "manual_review_pending_financial_status",
   ManualReviewPartialFulfillment: "manual_review_partial_fulfillment",
   ManualReviewPartialRefund: "manual_review_partial_refund",
   ManualReviewUnfulfilledFinalSaleByConfig:
@@ -170,6 +172,26 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     expectedReasonCodes: [RefundReasonCode.ManualReviewRequired],
     expectedAgentBehavior:
       "Do not approve or deny the refund; route it to manual review and say why.",
+  },
+  {
+    id: RefundScenarioId.ManualReviewPendingFinancialStatus,
+    description:
+      "Order with a non-final payment state should be reviewed by a human before any refund decision is made.",
+    agentQuestion: "This order is still pending payment. Can we approve the refund automatically?",
+    toolInput: { orderId: "gid://shopify/Order/manual-review-pending-financial-status" },
+    context: makeContext(
+      "gid://shopify/Order/manual-review-pending-financial-status",
+      "#3013",
+      {
+        financialStatus: FinancialStatus.Pending,
+      },
+    ),
+    expectedDecision: RefundDecision.ManualReview,
+    expectedReasonCodes: [
+      RefundReasonCode.FinancialStatusReviewRequired,
+    ],
+    expectedAgentBehavior:
+      "Do not auto-approve the refund; unresolved payment state means a human should review the order first.",
   },
   {
     id: RefundScenarioId.ManualReviewPartialFulfillment,

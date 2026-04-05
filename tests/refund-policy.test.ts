@@ -93,6 +93,29 @@ test("returns manual_review for partially refunded orders", () => {
   );
 });
 
+[
+  FinancialStatus.Pending,
+  FinancialStatus.PartiallyPaid,
+  FinancialStatus.Voided,
+  FinancialStatus.Unknown,
+].forEach((financialStatus) => {
+  test(`returns manual_review for ${financialStatus} orders`, () => {
+    const result = evaluateRefundPolicy(
+      makeInput({
+        financialStatus,
+      }),
+    );
+
+    assert.equal(result.decision, RefundDecision.ManualReview);
+    assert.ok(
+      result.reasons.some(
+        (reason) =>
+          reason.code === RefundReasonCode.FinancialStatusReviewRequired,
+      ),
+    );
+  });
+});
+
 test("returns ineligible for unfulfilled final-sale orders by default", () => {
   const result = evaluateRefundPolicy(
     makeInput({

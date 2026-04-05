@@ -51,6 +51,12 @@ const REFUND_POLICY_REASON_COPY = {
     "Order has returnable fulfillments available.",
 } as const;
 
+function financialStatusReviewRequiredMessage(
+  financialStatus: FinancialStatus,
+): string {
+  return `Order financial status is ${financialStatus}, so it requires human review before a refund decision is approved.`;
+}
+
 function withinRefundWindowMessage(refundWindowDays: number): string {
   return `Order is within the ${refundWindowDays}-day refund window.`;
 }
@@ -106,6 +112,11 @@ export function evaluateRefundPolicy(
     input.fulfillmentStatus === FulfillmentStatus.Partial;
   const isPartiallyRefundedOrder =
     input.financialStatus === FinancialStatus.PartiallyRefunded;
+  const requiresFinancialStatusReview =
+    input.financialStatus === FinancialStatus.Pending ||
+    input.financialStatus === FinancialStatus.PartiallyPaid ||
+    input.financialStatus === FinancialStatus.Voided ||
+    input.financialStatus === FinancialStatus.Unknown;
   const isUnfulfilledFinalSaleOrder =
     isUnfulfilledOrder && input.allItemsFinalSale && !flags.vipOverride;
   const evidence: RefundPolicyEvidence = {
@@ -128,6 +139,21 @@ export function evaluateRefundPolicy(
       makeReason(
         RefundReasonCode.ManualReviewRequired,
         REFUND_POLICY_REASON_COPY.manualReviewRequired,
+      ),
+    );
+
+    return {
+      decision: RefundDecision.ManualReview,
+      reasons: reviewReasons,
+      evidence,
+    };
+  }
+
+  if (requiresFinancialStatusReview) {
+    reviewReasons.push(
+      makeReason(
+        RefundReasonCode.FinancialStatusReviewRequired,
+        financialStatusReviewRequiredMessage(input.financialStatus),
       ),
     );
 

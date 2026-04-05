@@ -9,6 +9,7 @@ export type RefundDecision =
 
 export const RefundReasonCode = {
   ManualReviewRequired: "manual_review_required",
+  FinancialStatusReviewRequired: "financial_status_review_required",
   PartialFulfillmentReviewRequired: "partial_fulfillment_review_required",
   PartialRefundReviewRequired: "partial_refund_review_required",
   WithinCancelWindow: "within_cancel_window",
