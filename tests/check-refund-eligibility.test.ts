@@ -18,6 +18,7 @@ function makeContext(
     orderName: "#2001",
     orderCreatedAt: "2026-03-01T00:00:00.000Z",
     orderAgeDays: 5,
+    orderTotalAmount: 48,
     financialStatus: FinancialStatus.Paid,
     fulfillmentStatus: FulfillmentStatus.Fulfilled,
     hasReturnableFulfillments: true,

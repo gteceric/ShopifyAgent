@@ -10,6 +10,7 @@ export type RefundDecision =
 export const RefundReasonCode = {
   ManualReviewRequired: "manual_review_required",
   FinancialStatusReviewRequired: "financial_status_review_required",
+  HighValueOrderReviewRequired: "high_value_order_review_required",
   PartialFulfillmentReviewRequired: "partial_fulfillment_review_required",
   PartialRefundReviewRequired: "partial_refund_review_required",
   WithinCancelWindow: "within_cancel_window",
@@ -62,6 +63,7 @@ export type FulfillmentStatus =
 export interface RefundPolicyConfig {
   refundWindowDays: number;
   cancelWindowDays?: number;
+  highValueOrderThreshold?: number;
   finalSaleUnfulfilledDecision?:
     | typeof RefundDecision.Eligible
     | typeof RefundDecision.Ineligible
@@ -86,6 +88,7 @@ export interface RefundPolicyInput {
   orderName: string;
   orderCreatedAt: string;
   orderAgeDays: number;
+  orderTotalAmount: number;
   financialStatus: FinancialStatus;
   fulfillmentStatus: FulfillmentStatus;
   hasReturnableFulfillments: boolean;
@@ -98,6 +101,8 @@ export interface RefundPolicyEvidence {
   orderAgeDays: number;
   refundWindowDays: number;
   cancelWindowDays: number;
+  orderTotalAmount: number;
+  highValueOrderThreshold?: number;
   financialStatus: FinancialStatus;
   fulfillmentStatus: FulfillmentStatus;
   hasReturnableFulfillments: boolean;

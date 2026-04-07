@@ -29,6 +29,7 @@ function makeContext(): RefundAgentResponseContext {
         orderAgeDays: 7,
         refundWindowDays: 30,
         cancelWindowDays: 30,
+        orderTotalAmount: 48,
         financialStatus: "paid",
         fulfillmentStatus: "fulfilled",
         hasReturnableFulfillments: true,

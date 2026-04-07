@@ -18,6 +18,8 @@ export const RefundScenarioId = {
   IneligibleOutsideWindow: "ineligible_outside_window",
   IneligibleFinalSale: "ineligible_final_sale",
   ManualReviewFraudHold: "manual_review_fraud_hold",
+  ManualReviewHighValueOrderByConfig:
+    "manual_review_high_value_order_by_config",
   ManualReviewPendingFinancialStatus:
     "manual_review_pending_financial_status",
   ManualReviewPartialFulfillment: "manual_review_partial_fulfillment",
@@ -56,6 +58,7 @@ function makeContext(
     orderName,
     orderCreatedAt: "2026-03-01T00:00:00.000Z",
     orderAgeDays: 7,
+    orderTotalAmount: 48,
     financialStatus: FinancialStatus.Paid,
     fulfillmentStatus: FulfillmentStatus.Fulfilled,
     hasReturnableFulfillments: true,
@@ -172,6 +175,32 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     expectedReasonCodes: [RefundReasonCode.ManualReviewRequired],
     expectedAgentBehavior:
       "Do not approve or deny the refund; route it to manual review and say why.",
+  },
+  {
+    id: RefundScenarioId.ManualReviewHighValueOrderByConfig,
+    description:
+      "High-value order should be reviewed by a human when merchant policy sets a threshold.",
+    agentQuestion: "This order is expensive. Can we approve the refund automatically?",
+    toolInput: { orderId: "gid://shopify/Order/manual-review-high-value-order" },
+    context: makeContext(
+      "gid://shopify/Order/manual-review-high-value-order",
+      "#3014",
+      {
+        orderTotalAmount: 750,
+      },
+    ),
+    config: {
+      refundWindowDays: 30,
+      cancelWindowDays: 30,
+      highValueOrderThreshold: 500,
+      alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+    },
+    expectedDecision: RefundDecision.ManualReview,
+    expectedReasonCodes: [
+      RefundReasonCode.HighValueOrderReviewRequired,
+    ],
+    expectedAgentBehavior:
+      "Do not auto-approve the refund; expensive orders should be reviewed by a human first.",
   },
   {
     id: RefundScenarioId.ManualReviewPendingFinancialStatus,

@@ -48,6 +48,11 @@ test("maps live Shopify Admin responses into RefundPolicyInput", async () => {
           id: "gid://shopify/Order/live-1",
           name: "#3001",
           createdAt: "2026-03-20T00:00:00.000Z",
+          totalPriceSet: {
+            shopMoney: {
+              amount: "149.50",
+            },
+          },
           displayFinancialStatus: "PAID",
           displayFulfillmentStatus: "FULFILLED",
           lineItems: {
@@ -110,6 +115,7 @@ test("maps live Shopify Admin responses into RefundPolicyInput", async () => {
   assert.equal(result.orderId, "gid://shopify/Order/live-1");
   assert.equal(result.orderName, "#3001");
   assert.equal(result.orderAgeDays, 10);
+  assert.equal(result.orderTotalAmount, 149.5);
   assert.equal(result.financialStatus, FinancialStatus.Paid);
   assert.equal(result.fulfillmentStatus, FulfillmentStatus.Fulfilled);
   assert.equal(result.hasReturnableFulfillments, true);
@@ -139,6 +145,11 @@ test("maps admin helper fields for final sale, statuses, and flags safely", () =
       id: "gid://shopify/Order/live-2",
       name: "#3002",
       createdAt: "2026-03-01T00:00:00.000Z",
+      totalPriceSet: {
+        shopMoney: {
+          amount: "320.00",
+        },
+      },
       displayFinancialStatus: "REFUNDED",
       displayFulfillmentStatus: "PARTIALLY_FULFILLED",
       lineItems: {
@@ -163,6 +174,7 @@ test("maps admin helper fields for final sale, statuses, and flags safely", () =
   );
 
   assert.equal(result.financialStatus, FinancialStatus.Refunded);
+  assert.equal(result.orderTotalAmount, 320);
   assert.equal(result.fulfillmentStatus, FulfillmentStatus.Partial);
   assert.equal(result.alreadyFullyRefunded, true);
   assert.equal(result.hasReturnableFulfillments, false);

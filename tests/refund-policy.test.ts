@@ -18,6 +18,7 @@ function makeInput(
     orderName: "#1001",
     orderCreatedAt: "2026-03-01T00:00:00.000Z",
     orderAgeDays: 10,
+    orderTotalAmount: 48,
     financialStatus: FinancialStatus.Paid,
     fulfillmentStatus: FulfillmentStatus.Fulfilled,
     hasReturnableFulfillments: true,
@@ -89,6 +90,27 @@ test("returns manual_review for partially refunded orders", () => {
   assert.ok(
     result.reasons.some(
       (reason) => reason.code === RefundReasonCode.PartialRefundReviewRequired,
+    ),
+  );
+});
+
+test("returns manual_review for high-value orders when merchant policy configures a threshold", () => {
+  const result = evaluateRefundPolicy(
+    makeInput({
+      orderTotalAmount: 750,
+    }),
+    {
+      refundWindowDays: 30,
+      cancelWindowDays: 30,
+      highValueOrderThreshold: 500,
+      alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+    },
+  );
+
+  assert.equal(result.decision, RefundDecision.ManualReview);
+  assert.ok(
+    result.reasons.some(
+      (reason) => reason.code === RefundReasonCode.HighValueOrderReviewRequired,
     ),
   );
 });

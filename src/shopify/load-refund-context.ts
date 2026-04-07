@@ -1,4 +1,7 @@
-import { FinancialStatus, FulfillmentStatus } from "../policy/refund-policy.types.js";
+import {
+  FinancialStatus,
+  FulfillmentStatus,
+} from "../policy/refund-policy.types.js";
 import type { RefundPolicyInput } from "../policy/refund-policy.types.js";
 import { MOCK_SHOPIFY_ORDERS } from "./mock-shopify-orders.js";
 import type { ShopifyOrderRecord } from "./mock-shopify-orders.js";
@@ -19,9 +22,7 @@ export interface LoadRefundContextDeps {
   now?: Date;
 }
 
-function shouldUseRealShopify(
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
+function shouldUseRealShopify(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.USE_REAL_SHOPIFY === "true";
 }
 
@@ -43,6 +44,11 @@ interface ShopifyRefundOrderContextResponse {
     id: string;
     name: string;
     createdAt: string;
+    totalPriceSet?: {
+      shopMoney?: {
+        amount?: string | null;
+      } | null;
+    } | null;
     displayFinancialStatus?: string | null;
     displayFulfillmentStatus?: string | null;
     lineItems: {
@@ -143,6 +149,7 @@ function mapShopifyOrderToRefundPolicyInput(
     orderName: order.name,
     orderCreatedAt: order.createdAt,
     orderAgeDays: daysBetween(order.createdAt, now),
+    orderTotalAmount: order.totalAmount,
     financialStatus: order.displayFinancialStatus ?? FinancialStatus.Unknown,
     fulfillmentStatus:
       order.displayFulfillmentStatus ?? FulfillmentStatus.Unknown,
@@ -159,6 +166,7 @@ function mapShopifyOrderToRefundPolicyInput(
   };
 }
 
+// map shopify admin order response to RefundPolicyInput, including checking for returnable fulfillments
 function mapAdminOrderToRefundPolicyInput(
   order: NonNullable<ShopifyRefundOrderContextResponse["order"]>,
   returnable: ShopifyReturnableFulfillmentsResponse,
@@ -171,6 +179,7 @@ function mapAdminOrderToRefundPolicyInput(
     orderName: order.name,
     orderCreatedAt: order.createdAt,
     orderAgeDays: daysBetween(order.createdAt, now),
+    orderTotalAmount: Number(order.totalPriceSet?.shopMoney?.amount ?? "0"),
     financialStatus,
     fulfillmentStatus: mapFulfillmentStatus(order.displayFulfillmentStatus),
     hasReturnableFulfillments: returnable.returnableFulfillments.nodes.some(
@@ -195,14 +204,15 @@ async function loadRefundContextFromShopify(
   input: LoadRefundContextInput,
   deps: LoadRefundContextDeps,
 ): Promise<RefundPolicyInput> {
-  const orderResponse = await shopifyAdminFetch<ShopifyRefundOrderContextResponse>(
-    REFUND_ORDER_CONTEXT_QUERY,
-    { id: input.orderId },
-    {
-      env: deps.env,
-      fetchImpl: deps.fetchImpl,
-    },
-  );
+  const orderResponse =
+    await shopifyAdminFetch<ShopifyRefundOrderContextResponse>(
+      REFUND_ORDER_CONTEXT_QUERY,
+      { id: input.orderId },
+      {
+        env: deps.env,
+        fetchImpl: deps.fetchImpl,
+      },
+    );
 
   if (!orderResponse.order) {
     throw new Error(`No Shopify order exists for ${input.orderId}.`);

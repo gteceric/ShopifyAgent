@@ -16,6 +16,7 @@ import type {
 const DEFAULT_POLICY: Required<RefundPolicyConfig> = {
   refundWindowDays: 30,
   cancelWindowDays: 30,
+  highValueOrderThreshold: Number.POSITIVE_INFINITY,
   finalSaleUnfulfilledDecision: RefundDecision.Ineligible,
   unfulfilledOutsideWindowDecision: RefundDecision.ManualReview,
   alreadyFullyRefundedDecision: RefundDecision.Ineligible,
@@ -27,10 +28,11 @@ const REFUND_POLICY_REASON_COPY = {
     "Order is partially fulfilled, so it requires human review before a refund decision is approved.",
   partialRefundReviewRequired:
     "Order has already been partially refunded, so it requires human review before any additional refund is approved.",
+  highValueOrderReviewRequired:
+    "Order total meets the merchant's high-value review threshold, so it requires human review before a refund decision is approved.",
   alreadyFullyRefundedReview:
     "Order has already been fully refunded and requires manual review.",
-  alreadyFullyRefunded:
-    "Order has already been fully refunded.",
+  alreadyFullyRefunded: "Order has already been fully refunded.",
   finalSaleUnavailableForRefund:
     "All items on the order are marked final sale.",
   finalSaleUnfulfilledAllowed:
@@ -57,6 +59,13 @@ function financialStatusReviewRequiredMessage(
   return `Order financial status is ${financialStatus}, so it requires human review before a refund decision is approved.`;
 }
 
+function highValueOrderReviewRequiredMessage(
+  orderTotalAmount: number,
+  highValueOrderThreshold: number,
+): string {
+  return `Order total is ${orderTotalAmount.toFixed(2)}, which meets or exceeds the ${highValueOrderThreshold.toFixed(2)} high-value review threshold.`;
+}
+
 function withinRefundWindowMessage(refundWindowDays: number): string {
   return `Order is within the ${refundWindowDays}-day refund window.`;
 }
@@ -73,7 +82,9 @@ function outsideCancelWindowMessage(cancelWindowDays: number): string {
   return `Order is outside the ${cancelWindowDays}-day cancellation window.`;
 }
 
-function vipOverrideOutsideRefundWindowMessage(refundWindowDays: number): string {
+function vipOverrideOutsideRefundWindowMessage(
+  refundWindowDays: number,
+): string {
   return `VIP override allows a refund outside the ${refundWindowDays}-day refund window.`;
 }
 
@@ -112,6 +123,12 @@ export function evaluateRefundPolicy(
     input.fulfillmentStatus === FulfillmentStatus.Partial;
   const isPartiallyRefundedOrder =
     input.financialStatus === FinancialStatus.PartiallyRefunded;
+  const isHighValueOrderThresholdFinite = Number.isFinite(
+    effectiveConfig.highValueOrderThreshold,
+  );
+  const requiresHighValueReview =
+    isHighValueOrderThresholdFinite &&
+    input.orderTotalAmount >= effectiveConfig.highValueOrderThreshold;
   const requiresFinancialStatusReview =
     input.financialStatus === FinancialStatus.Pending ||
     input.financialStatus === FinancialStatus.PartiallyPaid ||
@@ -123,6 +140,10 @@ export function evaluateRefundPolicy(
     orderAgeDays: input.orderAgeDays,
     refundWindowDays: effectiveConfig.refundWindowDays,
     cancelWindowDays: effectiveConfig.cancelWindowDays,
+    orderTotalAmount: input.orderTotalAmount,
+    highValueOrderThreshold: isHighValueOrderThresholdFinite
+      ? effectiveConfig.highValueOrderThreshold
+      : undefined,
     financialStatus: input.financialStatus,
     fulfillmentStatus: input.fulfillmentStatus,
     hasReturnableFulfillments: input.hasReturnableFulfillments,
@@ -139,6 +160,24 @@ export function evaluateRefundPolicy(
       makeReason(
         RefundReasonCode.ManualReviewRequired,
         REFUND_POLICY_REASON_COPY.manualReviewRequired,
+      ),
+    );
+
+    return {
+      decision: RefundDecision.ManualReview,
+      reasons: reviewReasons,
+      evidence,
+    };
+  }
+
+  if (requiresHighValueReview) {
+    reviewReasons.push(
+      makeReason(
+        RefundReasonCode.HighValueOrderReviewRequired,
+        highValueOrderReviewRequiredMessage(
+          input.orderTotalAmount,
+          effectiveConfig.highValueOrderThreshold,
+        ),
       ),
     );
 
@@ -377,25 +416,25 @@ export function evaluateRefundPolicy(
         ? overrideReasons.slice(0, 1)
         : isUnfulfilledOrder
           ? [
-            makeReason(
-              RefundReasonCode.WithinCancelWindow,
-              withinCancelWindowMessage(effectiveConfig.cancelWindowDays),
-            ),
-            makeReason(
-              RefundReasonCode.CancelableBeforeFulfillment,
-              REFUND_POLICY_REASON_COPY.cancelableBeforeFulfillment,
-            ),
-          ]
-        : [
-            makeReason(
-              RefundReasonCode.WithinRefundWindow,
-              withinRefundWindowMessage(effectiveConfig.refundWindowDays),
-            ),
-            makeReason(
-              RefundReasonCode.ReturnableFulfillmentsAvailable,
-              REFUND_POLICY_REASON_COPY.returnableFulfillmentsAvailable,
-            ),
-          ],
+              makeReason(
+                RefundReasonCode.WithinCancelWindow,
+                withinCancelWindowMessage(effectiveConfig.cancelWindowDays),
+              ),
+              makeReason(
+                RefundReasonCode.CancelableBeforeFulfillment,
+                REFUND_POLICY_REASON_COPY.cancelableBeforeFulfillment,
+              ),
+            ]
+          : [
+              makeReason(
+                RefundReasonCode.WithinRefundWindow,
+                withinRefundWindowMessage(effectiveConfig.refundWindowDays),
+              ),
+              makeReason(
+                RefundReasonCode.ReturnableFulfillmentsAvailable,
+                REFUND_POLICY_REASON_COPY.returnableFulfillmentsAvailable,
+              ),
+            ],
     evidence,
   };
 }

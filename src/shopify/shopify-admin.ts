@@ -6,6 +6,11 @@ export const REFUND_ORDER_CONTEXT_QUERY = /* GraphQL */ `
       id
       name
       createdAt
+      totalPriceSet {
+        shopMoney {
+          amount
+        }
+      }
       displayFinancialStatus
       displayFulfillmentStatus
       lineItems(first: 100) {

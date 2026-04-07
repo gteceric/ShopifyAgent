@@ -18,6 +18,7 @@ export interface ShopifyOrderRecord {
   id: string;
   name: string;
   createdAt: string;
+  totalAmount: number;
   displayFinancialStatus?: FinancialStatus;
   displayFulfillmentStatus?: FulfillmentStatus;
   returnableFulfillmentsCount: number;
@@ -31,6 +32,7 @@ export const MOCK_SHOPIFY_ORDERS: Record<string, ShopifyOrderRecord> = {
     id: "gid://shopify/Order/demo",
     name: "#1001",
     createdAt: "2026-03-10T00:00:00.000Z",
+    totalAmount: 48,
     displayFinancialStatus: FinancialStatus.Paid,
     displayFulfillmentStatus: FulfillmentStatus.Fulfilled,
     returnableFulfillmentsCount: 1,
@@ -41,6 +43,7 @@ export const MOCK_SHOPIFY_ORDERS: Record<string, ShopifyOrderRecord> = {
     id: "gid://shopify/Order/refunded",
     name: "#1002",
     createdAt: "2026-02-28T00:00:00.000Z",
+    totalAmount: 24,
     displayFinancialStatus: FinancialStatus.Refunded,
     displayFulfillmentStatus: FulfillmentStatus.Fulfilled,
     returnableFulfillmentsCount: 0,

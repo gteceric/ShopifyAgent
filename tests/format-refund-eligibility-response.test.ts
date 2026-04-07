@@ -91,7 +91,10 @@ test("formats an eligible unfulfilled final-sale result as a cancellation respon
       "i",
     ),
   );
-  assert.match(response, /merchant policy allows cancellation before shipment/i);
+  assert.match(
+    response,
+    /merchant policy allows cancellation before shipment/i,
+  );
   assert.match(
     response,
     new RegExp(
@@ -139,6 +142,29 @@ test("formats a partially fulfilled order as a manual-review response", async ()
     ),
   );
   assert.match(response, /partially fulfilled/i);
+  assert.match(
+    response,
+    new RegExp(escapeRegExp(REFUND_RESPONSE_COPY.followupReviewStandard), "i"),
+  );
+});
+
+test("formats a high-value order as a manual-review response", async () => {
+  const response = await getFormattedResponse(
+    RefundScenarioId.ManualReviewHighValueOrderByConfig,
+  );
+
+  assert.match(response, /^Not automatically\./);
+  assert.match(
+    response,
+    new RegExp(
+      escapeRegExp(REFUND_RESPONSE_COPY.manualReviewHighValueOrder),
+      "i",
+    ),
+  );
+  assert.match(
+    response,
+    /meets or exceeds the 500\.00 high-value review threshold/i,
+  );
   assert.match(
     response,
     new RegExp(escapeRegExp(REFUND_RESPONSE_COPY.followupReviewStandard), "i"),
@@ -194,9 +220,7 @@ test("formats a stale unfulfilled order as a manual-review cancellation response
   assert.match(
     response,
     new RegExp(
-      escapeRegExp(
-        REFUND_RESPONSE_COPY.manualReviewPreFulfillmentCancellation,
-      ),
+      escapeRegExp(REFUND_RESPONSE_COPY.manualReviewPreFulfillmentCancellation),
       "i",
     ),
   );
@@ -225,7 +249,10 @@ test("formats an unfulfilled final-sale manual-review result with specific wordi
       "i",
     ),
   );
-  assert.match(response, /requires human review before a cancellation refund is approved/i);
+  assert.match(
+    response,
+    /requires human review before a cancellation refund is approved/i,
+  );
   assert.match(
     response,
     new RegExp(
