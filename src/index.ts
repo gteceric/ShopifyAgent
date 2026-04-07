@@ -1,5 +1,4 @@
-import { DEFAULT_POLICY } from "./policy/refund-policy.js";
-import type { RefundPolicyConfig } from "./policy/refund-policy.types.js";
+import { selectPolicyConfig } from "./policy/select-policy-config.js";
 import { createOllamaRefundResponder } from "./tools/generate-refund-response-with-ollama.js";
 import { createOpenAIRefundResponder } from "./tools/generate-refund-response-with-openai.js";
 import { getRefundResponse } from "./tools/get-refund-response.js";
@@ -40,10 +39,6 @@ function selectOrderId(): string {
   }
 
   return process.env.REFUND_DEMO_ORDER_ID?.trim() || DEFAULT_DEMO_ORDER_ID;
-}
-
-function selectPolicyConfig(): RefundPolicyConfig {
-  return DEFAULT_POLICY;
 }
 
 async function main(): Promise<void> {
