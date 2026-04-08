@@ -12,6 +12,7 @@
     "cleanbuild": "npm run clean && tsc -p tsconfig.json",
     "check": "npm run build",
     "dev": "node --env-file=.env --enable-source-maps build/src/index.js",
+    "mcp": "npm run build && node --env-file=.env --enable-source-maps build/src/mcp/run-stdio-server.js",
     "scenario-matrix": "npm run build && node --env-file=.env build/src/tools/run-refund-scenario-matrix.js",
     "test": "npm run build && node --test build/tests/**/*.test.js"
   },
