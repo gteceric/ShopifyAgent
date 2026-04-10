@@ -192,7 +192,7 @@ export function createMcpServer(tools: McpTool[]): McpServer {
   return new McpServer(new McpToolRegistry(tools));
 }
 
-export function createRefundMcpServer(
+export function createShopifyAgentMcpServer(
   deps: CheckRefundEligibilityDeps = {},
 ): McpServer {
   return createMcpServer([createCheckRefundEligibilityTool(deps)]);

@@ -6,7 +6,7 @@ import {
   RefundReasonCode,
 } from "../src/policy/refund-policy.types.js";
 import {
-  createRefundMcpServer,
+  createShopifyAgentMcpServer,
   MCP_PROTOCOL_VERSION,
 } from "../src/mcp/server.js";
 import type { RefundPolicyInput } from "../src/policy/refund-policy.types.js";
@@ -33,7 +33,7 @@ function makeContext(
 }
 
 test("initialize advertises tool capabilities", async () => {
-  const server = createRefundMcpServer();
+  const server = createShopifyAgentMcpServer();
   const message: InitializeRequest = {
     jsonrpc: "2.0",
     id: 1,
@@ -68,7 +68,7 @@ test("initialize advertises tool capabilities", async () => {
 });
 
 test("tools/list returns the refund eligibility tool definition", async () => {
-  const server = createRefundMcpServer();
+  const server = createShopifyAgentMcpServer();
   const message: JsonRpcRequest = {
     jsonrpc: "2.0",
     id: 2,
@@ -90,7 +90,7 @@ test("tools/list returns the refund eligibility tool definition", async () => {
 });
 
 test("tools/call returns structured refund eligibility output", async () => {
-  const server = createRefundMcpServer({
+  const server = createShopifyAgentMcpServer({
     config: {
       refundWindowDays: 30,
       cancelWindowDays: 30,
@@ -142,7 +142,7 @@ test("tools/call returns structured refund eligibility output", async () => {
 });
 
 test("tools/call returns invalid params for malformed input", async () => {
-  const server = createRefundMcpServer();
+  const server = createShopifyAgentMcpServer();
   const response = await server.handleMessage({
     jsonrpc: "2.0",
     id: 4,
@@ -164,7 +164,7 @@ test("tools/call returns invalid params for malformed input", async () => {
 });
 
 test("tools/call returns a tool error result when evaluation fails", async () => {
-  const server = createRefundMcpServer({
+  const server = createShopifyAgentMcpServer({
     loadContext: async () => {
       throw new Error("Shopify lookup failed");
     },

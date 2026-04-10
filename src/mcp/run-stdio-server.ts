@@ -1,9 +1,9 @@
 import readline from "node:readline";
 
-import { createRefundMcpServer } from "./server.js";
+import { createShopifyAgentMcpServer } from "./server.js";
 import { JsonRpcRequestSchema } from "./schemas.js";
 
-const server = createRefundMcpServer();
+const server = createShopifyAgentMcpServer();
 
 async function main(): Promise<void> {
   const rl = readline.createInterface({
