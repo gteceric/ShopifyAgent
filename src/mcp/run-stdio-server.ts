@@ -1,6 +1,7 @@
 import readline from "node:readline";
 
 import { createRefundMcpServer } from "./server.js";
+import { JsonRpcRequestSchema } from "./schemas.js";
 
 const server = createRefundMcpServer();
 
@@ -34,7 +35,23 @@ async function main(): Promise<void> {
       continue;
     }
 
-    const response = await server.handleMessage(parsed);
+    const parsedMessage = JsonRpcRequestSchema.safeParse(parsed);
+
+    if (!parsedMessage.success) {
+      process.stdout.write(
+        `${JSON.stringify({
+          jsonrpc: "2.0",
+          error: {
+            code: -32600,
+            message: "Invalid JSON-RPC message.",
+            data: parsedMessage.error.flatten(),
+          },
+        })}\n`,
+      );
+      continue;
+    }
+
+    const response = await server.handleMessage(parsedMessage.data);
 
     if (response) {
       process.stdout.write(`${JSON.stringify(response)}\n`);

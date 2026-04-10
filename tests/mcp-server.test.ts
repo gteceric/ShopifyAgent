@@ -1,9 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { RefundDecision, RefundReasonCode } from "../src/policy/refund-policy.types.js";
-import { createRefundMcpServer, MCP_PROTOCOL_VERSION } from "../src/mcp/server.js";
+import {
+  RefundDecision,
+  RefundReasonCode,
+} from "../src/policy/refund-policy.types.js";
+import {
+  createRefundMcpServer,
+  MCP_PROTOCOL_VERSION,
+} from "../src/mcp/server.js";
 import type { RefundPolicyInput } from "../src/policy/refund-policy.types.js";
+import { JsonRpcRequest } from "../src/mcp/json-rpc.js";
+import { InitializeRequest } from "../src/mcp/schemas.js";
 
 function makeContext(
   overrides: Partial<RefundPolicyInput> = {},
@@ -26,7 +34,7 @@ function makeContext(
 
 test("initialize advertises tool capabilities", async () => {
   const server = createRefundMcpServer();
-  const response = await server.handleMessage({
+  const message: InitializeRequest = {
     jsonrpc: "2.0",
     id: 1,
     method: "initialize",
@@ -38,7 +46,8 @@ test("initialize advertises tool capabilities", async () => {
         version: "1.0.0",
       },
     },
-  });
+  };
+  const response = await server.handleMessage(message);
 
   assert.ok(response);
   assert.equal("result" in response, true);
@@ -48,17 +57,24 @@ test("initialize advertises tool capabilities", async () => {
     return;
   }
 
-  assert.equal(response.result.protocolVersion, MCP_PROTOCOL_VERSION);
-  assert.deepEqual(response.result.capabilities, { tools: {} });
+  const result = response.result as Record<string, unknown>;
+  assert.deepEqual(result.serverInfo, {
+    name: "shopify-agent-refund-policy",
+    version: "0.1.0",
+  });
+
+  assert.equal(result.protocolVersion, MCP_PROTOCOL_VERSION);
+  assert.deepEqual(result.capabilities, { tools: {} });
 });
 
 test("tools/list returns the refund eligibility tool definition", async () => {
   const server = createRefundMcpServer();
-  const response = await server.handleMessage({
+  const message: JsonRpcRequest = {
     jsonrpc: "2.0",
     id: 2,
     method: "tools/list",
-  });
+  };
+  const response = await server.handleMessage(message);
 
   assert.ok(response);
   assert.equal("result" in response, true);
@@ -109,8 +125,10 @@ test("tools/call returns structured refund eligibility output", async () => {
 
   assert.equal(response.result.isError, false);
 
-  const structuredContent = response.result
-    .structuredContent as Record<string, unknown>;
+  const structuredContent = response.result.structuredContent as Record<
+    string,
+    unknown
+  >;
 
   assert.equal(structuredContent.orderId, "gid://shopify/Order/high-value");
   assert.equal(structuredContent.decision, RefundDecision.ManualReview);
@@ -118,8 +136,7 @@ test("tools/call returns structured refund eligibility output", async () => {
   const reasons = structuredContent.reasons as Array<Record<string, unknown>>;
   assert.ok(
     reasons.some(
-      (reason) =>
-        reason.code === RefundReasonCode.HighValueOrderReviewRequired,
+      (reason) => reason.code === RefundReasonCode.HighValueOrderReviewRequired,
     ),
   );
 });

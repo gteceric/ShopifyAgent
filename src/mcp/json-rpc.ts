@@ -1,28 +1,18 @@
-export type JsonRpcId = string | number;
+import type {
+  JsonRpcErrorResponse,
+  JsonRpcId,
+  JsonRpcRequest,
+} from "./schemas.js";
 
-export interface JsonRpcRequest {
-  jsonrpc: "2.0";
-  id?: JsonRpcId;
-  method: string;
-  params?: unknown;
-}
+export type { JsonRpcErrorResponse, JsonRpcId, JsonRpcRequest };
 
+// generic type, not able to move to schemas.ts without circular dependency
 export interface JsonRpcSuccessResponse<
   T extends object = Record<string, unknown>,
 > {
   jsonrpc: "2.0";
   id: JsonRpcId;
   result: T;
-}
-
-export interface JsonRpcErrorResponse {
-  jsonrpc: "2.0";
-  id?: JsonRpcId;
-  error: {
-    code: number;
-    message: string;
-    data?: unknown;
-  };
 }
 
 export type JsonRpcResponse<T extends object = Record<string, unknown>> =

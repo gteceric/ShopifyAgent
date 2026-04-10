@@ -10,7 +10,9 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "types": ["node"] // tells TypeScript to load the Node.js type definitions.
+    "types": ["node"], // tells TypeScript to load the Node.js type definitions.
+    "sourceMap": true,
+    "inlineSources": true
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"],
   "exclude": ["build", "node_modules"]

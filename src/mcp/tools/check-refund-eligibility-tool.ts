@@ -1,0 +1,164 @@
+import { z } from "zod";
+
+import {
+  FinancialStatus,
+  FulfillmentStatus,
+  RefundDecision,
+  RefundReasonCode,
+} from "../../policy/refund-policy.types.js";
+import { checkRefundEligibility } from "../../tools/check-refund-eligibility.js";
+import type {
+  CheckRefundEligibilityDeps,
+  CheckRefundEligibilityInput,
+  CheckRefundEligibilityResult,
+} from "../../tools/check-refund-eligibility.js";
+import { makeMcpToolErrorResult, makeMcpToolResult } from "../tool-results.js";
+import type { McpTool } from "../tool-types.js";
+
+export const CHECK_REFUND_ELIGIBILITY_TOOL_NAME = "check_refund_eligibility";
+
+export const CheckRefundEligibilityArgsSchema = z.object({
+  orderId: z.string(),
+});
+
+const CHECK_REFUND_ELIGIBILITY_TOOL = {
+  name: CHECK_REFUND_ELIGIBILITY_TOOL_NAME,
+  title: "Check Refund Eligibility",
+  description:
+    "Load Shopify order context and evaluate the merchant's refund policy for a single order.",
+  inputSchema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      orderId: {
+        type: "string",
+        description: "The Shopify order GID to evaluate.",
+      },
+    },
+    required: ["orderId"],
+  },
+  outputSchema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      orderId: {
+        type: "string",
+      },
+      decision: {
+        type: "string",
+        enum: Object.values(RefundDecision),
+      },
+      reasons: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            code: {
+              type: "string",
+              enum: Object.values(RefundReasonCode),
+            },
+            message: {
+              type: "string",
+            },
+          },
+          required: ["code", "message"],
+        },
+      },
+      evidence: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          orderAgeDays: {
+            type: "number",
+          },
+          refundWindowDays: {
+            type: "number",
+          },
+          cancelWindowDays: {
+            type: "number",
+          },
+          orderTotalAmount: {
+            type: "number",
+          },
+          highValueOrderThreshold: {
+            type: "number",
+          },
+          financialStatus: {
+            type: "string",
+            enum: Object.values(FinancialStatus),
+          },
+          fulfillmentStatus: {
+            type: "string",
+            enum: Object.values(FulfillmentStatus),
+          },
+          hasReturnableFulfillments: {
+            type: "boolean",
+          },
+          alreadyFullyRefunded: {
+            type: "boolean",
+          },
+          allItemsFinalSale: {
+            type: "boolean",
+          },
+          flags: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              fraudHold: {
+                type: "boolean",
+              },
+              manualReview: {
+                type: "boolean",
+              },
+              vipOverride: {
+                type: "boolean",
+              },
+            },
+            required: ["fraudHold", "manualReview", "vipOverride"],
+          },
+        },
+        required: [
+          "orderAgeDays",
+          "refundWindowDays",
+          "cancelWindowDays",
+          "orderTotalAmount",
+          "financialStatus",
+          "fulfillmentStatus",
+          "hasReturnableFulfillments",
+          "alreadyFullyRefunded",
+          "allItemsFinalSale",
+          "flags",
+        ],
+      },
+    },
+    required: ["orderId", "decision", "reasons", "evidence"],
+  },
+  annotations: {
+    readOnlyHint: true,
+    idempotentHint: true,
+    openWorldHint: true,
+  },
+} as const;
+
+export function createCheckRefundEligibilityTool(
+  deps: CheckRefundEligibilityDeps = {},
+): McpTool<CheckRefundEligibilityInput, CheckRefundEligibilityResult> {
+  return {
+    name: CHECK_REFUND_ELIGIBILITY_TOOL_NAME,
+    definition: CHECK_REFUND_ELIGIBILITY_TOOL,
+    invalidArgsMessage: "check_refund_eligibility requires an orderId string.",
+    argsSchema: CheckRefundEligibilityArgsSchema,
+    async execute(args) {
+      try {
+        const result = await checkRefundEligibility(args, deps);
+        return makeMcpToolResult(result);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Refund eligibility check failed.";
+
+        return makeMcpToolErrorResult(message);
+      }
+    },
+  };
+}
