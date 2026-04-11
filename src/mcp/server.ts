@@ -1,4 +1,4 @@
-import type { ZodType } from "zod";
+import { z, type ZodType } from "zod";
 
 import type { CheckRefundEligibilityDeps } from "../tools/check-refund-eligibility.js";
 import {
@@ -170,7 +170,7 @@ export class McpServer {
         -32602,
         tool.invalidArgsMessage,
         request.id,
-        parsedArgs.error.flatten(),
+        z.flattenError(parsedArgs.error),
       );
     }
 

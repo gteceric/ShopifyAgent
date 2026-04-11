@@ -1,4 +1,5 @@
 import readline from "node:readline";
+import { z } from "zod";
 
 import { createShopifyAgentMcpServer } from "./server.js";
 import { JsonRpcRequestSchema } from "./schemas.js";
@@ -44,7 +45,7 @@ async function main(): Promise<void> {
           error: {
             code: -32600,
             message: "Invalid JSON-RPC message.",
-            data: parsedMessage.error.flatten(),
+            data: z.flattenError(parsedMessage.error),
           },
         })}\n`,
       );
