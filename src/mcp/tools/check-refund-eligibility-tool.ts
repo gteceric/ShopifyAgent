@@ -17,9 +17,13 @@ import { makeMcpToolErrorResult, makeMcpToolResult } from "../tool-results.js";
 import type { McpTool } from "../tool-types.js";
 
 export const CHECK_REFUND_ELIGIBILITY_TOOL_NAME = "check_refund_eligibility";
+const SHOPIFY_ORDER_GID_PATTERN = /^gid:\/\/shopify\/Order\/\d+$/;
 
 export const CheckRefundEligibilityArgsSchema = z.object({
-  orderId: z.string(),
+  orderId: z.string().regex(
+    SHOPIFY_ORDER_GID_PATTERN,
+    "orderId must be a Shopify order GID like gid://shopify/Order/123.",
+  ),
 });
 
 const CHECK_REFUND_ELIGIBILITY_TOOL = {
@@ -33,7 +37,7 @@ const CHECK_REFUND_ELIGIBILITY_TOOL = {
     properties: {
       orderId: {
         type: "string",
-        description: "The Shopify order GID to evaluate.",
+        description: "The Shopify order GID to evaluate, for example gid://shopify/Order/123.",
       },
     },
     required: ["orderId"],
@@ -171,7 +175,8 @@ export function createCheckRefundEligibilityTool(
   return {
     name: CHECK_REFUND_ELIGIBILITY_TOOL_NAME,
     definition: CHECK_REFUND_ELIGIBILITY_TOOL,
-    invalidArgsMessage: "check_refund_eligibility requires an orderId string.",
+    invalidArgsMessage:
+      "check_refund_eligibility requires a Shopify order GID like gid://shopify/Order/123.",
     argsSchema: CheckRefundEligibilityArgsSchema,
     async execute(args) {
       try {

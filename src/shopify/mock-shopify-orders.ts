@@ -28,8 +28,8 @@ export interface ShopifyOrderRecord {
 }
 
 export const MOCK_SHOPIFY_ORDERS: Record<string, ShopifyOrderRecord> = {
-  "gid://shopify/Order/demo": {
-    id: "gid://shopify/Order/demo",
+  "gid://shopify/Order/1001": {
+    id: "gid://shopify/Order/1001",
     name: "#1001",
     createdAt: "2026-03-10T00:00:00.000Z",
     totalAmount: 48,
@@ -39,8 +39,8 @@ export const MOCK_SHOPIFY_ORDERS: Record<string, ShopifyOrderRecord> = {
     isFullyRefunded: false,
     lineItems: [{ sku: "DEMO-TEE", finalSale: false }],
   },
-  "gid://shopify/Order/refunded": {
-    id: "gid://shopify/Order/refunded",
+  "gid://shopify/Order/1002": {
+    id: "gid://shopify/Order/1002",
     name: "#1002",
     createdAt: "2026-02-28T00:00:00.000Z",
     totalAmount: 24,

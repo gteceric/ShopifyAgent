@@ -74,8 +74,8 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     id: RefundScenarioId.EligibleStandard,
     description: "Straightforward refundable order inside the refund window.",
     agentQuestion: "Can I refund order #3001?",
-    toolInput: { orderId: "gid://shopify/Order/eligible-standard" },
-    context: makeContext("gid://shopify/Order/eligible-standard", "#3001"),
+    toolInput: { orderId: "gid://shopify/Order/910000000001" },
+    context: makeContext("gid://shopify/Order/910000000001", "#3001"),
     expectedDecision: RefundDecision.Eligible,
     expectedReasonCodes: [
       RefundReasonCode.WithinRefundWindow,
@@ -89,9 +89,9 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     description:
       "Paid but unfulfilled order can be canceled before shipment instead of requiring a return flow.",
     agentQuestion: "Can we refund order #3001 before it ships?",
-    toolInput: { orderId: "gid://shopify/Order/eligible-unfulfilled-cancelable" },
+    toolInput: { orderId: "gid://shopify/Order/910000000002" },
     context: makeContext(
-      "gid://shopify/Order/eligible-unfulfilled-cancelable",
+      "gid://shopify/Order/910000000002",
       "#3007",
       {
         fulfillmentStatus: FulfillmentStatus.Unfulfilled,
@@ -111,9 +111,9 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     description:
       "Merchant policy allows a final-sale order to be canceled before shipment.",
     agentQuestion: "This final-sale order has not shipped yet. Can we still cancel and refund it?",
-    toolInput: { orderId: "gid://shopify/Order/eligible-unfulfilled-final-sale" },
+    toolInput: { orderId: "gid://shopify/Order/910000000003" },
     context: makeContext(
-      "gid://shopify/Order/eligible-unfulfilled-final-sale",
+      "gid://shopify/Order/910000000003",
       "#3009",
       {
         fulfillmentStatus: FulfillmentStatus.Unfulfilled,
@@ -137,9 +137,9 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     description: "Order is too old for the default refund policy.",
     agentQuestion:
       "A customer wants a refund for order #3002. Can we approve it?",
-    toolInput: { orderId: "gid://shopify/Order/ineligible-outside-window" },
+    toolInput: { orderId: "gid://shopify/Order/910000000004" },
     context: makeContext(
-      "gid://shopify/Order/ineligible-outside-window",
+      "gid://shopify/Order/910000000004",
       "#3002",
       {
         orderAgeDays: 45,
@@ -154,8 +154,8 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     id: RefundScenarioId.IneligibleFinalSale,
     description: "Final-sale order that should not be refunded automatically.",
     agentQuestion: "Customer says order #3003 did not fit. Can we refund it?",
-    toolInput: { orderId: "gid://shopify/Order/ineligible-final-sale" },
-    context: makeContext("gid://shopify/Order/ineligible-final-sale", "#3003", {
+    toolInput: { orderId: "gid://shopify/Order/910000000005" },
+    context: makeContext("gid://shopify/Order/910000000005", "#3003", {
       allItemsFinalSale: true,
     }),
     expectedDecision: RefundDecision.Ineligible,
@@ -167,8 +167,8 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     id: RefundScenarioId.ManualReviewFraudHold,
     description: "Flagged order that should be routed to a human review queue.",
     agentQuestion: "Can the system handle refund order #3004 automatically?",
-    toolInput: { orderId: "gid://shopify/Order/manual-review-fraud" },
-    context: makeContext("gid://shopify/Order/manual-review-fraud", "#3004", {
+    toolInput: { orderId: "gid://shopify/Order/910000000006" },
+    context: makeContext("gid://shopify/Order/910000000006", "#3004", {
       flags: { fraudHold: true },
     }),
     expectedDecision: RefundDecision.ManualReview,
@@ -181,9 +181,9 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     description:
       "High-value order should be reviewed by a human when merchant policy sets a threshold.",
     agentQuestion: "This order is expensive. Can we approve the refund automatically?",
-    toolInput: { orderId: "gid://shopify/Order/manual-review-high-value-order" },
+    toolInput: { orderId: "gid://shopify/Order/910000000007" },
     context: makeContext(
-      "gid://shopify/Order/manual-review-high-value-order",
+      "gid://shopify/Order/910000000007",
       "#3014",
       {
         orderTotalAmount: 750,
@@ -207,9 +207,9 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     description:
       "Order with a non-final payment state should be reviewed by a human before any refund decision is made.",
     agentQuestion: "This order is still pending payment. Can we approve the refund automatically?",
-    toolInput: { orderId: "gid://shopify/Order/manual-review-pending-financial-status" },
+    toolInput: { orderId: "gid://shopify/Order/910000000008" },
     context: makeContext(
-      "gid://shopify/Order/manual-review-pending-financial-status",
+      "gid://shopify/Order/910000000008",
       "#3013",
       {
         financialStatus: FinancialStatus.Pending,
@@ -227,9 +227,9 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     description:
       "Partially fulfilled order should be reviewed by a human because fulfillment is mixed.",
     agentQuestion: "This order only shipped partially. Can we approve the refund automatically?",
-    toolInput: { orderId: "gid://shopify/Order/manual-review-partial-fulfillment" },
+    toolInput: { orderId: "gid://shopify/Order/910000000009" },
     context: makeContext(
-      "gid://shopify/Order/manual-review-partial-fulfillment",
+      "gid://shopify/Order/910000000009",
       "#3011",
       {
         fulfillmentStatus: FulfillmentStatus.Partial,
@@ -247,9 +247,9 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     description:
       "Partially refunded order should be reviewed by a human before any additional refund is approved.",
     agentQuestion: "This order already has a partial refund. Can we approve another refund automatically?",
-    toolInput: { orderId: "gid://shopify/Order/manual-review-partial-refund" },
+    toolInput: { orderId: "gid://shopify/Order/910000000010" },
     context: makeContext(
-      "gid://shopify/Order/manual-review-partial-refund",
+      "gid://shopify/Order/910000000010",
       "#3012",
       {
         financialStatus: FinancialStatus.PartiallyRefunded,
@@ -267,9 +267,9 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     description:
       "Merchant policy requires review for final-sale orders before shipment.",
     agentQuestion: "This final-sale order has not shipped yet. Should we cancel and refund it automatically?",
-    toolInput: { orderId: "gid://shopify/Order/manual-review-unfulfilled-final-sale" },
+    toolInput: { orderId: "gid://shopify/Order/910000000011" },
     context: makeContext(
-      "gid://shopify/Order/manual-review-unfulfilled-final-sale",
+      "gid://shopify/Order/910000000011",
       "#3010",
       {
         fulfillmentStatus: FulfillmentStatus.Unfulfilled,
@@ -295,9 +295,9 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     description:
       "Old unfulfilled order should be reviewed by a human before approving a cancellation refund.",
     agentQuestion: "This order never shipped and is very old. Can we still cancel and refund it?",
-    toolInput: { orderId: "gid://shopify/Order/manual-review-unfulfilled-old" },
+    toolInput: { orderId: "gid://shopify/Order/910000000012" },
     context: makeContext(
-      "gid://shopify/Order/manual-review-unfulfilled-old",
+      "gid://shopify/Order/910000000012",
       "#3008",
       {
         orderAgeDays: 60,
@@ -317,9 +317,9 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     description:
       "Merchant config prefers manual review instead of hard denial for already refunded orders.",
     agentQuestion: "Order #3005 looks refunded already. What should we do?",
-    toolInput: { orderId: "gid://shopify/Order/manual-review-refunded" },
+    toolInput: { orderId: "gid://shopify/Order/910000000013" },
     context: makeContext(
-      "gid://shopify/Order/manual-review-refunded",
+      "gid://shopify/Order/910000000013",
       "#3005",
       {
         alreadyFullyRefunded: true,
@@ -341,8 +341,8 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     description:
       "VIP override allows an otherwise ineligible order to pass automatically.",
     agentQuestion: "Should we make an exception for VIP order #3006?",
-    toolInput: { orderId: "gid://shopify/Order/eligible-vip-override" },
-    context: makeContext("gid://shopify/Order/eligible-vip-override", "#3006", {
+    toolInput: { orderId: "gid://shopify/Order/910000000014" },
+    context: makeContext("gid://shopify/Order/910000000014", "#3006", {
       orderAgeDays: 60,
       hasReturnableFulfillments: false,
       flags: { vipOverride: true },

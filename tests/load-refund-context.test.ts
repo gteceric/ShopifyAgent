@@ -9,14 +9,14 @@ import {
 
 test("uses mock Shopify orders when Admin API env vars are missing", async () => {
   const result = await loadRefundContext(
-    { orderId: "gid://shopify/Order/demo" },
+    { orderId: "gid://shopify/Order/1001" },
     {
       now: new Date("2026-03-30T00:00:00.000Z"),
       env: {},
     },
   );
 
-  assert.equal(result.orderId, "gid://shopify/Order/demo");
+  assert.equal(result.orderId, "gid://shopify/Order/1001");
   assert.equal(result.orderName, "#1001");
   assert.equal(result.orderAgeDays, 20);
   assert.equal(result.financialStatus, FinancialStatus.Paid);
@@ -26,7 +26,7 @@ test("uses mock Shopify orders when Admin API env vars are missing", async () =>
 
 test("uses mock Shopify orders unless USE_REAL_SHOPIFY=true", async () => {
   const result = await loadRefundContext(
-    { orderId: "gid://shopify/Order/demo" },
+    { orderId: "gid://shopify/Order/1001" },
     {
       now: new Date("2026-03-30T00:00:00.000Z"),
       env: {
@@ -36,7 +36,7 @@ test("uses mock Shopify orders unless USE_REAL_SHOPIFY=true", async () => {
     },
   );
 
-  assert.equal(result.orderId, "gid://shopify/Order/demo");
+  assert.equal(result.orderId, "gid://shopify/Order/1001");
   assert.equal(result.orderName, "#1001");
 });
 
@@ -45,7 +45,7 @@ test("maps live Shopify Admin responses into RefundPolicyInput", async () => {
     {
       data: {
         order: {
-          id: "gid://shopify/Order/live-1",
+          id: "gid://shopify/Order/900000000301",
           name: "#3001",
           createdAt: "2026-03-20T00:00:00.000Z",
           totalPriceSet: {
@@ -100,7 +100,7 @@ test("maps live Shopify Admin responses into RefundPolicyInput", async () => {
     });
 
   const result = await loadRefundContext(
-    { orderId: "gid://shopify/Order/live-1" },
+    { orderId: "gid://shopify/Order/900000000301" },
     {
       now: new Date("2026-03-30T00:00:00.000Z"),
       env: {
@@ -112,7 +112,7 @@ test("maps live Shopify Admin responses into RefundPolicyInput", async () => {
     },
   );
 
-  assert.equal(result.orderId, "gid://shopify/Order/live-1");
+  assert.equal(result.orderId, "gid://shopify/Order/900000000301");
   assert.equal(result.orderName, "#3001");
   assert.equal(result.orderAgeDays, 10);
   assert.equal(result.orderTotalAmount, 149.5);
@@ -128,7 +128,7 @@ test("throws when USE_REAL_SHOPIFY=true but Shopify Admin env vars are incomplet
   await assert.rejects(
     () =>
       loadRefundContext(
-        { orderId: "gid://shopify/Order/demo" },
+        { orderId: "gid://shopify/Order/1001" },
         {
           env: {
             USE_REAL_SHOPIFY: "true",
@@ -142,7 +142,7 @@ test("throws when USE_REAL_SHOPIFY=true but Shopify Admin env vars are incomplet
 test("maps admin helper fields for final sale, statuses, and flags safely", () => {
   const result = mapAdminOrderToRefundPolicyInput(
     {
-      id: "gid://shopify/Order/live-2",
+      id: "gid://shopify/Order/900000000302",
       name: "#3002",
       createdAt: "2026-03-01T00:00:00.000Z",
       totalPriceSet: {

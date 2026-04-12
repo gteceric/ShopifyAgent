@@ -3,7 +3,7 @@ import { createOllamaRefundResponder } from "./tools/generate-refund-response-wi
 import { createOpenAIRefundResponder } from "./tools/generate-refund-response-with-openai.js";
 import { getRefundResponse } from "./tools/get-refund-response.js";
 
-const DEFAULT_DEMO_ORDER_ID = "gid://shopify/Order/demo";
+const DEFAULT_DEMO_ORDER_ID = "gid://shopify/Order/1001";
 
 function selectResponder() {
   if (process.env.RESPONSE_MODEL_PROVIDER === "none") {

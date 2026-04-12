@@ -15,7 +15,7 @@ function makeContext(
   overrides: Partial<RefundPolicyInput> = {},
 ): RefundPolicyInput {
   return {
-    orderId: "gid://shopify/Order/test",
+    orderId: "gid://shopify/Order/900000000100",
     orderName: "#2001",
     orderCreatedAt: "2026-03-01T00:00:00.000Z",
     orderAgeDays: 5,
@@ -32,7 +32,7 @@ function makeContext(
 
 test("uses injected loadContext and returns structured eligibility result", async () => {
   const result = await checkRefundEligibility(
-    { orderId: "gid://shopify/Order/custom" },
+    { orderId: "gid://shopify/Order/900000000101" },
     {
       loadContext: async (input) =>
         makeContext({
@@ -42,7 +42,7 @@ test("uses injected loadContext and returns structured eligibility result", asyn
     },
   );
 
-  assert.equal(result.orderId, "gid://shopify/Order/custom");
+  assert.equal(result.orderId, "gid://shopify/Order/900000000101");
   assert.equal(result.decision, RefundDecision.Eligible);
   assert.equal(result.exceptionAvailable, false);
   assert.equal(result.escalationRequired, false);
@@ -56,7 +56,7 @@ test("uses injected loadContext and returns structured eligibility result", asyn
 
 test("uses injected merchant config when evaluating refunded orders", async () => {
   const result = await checkRefundEligibility(
-    { orderId: "gid://shopify/Order/refunded-review" },
+    { orderId: "gid://shopify/Order/900000000102" },
     {
       config: {
         refundWindowDays: 30,
@@ -86,7 +86,7 @@ test("uses injected merchant config when evaluating refunded orders", async () =
 
 test("marks VIP overrides as an active exception without requiring escalation", async () => {
   const result = await checkRefundEligibility(
-    { orderId: "gid://shopify/Order/vip-override" },
+    { orderId: "gid://shopify/Order/900000000103" },
     {
       config: {
         refundWindowDays: 30,

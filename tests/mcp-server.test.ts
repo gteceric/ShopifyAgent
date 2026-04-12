@@ -18,7 +18,7 @@ function makeContext(
   overrides: Partial<RefundPolicyInput> = {},
 ): RefundPolicyInput {
   return {
-    orderId: "gid://shopify/Order/test",
+    orderId: "gid://shopify/Order/900000000200",
     orderName: "#2001",
     orderCreatedAt: "2026-03-01T00:00:00.000Z",
     orderAgeDays: 5,
@@ -167,7 +167,7 @@ test("tools/call returns structured refund eligibility output", async () => {
     params: {
       name: "check_refund_eligibility",
       arguments: {
-        orderId: "gid://shopify/Order/high-value",
+        orderId: "gid://shopify/Order/900000000201",
       },
     },
   });
@@ -186,7 +186,7 @@ test("tools/call returns structured refund eligibility output", async () => {
     unknown
   >;
 
-  assert.equal(structuredContent.orderId, "gid://shopify/Order/high-value");
+  assert.equal(structuredContent.orderId, "gid://shopify/Order/900000000201");
   assert.equal(structuredContent.decision, RefundDecision.ManualReview);
   assert.equal(structuredContent.exceptionAvailable, false);
   assert.equal(structuredContent.escalationRequired, true);
@@ -225,6 +225,34 @@ test("tools/call returns invalid params for malformed input", async () => {
   assert.equal(response.error.code, -32602);
 });
 
+test("tools/call rejects order IDs that are not Shopify order GIDs", async () => {
+  const server = createShopifyAgentMcpServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 8,
+    method: "tools/call",
+    params: {
+      name: "check_refund_eligibility",
+      arguments: {
+        orderId: "123",
+      },
+    },
+  });
+
+  assert.ok(response);
+  assert.equal("error" in response, true);
+
+  if (!response || !("error" in response)) {
+    return;
+  }
+
+  assert.equal(response.error.code, -32602);
+  assert.equal(
+    response.error.message,
+    "check_refund_eligibility requires a Shopify order GID like gid://shopify/Order/123.",
+  );
+});
+
 test("tools/call returns a tool error result when evaluation fails", async () => {
   const server = createShopifyAgentMcpServer({
     loadContext: async () => {
@@ -239,7 +267,7 @@ test("tools/call returns a tool error result when evaluation fails", async () =>
     params: {
       name: "check_refund_eligibility",
       arguments: {
-        orderId: "gid://shopify/Order/missing",
+        orderId: "gid://shopify/Order/900000000202",
       },
     },
   });
