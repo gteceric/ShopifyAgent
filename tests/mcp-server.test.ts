@@ -9,6 +9,7 @@ import {
   createShopifyAgentMcpServer,
   MCP_PROTOCOL_VERSION,
 } from "../src/mcp/server.js";
+import { RecommendedRefundAction } from "../src/tools/check-refund-eligibility.js";
 import type { RefundPolicyInput } from "../src/policy/refund-policy.types.js";
 import { JsonRpcRequest } from "../src/mcp/json-rpc.js";
 import { InitializeRequest } from "../src/mcp/schemas.js";
@@ -65,6 +66,61 @@ test("initialize advertises tool capabilities", async () => {
 
   assert.equal(result.protocolVersion, MCP_PROTOCOL_VERSION);
   assert.deepEqual(result.capabilities, { tools: {} });
+});
+
+test("initialize accepts older supported MCP protocol versions", async () => {
+  const server = createShopifyAgentMcpServer();
+  const message: InitializeRequest = {
+    jsonrpc: "2.0",
+    id: 6,
+    method: "initialize",
+    params: {
+      protocolVersion: "2025-06-18",
+      capabilities: {},
+      clientInfo: {
+        name: "test-client",
+        version: "1.0.0",
+      },
+    },
+  };
+  const response = await server.handleMessage(message);
+
+  assert.ok(response);
+  assert.equal("result" in response, true);
+
+  if (!response || !("result" in response)) {
+    return;
+  }
+
+  const result = response.result as Record<string, unknown>;
+  assert.equal(result.protocolVersion, "2025-06-18");
+});
+
+test("initialize rejects unsupported MCP protocol versions", async () => {
+  const server = createShopifyAgentMcpServer();
+  const message: InitializeRequest = {
+    jsonrpc: "2.0",
+    id: 7,
+    method: "initialize",
+    params: {
+      protocolVersion: "2099-01-01",
+      capabilities: {},
+      clientInfo: {
+        name: "test-client",
+        version: "1.0.0",
+      },
+    },
+  };
+  const response = await server.handleMessage(message);
+
+  assert.ok(response);
+  assert.equal("error" in response, true);
+
+  if (!response || !("error" in response)) {
+    return;
+  }
+
+  assert.equal(response.error.code, -32602);
 });
 
 test("tools/list returns the refund eligibility tool definition", async () => {
@@ -132,6 +188,12 @@ test("tools/call returns structured refund eligibility output", async () => {
 
   assert.equal(structuredContent.orderId, "gid://shopify/Order/high-value");
   assert.equal(structuredContent.decision, RefundDecision.ManualReview);
+  assert.equal(structuredContent.exceptionAvailable, false);
+  assert.equal(structuredContent.escalationRequired, true);
+  assert.equal(
+    structuredContent.recommendedNextAction,
+    RecommendedRefundAction.ManualReview,
+  );
 
   const reasons = structuredContent.reasons as Array<Record<string, unknown>>;
   assert.ok(

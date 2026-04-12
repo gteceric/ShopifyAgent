@@ -12,6 +12,7 @@ import type {
   CheckRefundEligibilityInput,
   CheckRefundEligibilityResult,
 } from "../../tools/check-refund-eligibility.js";
+import { RecommendedRefundAction } from "../../tools/check-refund-eligibility.js";
 import { makeMcpToolErrorResult, makeMcpToolResult } from "../tool-results.js";
 import type { McpTool } from "../tool-types.js";
 
@@ -47,6 +48,21 @@ const CHECK_REFUND_ELIGIBILITY_TOOL = {
       decision: {
         type: "string",
         enum: Object.values(RefundDecision),
+      },
+      exceptionAvailable: {
+        type: "boolean",
+        description:
+          "Whether the evaluation indicates an active exception, such as a VIP override.",
+      },
+      escalationRequired: {
+        type: "boolean",
+        description: "Whether a human review or escalation step is required.",
+      },
+      recommendedNextAction: {
+        type: "string",
+        enum: Object.values(RecommendedRefundAction),
+        description:
+          "The recommended next action for the caller: approve, deny, or route to manual review.",
       },
       reasons: {
         type: "array",
@@ -132,7 +148,15 @@ const CHECK_REFUND_ELIGIBILITY_TOOL = {
         ],
       },
     },
-    required: ["orderId", "decision", "reasons", "evidence"],
+    required: [
+      "orderId",
+      "decision",
+      "exceptionAvailable",
+      "escalationRequired",
+      "recommendedNextAction",
+      "reasons",
+      "evidence",
+    ],
   },
   annotations: {
     readOnlyHint: true,

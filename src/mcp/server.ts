@@ -8,6 +8,7 @@ import {
 import type { JsonRpcErrorResponse, JsonRpcResponse } from "./json-rpc.js";
 import {
   MCP_PROTOCOL_VERSION,
+  MCP_SUPPORTED_PROTOCOL_VERSIONS,
   MCP_SERVER_INFO,
   MCP_SERVER_INSTRUCTIONS,
 } from "./protocol.js";
@@ -114,13 +115,17 @@ export class McpServer {
       "initialize requires a protocolVersion string.",
     );
 
-    if (request.params.protocolVersion !== MCP_PROTOCOL_VERSION) {
+    if (
+      !MCP_SUPPORTED_PROTOCOL_VERSIONS.some(
+        (version) => version === request.params.protocolVersion,
+      )
+    ) {
       return makeErrorResponse(
         -32602,
         "Unsupported protocol version",
         request.id,
         {
-          supported: [MCP_PROTOCOL_VERSION],
+          supported: MCP_SUPPORTED_PROTOCOL_VERSIONS,
           requested: request.params.protocolVersion,
         },
       );

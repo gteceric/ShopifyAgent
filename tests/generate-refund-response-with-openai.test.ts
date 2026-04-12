@@ -9,6 +9,7 @@ import {
   createOpenAIRefundResponder,
   generateRefundResponseWithOpenAI,
 } from "../src/tools/generate-refund-response-with-openai.js";
+import { RecommendedRefundAction } from "../src/tools/check-refund-eligibility.js";
 import type { RefundAgentResponseContext } from "../src/tools/get-refund-response.js";
 
 function makeContext(): RefundAgentResponseContext {
@@ -19,6 +20,9 @@ function makeContext(): RefundAgentResponseContext {
     result: {
       orderId: "gid://shopify/Order/1",
       decision: RefundDecision.Eligible,
+      exceptionAvailable: false,
+      escalationRequired: false,
+      recommendedNextAction: RecommendedRefundAction.Approve,
       reasons: [
         {
           code: RefundReasonCode.WithinRefundWindow,

@@ -1,4 +1,10 @@
 export const MCP_PROTOCOL_VERSION = "2025-11-25";
+export const MCP_SUPPORTED_PROTOCOL_VERSIONS = [
+  MCP_PROTOCOL_VERSION,
+  "2025-06-18",
+  "2025-03-26",
+  "2024-11-05",
+] as const satisfies readonly string[];
 
 export const MCP_SERVER_INFO = {
   name: "shopify-agent-refund-policy",
