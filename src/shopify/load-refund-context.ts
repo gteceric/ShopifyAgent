@@ -3,6 +3,10 @@ import {
   FulfillmentStatus,
 } from "../policy/refund-policy.types.js";
 import type { RefundPolicyInput } from "../policy/refund-policy.types.js";
+import type {
+  LoadRefundContextInput,
+  RefundContextPlatformAdapter,
+} from "../platform-adapters/refund-context-adapter.js";
 import { MOCK_SHOPIFY_ORDERS } from "./mock-shopify-orders.js";
 import type { ShopifyOrderRecord } from "./mock-shopify-orders.js";
 import {
@@ -12,11 +16,7 @@ import {
   shopifyAdminFetch,
 } from "./shopify-admin.js";
 
-export interface LoadRefundContextInput {
-  orderId: string;
-}
-
-export interface LoadRefundContextDeps {
+export interface LoadShopifyRefundContextDeps {
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
   now?: Date;
@@ -202,7 +202,7 @@ function mapAdminOrderToRefundPolicyInput(
 
 async function loadRefundContextFromShopify(
   input: LoadRefundContextInput,
-  deps: LoadRefundContextDeps,
+  deps: LoadShopifyRefundContextDeps,
 ): Promise<RefundPolicyInput> {
   const orderResponse =
     await shopifyAdminFetch<ShopifyRefundOrderContextResponse>(
@@ -237,7 +237,7 @@ async function loadRefundContextFromShopify(
 
 export async function loadRefundContext(
   input: LoadRefundContextInput,
-  deps: LoadRefundContextDeps = {},
+  deps: LoadShopifyRefundContextDeps = {},
 ): Promise<RefundPolicyInput> {
   if (shouldUseRealShopify(deps.env)) {
     if (!hasShopifyAdminConfig(deps.env)) {
@@ -259,6 +259,17 @@ export async function loadRefundContext(
   }
 
   return mapShopifyOrderToRefundPolicyInput(order, deps.now ?? new Date());
+}
+
+export function createShopifyRefundContextAdapter(
+  deps: LoadShopifyRefundContextDeps = {},
+): RefundContextPlatformAdapter {
+  return {
+    platform: "shopify",
+    loadRefundContext(input) {
+      return loadRefundContext(input, deps);
+    },
+  };
 }
 
 export {
