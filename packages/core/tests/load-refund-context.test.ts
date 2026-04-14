@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { FinancialStatus, FulfillmentStatus } from "../src/policy/refund-policy.types.js";
+import {
+  FinancialStatus,
+  FulfillmentStatus,
+} from "../src/policy/refund-policy.types.js";
 import {
   loadRefundContext,
   mapAdminOrderToRefundPolicyInput,

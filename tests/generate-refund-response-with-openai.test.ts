@@ -1,15 +1,14 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-
 import {
+  RecommendedRefundAction,
   RefundDecision,
   RefundReasonCode,
-} from "../src/policy/refund-policy.types.js";
+} from "@shopify-agent/core";
+import test from "node:test";
+import assert from "node:assert/strict";
 import {
   createOpenAIRefundResponder,
   generateRefundResponseWithOpenAI,
 } from "../src/tools/generate-refund-response-with-openai.js";
-import { RecommendedRefundAction } from "../src/tools/check-refund-eligibility.js";
 import type { RefundAgentResponseContext } from "../src/tools/get-refund-response.js";
 
 function makeContext(): RefundAgentResponseContext {

@@ -9,8 +9,8 @@ import type {
   RefundPolicyEvidence,
   RefundPolicyFlags,
   RefundPolicyInput,
-  RefundReason,
   RefundPolicyResult,
+  RefundReason,
 } from "./refund-policy.types.js";
 
 const DEFAULT_POLICY: Required<RefundPolicyConfig> = {

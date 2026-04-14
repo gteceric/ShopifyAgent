@@ -1,14 +1,14 @@
 import type {
+  CheckRefundEligibilityInput,
   RefundPolicyConfig,
   RefundPolicyInput,
-} from "../../src/policy/refund-policy.types.js";
+} from "@shopify-agent/core";
 import {
   FinancialStatus,
   FulfillmentStatus,
   RefundDecision,
   RefundReasonCode,
-} from "../../src/policy/refund-policy.types.js";
-import type { CheckRefundEligibilityInput } from "../../src/tools/check-refund-eligibility.js";
+} from "@shopify-agent/core";
 
 export const RefundScenarioId = {
   EligibleStandard: "eligible_standard",

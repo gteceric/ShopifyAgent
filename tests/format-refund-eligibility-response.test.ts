@@ -5,7 +5,7 @@ import {
   formatRefundEligibilityResponse,
   REFUND_RESPONSE_COPY,
 } from "../src/tools/format-refund-eligibility-response.js";
-import { checkRefundEligibility } from "../src/tools/check-refund-eligibility.js";
+import { checkRefundEligibility } from "@shopify-agent/core";
 import {
   REFUND_SCENARIO_MATRIX,
   RefundScenarioId,

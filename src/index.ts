@@ -1,4 +1,4 @@
-import { selectPolicyConfig } from "./policy/select-policy-config.js";
+import { selectPolicyConfig } from "@shopify-agent/core";
 import { createOllamaRefundResponder } from "./tools/generate-refund-response-with-ollama.js";
 import { createOpenAIRefundResponder } from "./tools/generate-refund-response-with-openai.js";
 import { getRefundResponse } from "./tools/get-refund-response.js";

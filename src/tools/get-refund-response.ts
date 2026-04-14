@@ -1,8 +1,8 @@
-import { checkRefundEligibility } from "./check-refund-eligibility.js";
+import { checkRefundEligibility } from "@shopify-agent/core";
 import type {
   CheckRefundEligibilityDeps,
   CheckRefundEligibilityResult,
-} from "./check-refund-eligibility.js";
+} from "@shopify-agent/core";
 import { formatRefundEligibilityResponse } from "./format-refund-eligibility-response.js";
 
 export interface RefundAgentResponseContext {

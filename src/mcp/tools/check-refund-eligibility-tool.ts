@@ -1,18 +1,17 @@
-import { z } from "zod";
-
 import {
+  checkRefundEligibility,
   FinancialStatus,
   FulfillmentStatus,
+  RecommendedRefundAction,
   RefundDecision,
   RefundReasonCode,
-} from "../../policy/refund-policy.types.js";
-import { checkRefundEligibility } from "../../tools/check-refund-eligibility.js";
+} from "@shopify-agent/core";
 import type {
   CheckRefundEligibilityDeps,
   CheckRefundEligibilityInput,
   CheckRefundEligibilityResult,
-} from "../../tools/check-refund-eligibility.js";
-import { RecommendedRefundAction } from "../../tools/check-refund-eligibility.js";
+} from "@shopify-agent/core";
+import { z } from "zod";
 import { makeMcpToolErrorResult, makeMcpToolResult } from "../tool-results.js";
 import type { McpTool } from "../tool-types.js";
 

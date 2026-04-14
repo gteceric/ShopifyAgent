@@ -1,8 +1,8 @@
 import {
   RefundDecision,
   RefundReasonCode,
-} from "../policy/refund-policy.types.js";
-import type { CheckRefundEligibilityResult } from "./check-refund-eligibility.js";
+} from "@shopify-agent/core";
+import type { CheckRefundEligibilityResult } from "@shopify-agent/core";
 
 export const REFUND_RESPONSE_COPY = {
   eligibleException:

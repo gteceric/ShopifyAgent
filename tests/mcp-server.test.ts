@@ -1,16 +1,15 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-
 import {
+  RecommendedRefundAction,
   RefundDecision,
   RefundReasonCode,
-} from "../src/policy/refund-policy.types.js";
+} from "@shopify-agent/core";
+import type { RefundPolicyInput } from "@shopify-agent/core";
+import test from "node:test";
+import assert from "node:assert/strict";
 import {
   createShopifyAgentMcpServer,
   MCP_PROTOCOL_VERSION,
 } from "../src/mcp/server.js";
-import { RecommendedRefundAction } from "../src/tools/check-refund-eligibility.js";
-import type { RefundPolicyInput } from "../src/policy/refund-policy.types.js";
 import { JsonRpcRequest } from "../src/mcp/json-rpc.js";
 import { InitializeRequest } from "../src/mcp/schemas.js";
 

@@ -1,4 +1,6 @@
 node_modules
 build
 .env
-
+packages/core/dist
+packages/core/build
+apps/web/.next

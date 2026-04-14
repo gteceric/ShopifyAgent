@@ -166,8 +166,8 @@ function mapShopifyOrderToRefundPolicyInput(
   };
 }
 
-// map shopify admin order response to RefundPolicyInput, including checking for returnable fulfillments
-function mapAdminOrderToRefundPolicyInput(
+// Map Shopify order context into the platform-neutral refund policy input.
+export function mapAdminOrderToRefundPolicyInput(
   order: NonNullable<ShopifyRefundOrderContextResponse["order"]>,
   returnable: ShopifyReturnableFulfillmentsResponse,
   now: Date,
@@ -271,12 +271,3 @@ export function createShopifyRefundContextAdapter(
     },
   };
 }
-
-export {
-  isFinalSaleLineItem,
-  mapAdminOrderToRefundPolicyInput,
-  mapFinancialStatus,
-  mapFulfillmentStatus,
-  parseBooleanFlag,
-  shouldUseRealShopify,
-};

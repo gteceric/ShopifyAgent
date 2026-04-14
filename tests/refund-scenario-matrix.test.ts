@@ -1,7 +1,6 @@
+import { checkRefundEligibility } from "@shopify-agent/core";
 import test from "node:test";
 import assert from "node:assert/strict";
-
-import { checkRefundEligibility } from "../src/tools/check-refund-eligibility.js";
 import { REFUND_SCENARIO_MATRIX } from "./fixtures/refund-scenario-matrix.js";
 
 for (const scenario of REFUND_SCENARIO_MATRIX) {

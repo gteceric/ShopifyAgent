@@ -2,16 +2,16 @@ import {
   DEFAULT_POLICY,
   evaluateRefundPolicy,
 } from "../policy/refund-policy.js";
+import {
+  RefundDecision,
+  RefundReasonCode,
+} from "../policy/refund-policy.types.js";
 import type {
   RefundPolicyConfig,
   RefundPolicyInput,
   RefundPolicyResult,
 } from "../policy/refund-policy.types.js";
 import type { RefundContextPlatformAdapter } from "../platform-adapters/refund-context-adapter.js";
-import {
-  RefundDecision,
-  RefundReasonCode,
-} from "../policy/refund-policy.types.js";
 import { createShopifyRefundContextAdapter } from "../shopify/load-refund-context.js";
 
 // Keep the tool input minimal for v1. This can grow later if the caller needs
@@ -73,7 +73,8 @@ export async function checkRefundEligibility(
   const loadContext =
     deps.loadContext ??
     (adapter
-      ? (input: CheckRefundEligibilityInput) => adapter.loadRefundContext(input)
+      ? (request: CheckRefundEligibilityInput) =>
+          adapter.loadRefundContext(request)
       : createShopifyRefundContextAdapter().loadRefundContext);
   const context = await loadContext(input);
   const result = evaluateRefundPolicy(context, deps.config ?? DEFAULT_POLICY);

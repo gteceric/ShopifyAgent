@@ -1,7 +1,6 @@
+import { RefundDecision } from "@shopify-agent/core";
 import test from "node:test";
 import assert from "node:assert/strict";
-
-import { RefundDecision } from "../src/policy/refund-policy.types.js";
 import { getRefundResponse } from "../src/tools/get-refund-response.js";
 import {
   REFUND_SCENARIO_MATRIX,

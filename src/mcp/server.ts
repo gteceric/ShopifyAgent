@@ -1,6 +1,6 @@
 import { z, type ZodType } from "zod";
 
-import type { CheckRefundEligibilityDeps } from "../tools/check-refund-eligibility.js";
+import type { CheckRefundEligibilityDeps } from "@shopify-agent/core";
 import {
   makeErrorResponse,
   makeSuccessResponse,
