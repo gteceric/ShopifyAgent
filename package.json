@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "type": "module",
   "engines": {
@@ -12,15 +13,19 @@
   "scripts": {
     "clean": "node --input-type=module -e \"import { rmSync } from 'node:fs'; rmSync('build', { recursive: true, force: true }); rmSync('packages/core/dist', { recursive: true, force: true }); rmSync('packages/core/build', { recursive: true, force: true });\"",
     "build": "npm run build:core && tsc -p tsconfig.json",
-    "build:core": "npm --prefix packages/core run build",
+    "build:core": "npm --workspace @shopify-agent/core run build",
     "cleanbuild": "npm run clean && npm run build",
     "check": "npm run build",
     "dev": "node --env-file=.env --enable-source-maps build/src/index.js",
     "mcp": "npm run build && node --env-file=.env --enable-source-maps build/src/mcp/run-stdio-server.js",
     "scenario-matrix": "npm run build && node --env-file=.env build/src/tools/run-refund-scenario-matrix.js",
-    "test:core": "npm --prefix packages/core run test",
+    "test:core": "npm --workspace @shopify-agent/core run test",
     "test:app": "npm run cleanbuild && node --test build/tests/**/*.test.js",
-    "test": "npm run test:core && npm run test:app"
+    "test": "npm run test:core && npm run test:app",
+    "web:dev": "npm --workspace @shopify-agent/web run dev",
+    "web:build": "npm --workspace @shopify-agent/web run build",
+    "web:start": "npm --workspace @shopify-agent/web run start",
+    "web:lint": "npm --workspace @shopify-agent/web run lint"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
