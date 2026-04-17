@@ -1,14 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { evaluateRefundPolicy } from "../src/policy/refund-policy.js";
+import { evaluateRefundPolicy } from "../src/domain/refund-policy.js";
 import {
   FinancialStatus,
   FulfillmentStatus,
   RefundDecision,
   RefundReasonCode,
-} from "../src/policy/refund-policy.types.js";
-import type { RefundPolicyInput } from "../src/policy/refund-policy.types.js";
+} from "../src/domain/refund-policy.types.js";
+import type { RefundPolicyInput } from "../src/domain/refund-policy.types.js";
 
 function makeInput(
   overrides: Partial<RefundPolicyInput> = {},

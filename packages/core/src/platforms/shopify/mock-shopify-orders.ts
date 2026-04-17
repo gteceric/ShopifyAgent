@@ -1,7 +1,7 @@
 import {
   FinancialStatus,
   FulfillmentStatus,
-} from "../policy/refund-policy.types.js";
+} from "../../domain/refund-policy.types.js";
 
 export interface ShopifyLineItem {
   sku: string;

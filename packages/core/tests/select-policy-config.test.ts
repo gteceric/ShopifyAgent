@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { DEFAULT_POLICY } from "../src/policy/refund-policy.js";
-import { selectPolicyConfig } from "../src/policy/select-policy-config.js";
+import { DEFAULT_POLICY } from "../src/domain/refund-policy.js";
+import { selectPolicyConfig } from "../src/domain/select-policy-config.js";
 
 test("returns the default policy when no policy env vars are set", () => {
   const config = selectPolicyConfig({});

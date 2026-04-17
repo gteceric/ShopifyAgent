@@ -1,15 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { checkRefundEligibility } from "../src/tools/check-refund-eligibility.js";
-import { RecommendedRefundAction } from "../src/tools/check-refund-eligibility.js";
+import { checkRefundEligibility } from "../src/application/check-refund-eligibility.js";
+import { RecommendedRefundAction } from "../src/application/check-refund-eligibility.js";
 import {
   FinancialStatus,
   FulfillmentStatus,
   RefundDecision,
   RefundReasonCode,
-} from "../src/policy/refund-policy.types.js";
-import type { RefundPolicyInput } from "../src/policy/refund-policy.types.js";
+} from "../src/domain/refund-policy.types.js";
+import type { RefundPolicyInput } from "../src/domain/refund-policy.types.js";
 
 function makeContext(
   overrides: Partial<RefundPolicyInput> = {},

@@ -1,18 +1,18 @@
 import {
   DEFAULT_POLICY,
   evaluateRefundPolicy,
-} from "../policy/refund-policy.js";
+} from "../domain/refund-policy.js";
 import {
   RefundDecision,
   RefundReasonCode,
-} from "../policy/refund-policy.types.js";
+} from "../domain/refund-policy.types.js";
 import type {
   RefundPolicyConfig,
   RefundPolicyInput,
   RefundPolicyResult,
-} from "../policy/refund-policy.types.js";
-import type { RefundContextPlatformAdapter } from "../platform-adapters/refund-context-adapter.js";
-import { createShopifyRefundContextAdapter } from "../shopify/load-refund-context.js";
+} from "../domain/refund-policy.types.js";
+import type { RefundContextPlatformAdapter } from "./refund-context-adapter.js";
+import { createShopifyRefundContextAdapter } from "../platforms/shopify/load-refund-context.js";
 
 // Keep the tool input minimal for v1. This can grow later if the caller needs
 // merchant context, request metadata, or line-item-level refund requests.

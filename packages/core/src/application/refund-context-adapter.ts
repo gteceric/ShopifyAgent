@@ -1,4 +1,4 @@
-import type { RefundPolicyInput } from "../policy/refund-policy.types.js";
+import type { RefundPolicyInput } from "../domain/refund-policy.types.js";
 
 export interface LoadRefundContextInput {
   orderId: string;

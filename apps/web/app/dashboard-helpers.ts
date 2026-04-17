@@ -19,6 +19,15 @@ export const AGE_OPTIONS = [
 
 export type AgeFilter = (typeof AGE_OPTIONS)[number]["value"];
 
+export interface DashboardUrlState {
+  search: string;
+  decisionFilter: "all" | RefundDecision;
+  ageFilter: AgeFilter;
+  selectedOrderId: string;
+}
+
+type DashboardSearchParams = Record<string, string | string[] | undefined>;
+
 export const decisionPillClassName: Record<RefundDecision, string> = {
   eligible:
     "border border-emerald-900/10 bg-emerald-900/10 text-emerald-950",
@@ -27,6 +36,90 @@ export const decisionPillClassName: Record<RefundDecision, string> = {
   manual_review:
     "border border-amber-950/10 bg-amber-500/15 text-amber-950",
 };
+
+function readDashboardParam(
+  value: string | string[] | undefined,
+  fallback = "",
+): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value[0] ?? fallback;
+  }
+
+  return fallback;
+}
+
+function isDecisionFilter(
+  value: string,
+): value is DashboardUrlState["decisionFilter"] {
+  return DECISION_OPTIONS.some((option) => option.value === value);
+}
+
+function isAgeFilter(value: string): value is AgeFilter {
+  return AGE_OPTIONS.some((option) => option.value === value);
+}
+
+export function parseDashboardUrlState(
+  searchParams: DashboardSearchParams,
+  orders: DashboardOrder[],
+): DashboardUrlState {
+  const decisionCandidate = readDashboardParam(searchParams.decision, "all");
+  const ageCandidate = readDashboardParam(searchParams.age, "all");
+  const selectedOrderIdCandidate = readDashboardParam(searchParams.orderId);
+
+  return {
+    search: readDashboardParam(searchParams.search),
+    decisionFilter: isDecisionFilter(decisionCandidate)
+      ? decisionCandidate
+      : "all",
+    ageFilter: isAgeFilter(ageCandidate) ? ageCandidate : "all",
+    selectedOrderId: orders.some(
+      (order) => order.id === selectedOrderIdCandidate,
+    )
+      ? selectedOrderIdCandidate
+      : orders[0]?.id ?? "",
+  };
+}
+
+export function buildDashboardSearchParams(
+  currentSearchParams: URLSearchParams,
+  state: DashboardUrlState,
+  defaultOrderId: string,
+): string {
+  const nextSearchParams = new URLSearchParams(currentSearchParams.toString());
+
+  if (state.search.trim().length > 0) {
+    nextSearchParams.set("search", state.search);
+  } else {
+    nextSearchParams.delete("search");
+  }
+
+  if (state.decisionFilter !== "all") {
+    nextSearchParams.set("decision", state.decisionFilter);
+  } else {
+    nextSearchParams.delete("decision");
+  }
+
+  if (state.ageFilter !== "all") {
+    nextSearchParams.set("age", state.ageFilter);
+  } else {
+    nextSearchParams.delete("age");
+  }
+
+  if (
+    state.selectedOrderId.length > 0 &&
+    state.selectedOrderId !== defaultOrderId
+  ) {
+    nextSearchParams.set("orderId", state.selectedOrderId);
+  } else {
+    nextSearchParams.delete("orderId");
+  }
+
+  return nextSearchParams.toString();
+}
 
 export function getDecisionLabel(decision: RefundDecision): string {
   switch (decision) {

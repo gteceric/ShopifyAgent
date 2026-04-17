@@ -4,11 +4,11 @@ import assert from "node:assert/strict";
 import {
   FinancialStatus,
   FulfillmentStatus,
-} from "../src/policy/refund-policy.types.js";
+} from "../src/domain/refund-policy.types.js";
 import {
   loadRefundContext,
   mapAdminOrderToRefundPolicyInput,
-} from "../src/shopify/load-refund-context.js";
+} from "../src/platforms/shopify/load-refund-context.js";
 
 test("uses mock Shopify orders when Admin API env vars are missing", async () => {
   const result = await loadRefundContext(

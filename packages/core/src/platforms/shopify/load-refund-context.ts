@@ -1,12 +1,12 @@
 import {
   FinancialStatus,
   FulfillmentStatus,
-} from "../policy/refund-policy.types.js";
-import type { RefundPolicyInput } from "../policy/refund-policy.types.js";
+} from "../../domain/refund-policy.types.js";
+import type { RefundPolicyInput } from "../../domain/refund-policy.types.js";
 import type {
   LoadRefundContextInput,
   RefundContextPlatformAdapter,
-} from "../platform-adapters/refund-context-adapter.js";
+} from "../../application/refund-context-adapter.js";
 import { MOCK_SHOPIFY_ORDERS } from "./mock-shopify-orders.js";
 import type { ShopifyOrderRecord } from "./mock-shopify-orders.js";
 import {
