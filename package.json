@@ -22,8 +22,8 @@
     "test:core": "npm --workspace @shopify-agent/core run test",
     "test:app": "npm run cleanbuild && node --test build/tests/**/*.test.js",
     "test": "npm run test:core && npm run test:app",
-    "web:dev": "npm --workspace @shopify-agent/web run dev",
-    "web:build": "npm --workspace @shopify-agent/web run build",
+    "web:dev": "npm run build:core && npm --workspace @shopify-agent/web run dev",
+    "web:build": "npm run build:core && npm --workspace @shopify-agent/web run build",
     "web:start": "npm --workspace @shopify-agent/web run start",
     "web:lint": "npm --workspace @shopify-agent/web run lint"
   },

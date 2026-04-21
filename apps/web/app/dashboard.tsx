@@ -1,13 +1,16 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { startTransition, useDeferredValue } from "react";
+import { useDeferredValue, useState, useTransition } from "react";
+import type { DashboardOrderErrorState } from "./dashboard-order-evaluation";
 import type { DashboardOrder } from "./mock-orders";
 import {
   buildDashboardSearchParams,
   filterOrders,
   getSummary,
+  normalizeDashboardSearchParams,
   parseDashboardUrlState,
+  selectActiveOrder,
   type DashboardUrlState,
 } from "./dashboard-helpers";
 import { DashboardHero } from "./dashboard-hero";
@@ -17,17 +20,26 @@ import { OrdersPanel } from "./orders-panel";
 interface DashboardProps {
   orders: DashboardOrder[];
   initialState: DashboardUrlState;
+  selectedOrderError: DashboardOrderErrorState | null;
 }
 
-export function Dashboard({ orders, initialState }: DashboardProps) {
+export function Dashboard({
+  orders,
+  initialState,
+  selectedOrderError,
+}: DashboardProps) {
   const pathname = usePathname();
   const router = useRouter();
   const urlSearchParams = useSearchParams();
   const defaultOrderId = orders[0]?.id ?? "";
-  const queryEntries = Object.fromEntries(urlSearchParams.entries());
+  const [isPending, startTransition] = useTransition();
+  const [pendingSelectedOrderId, setPendingSelectedOrderId] = useState<
+    string | null
+  >(null);
+  const normalizedSearchParams = normalizeDashboardSearchParams(urlSearchParams);
   const dashboardState =
-    Object.keys(queryEntries).length > 0
-      ? parseDashboardUrlState(queryEntries, orders)
+    urlSearchParams.size > 0
+      ? parseDashboardUrlState(normalizedSearchParams, orders)
       : initialState;
   const deferredSearch = useDeferredValue(dashboardState.search);
   const filteredOrders = filterOrders(
@@ -36,16 +48,29 @@ export function Dashboard({ orders, initialState }: DashboardProps) {
     dashboardState.decisionFilter,
     dashboardState.ageFilter,
   );
-
-  const selectedOrder =
-    filteredOrders.find((order) => order.id === dashboardState.selectedOrderId) ??
-    filteredOrders[0] ??
-    null;
+  const selectedOrder = selectActiveOrder(
+    filteredOrders,
+    dashboardState.selectedOrderId,
+  );
   const activeSelectedOrderId = selectedOrder?.id ?? "";
+  const displaySelectedOrderId =
+    isPending && pendingSelectedOrderId
+      ? pendingSelectedOrderId
+      : activeSelectedOrderId;
+  const displayedOrder =
+    filteredOrders.find((order) => order.id === displaySelectedOrderId) ??
+    selectedOrder;
+  const displayedOrderError =
+    selectedOrderError?.orderId === activeSelectedOrderId
+      ? selectedOrderError.message
+      : null;
 
   const summary = getSummary(orders);
 
-  function updateDashboardState(nextState: DashboardUrlState) {
+  function updateDashboardState(
+    nextState: DashboardUrlState,
+    nextPendingSelectedOrderId: string | null = null,
+  ) {
     const nextSearchParams = buildDashboardSearchParams(
       new URLSearchParams(urlSearchParams.toString()),
       nextState,
@@ -62,6 +87,7 @@ export function Dashboard({ orders, initialState }: DashboardProps) {
         : pathname;
 
     startTransition(() => {
+      setPendingSelectedOrderId(nextPendingSelectedOrderId);
       router.replace(nextUrl, { scroll: false });
     });
   }
@@ -82,33 +108,37 @@ export function Dashboard({ orders, initialState }: DashboardProps) {
             search={dashboardState.search}
             decisionFilter={dashboardState.decisionFilter}
             ageFilter={dashboardState.ageFilter}
-            selectedOrderId={activeSelectedOrderId}
+            selectedOrderId={displaySelectedOrderId}
             onSearchChange={(nextValue) => {
               updateDashboardState({
                 ...dashboardState,
                 search: nextValue,
-              });
+              }, null);
             }}
             onDecisionFilterChange={(nextValue) => {
               updateDashboardState({
                 ...dashboardState,
                 decisionFilter: nextValue,
-              });
+              }, null);
             }}
             onAgeFilterChange={(nextValue) => {
               updateDashboardState({
                 ...dashboardState,
                 ageFilter: nextValue,
-              });
+              }, null);
             }}
             onSelectOrder={(orderId) => {
               updateDashboardState({
                 ...dashboardState,
                 selectedOrderId: orderId,
-              });
+              }, orderId);
             }}
           />
-          <OrderDetailsPanel order={selectedOrder} />
+          <OrderDetailsPanel
+            order={displayedOrder}
+            errorMessage={displayedOrderError}
+            isPending={isPending}
+          />
         </section>
       </div>
     </main>

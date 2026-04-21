@@ -6,13 +6,31 @@ import {
 
 interface OrderDetailsPanelProps {
   order: DashboardOrder | null;
+  errorMessage?: string | null;
+  isPending?: boolean;
 }
 
-export function OrderDetailsPanel({ order }: OrderDetailsPanelProps) {
+export function OrderDetailsPanel({
+  order,
+  errorMessage,
+  isPending = false,
+}: OrderDetailsPanelProps) {
   return (
     <aside className="grid gap-5 rounded-[28px] border border-stone-900/10 bg-stone-50/85 p-6 shadow-[0_18px_48px_rgba(66,45,23,0.12)] backdrop-blur-xl xl:sticky xl:top-6">
       {order ? (
         <>
+          {isPending ? (
+            <div className="rounded-2xl border border-orange-700/15 bg-orange-100/60 px-4 py-3 text-sm text-stone-700">
+              Checking the latest refund posture for this order...
+            </div>
+          ) : null}
+
+          {errorMessage ? (
+            <div className="rounded-2xl border border-red-900/10 bg-red-50 px-4 py-3 text-sm leading-6 text-red-900">
+              Live refund check failed: {errorMessage}
+            </div>
+          ) : null}
+
           <header className="grid gap-2.5">
             <span
               className={`inline-flex w-fit min-w-[108px] items-center justify-center rounded-full px-3 py-2 text-[11px] font-bold uppercase tracking-[0.12em] ${decisionPillClassName[order.decision]}`}
