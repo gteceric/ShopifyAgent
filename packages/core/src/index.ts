@@ -4,5 +4,6 @@ export * from "./domain/refund-policy.js";
 export * from "./domain/refund-policy.types.js";
 export * from "./domain/select-policy-config.js";
 export * from "./platforms/shopify/load-refund-context.js";
+export * from "./platforms/shopify/load-orders.js";
 export * from "./platforms/shopify/mock-shopify-orders.js";
 export * from "./platforms/shopify/shopify-admin.js";

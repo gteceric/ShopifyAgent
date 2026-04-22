@@ -57,6 +57,28 @@ export const REFUND_RETURNABLE_FULFILLMENTS_QUERY = /* GraphQL */ `
   }
 `;
 
+export const SHOPIFY_ORDERS_LIST_QUERY = /* GraphQL */ `
+  query ShopifyOrdersList($first: Int!) {
+    orders(first: $first, sortKey: CREATED_AT, reverse: true) {
+      nodes {
+        id
+        name
+        createdAt
+        totalPriceSet {
+          shopMoney {
+            amount
+          }
+        }
+        displayFinancialStatus
+        displayFulfillmentStatus
+        customer {
+          displayName
+        }
+      }
+    }
+  }
+`;
+
 export interface ShopifyAdminFetchOptions {
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;

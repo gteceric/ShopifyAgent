@@ -20,12 +20,14 @@ import { OrdersPanel } from "./orders-panel";
 interface DashboardProps {
   orders: DashboardOrder[];
   initialState: DashboardUrlState;
+  ordersLoadError?: string | null;
   selectedOrderError: DashboardOrderErrorState | null;
 }
 
 export function Dashboard({
   orders,
   initialState,
+  ordersLoadError,
   selectedOrderError,
 }: DashboardProps) {
   const pathname = usePathname();
@@ -101,6 +103,12 @@ export function Dashboard({
           manualReviewCount={summary.manualReviewCount}
           blockedCount={summary.blockedCount}
         />
+
+        {ordersLoadError ? (
+          <div className="rounded-[24px] border border-red-900/10 bg-red-50 px-5 py-4 text-sm leading-6 text-red-900">
+            Could not load the live Shopify order list: {ordersLoadError}
+          </div>
+        ) : null}
 
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(340px,0.85fr)] xl:items-start">
           <OrdersPanel

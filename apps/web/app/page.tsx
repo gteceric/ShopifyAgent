@@ -1,8 +1,12 @@
-import { checkRefundEligibility } from "@shopify-agent/core";
+import {
+  checkRefundEligibility,
+  loadOrders,
+} from "@shopify-agent/core";
 import { Dashboard } from "./dashboard";
 import {
   applyRefundEvaluationToOrder,
   DASHBOARD_DEMO_POLICY,
+  mapOrderSummaryToDashboardOrder,
   type DashboardOrderErrorState,
 } from "./dashboard-order-evaluation";
 import {
@@ -10,20 +14,66 @@ import {
   parseDashboardUrlState,
   selectActiveOrder,
 } from "./dashboard-helpers";
-import { DASHBOARD_ORDERS } from "./mock-orders";
+import { DASHBOARD_ORDERS, type DashboardOrder } from "./mock-orders";
 
 interface HomeProps {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
+function shouldAllowMockOrdersFallback(): boolean {
+  return process.env.WEB_ENABLE_MOCK_ORDERS_FALLBACK === "true";
+}
+
 export default async function Home({ searchParams }: HomeProps) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
+  const now = new Date();
+  const allowMockOrdersFallback = shouldAllowMockOrdersFallback();
+  let orders: DashboardOrder[] = [];
+  let ordersLoadError: string | null = null;
+
+  if (!allowMockOrdersFallback && process.env.USE_REAL_SHOPIFY !== "true") {
+    ordersLoadError =
+      "Live Shopify loading is disabled. Set USE_REAL_SHOPIFY=true or explicitly enable WEB_ENABLE_MOCK_ORDERS_FALLBACK=true.";
+  } else {
+    try {
+      const orderSummaries = await loadOrders({ limit: 9 });
+      const evaluationResults = await Promise.allSettled(
+        orderSummaries.map((order) =>
+          checkRefundEligibility(
+            { orderId: order.id },
+            { config: DASHBOARD_DEMO_POLICY },
+          ),
+        ),
+      );
+
+      orders = orderSummaries.map((orderSummary, index) => {
+        const baseOrder = mapOrderSummaryToDashboardOrder(orderSummary, now);
+        const evaluationResult = evaluationResults[index];
+
+        if (evaluationResult?.status === "fulfilled") {
+          return applyRefundEvaluationToOrder(baseOrder, evaluationResult.value);
+        }
+
+        return baseOrder;
+      });
+    } catch (error) {
+      ordersLoadError =
+        error instanceof Error
+          ? error.message
+          : "Shopify order loading failed.";
+
+      if (allowMockOrdersFallback) {
+        orders = DASHBOARD_ORDERS;
+      }
+    }
+  }
+
   const initialState = parseDashboardUrlState(
     resolvedSearchParams,
-    DASHBOARD_ORDERS,
+    orders,
   );
   const filteredOrders = filterOrders(
-    DASHBOARD_ORDERS,
+    orders,
     initialState.search,
     initialState.decisionFilter,
     initialState.ageFilter,
@@ -32,7 +82,6 @@ export default async function Home({ searchParams }: HomeProps) {
     filteredOrders,
     initialState.selectedOrderId,
   );
-  let orders = DASHBOARD_ORDERS;
   let selectedOrderError: DashboardOrderErrorState | null = null;
 
   if (activeSelectedOrder) {
@@ -42,7 +91,7 @@ export default async function Home({ searchParams }: HomeProps) {
         { config: DASHBOARD_DEMO_POLICY },
       );
 
-      orders = DASHBOARD_ORDERS.map((order) =>
+      orders = orders.map((order) =>
         order.id === activeSelectedOrder.id
           ? applyRefundEvaluationToOrder(order, result)
           : order,
@@ -62,6 +111,7 @@ export default async function Home({ searchParams }: HomeProps) {
     <Dashboard
       orders={orders}
       initialState={initialState}
+      ordersLoadError={ordersLoadError}
       selectedOrderError={selectedOrderError}
     />
   );
