@@ -7,12 +7,14 @@ import {
 interface OrderDetailsPanelProps {
   order: DashboardOrder | null;
   errorMessage?: string | null;
+  emptyMessage?: string;
   isPending?: boolean;
 }
 
 export function OrderDetailsPanel({
   order,
   errorMessage,
+  emptyMessage,
   isPending = false,
 }: OrderDetailsPanelProps) {
   return (
@@ -119,8 +121,8 @@ export function OrderDetailsPanel({
         </>
       ) : (
         <div className="text-sm leading-6 text-stone-600">
-          Select an order to inspect refund posture, policy reasoning, and
-          next-step guidance.
+          {emptyMessage ??
+            "Select an order to inspect refund posture, policy reasoning, and next-step guidance."}
         </div>
       )}
     </aside>

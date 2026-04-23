@@ -30,6 +30,9 @@ export default async function Home({ searchParams }: HomeProps) {
   const allowMockOrdersFallback = shouldAllowMockOrdersFallback();
   let orders: DashboardOrder[] = [];
   let ordersLoadError: string | null = null;
+  // Keep row-level refund-check failures separate from top-level order-feed
+  // failures so the dashboard can still render partial success.
+  const orderEvaluationErrors = new Map<string, string>();
 
   if (!allowMockOrdersFallback && process.env.USE_REAL_SHOPIFY !== "true") {
     ordersLoadError =
@@ -37,7 +40,9 @@ export default async function Home({ searchParams }: HomeProps) {
   } else {
     try {
       const orderSummaries = await loadOrders({ limit: 9 });
-      const evaluationResults = await Promise.allSettled(
+      // Each loaded row gets its own refund evaluation so the queue can show
+      // real posture immediately instead of only enriching the selected order.
+      const evaluationOutcomes = await Promise.allSettled(
         orderSummaries.map((order) =>
           checkRefundEligibility(
             { orderId: order.id },
@@ -47,11 +52,22 @@ export default async function Home({ searchParams }: HomeProps) {
       );
 
       orders = orderSummaries.map((orderSummary, index) => {
+        // First convert Shopify order-summary data into the dashboard view
+        // model, then layer the live refund result on top when available.
         const baseOrder = mapOrderSummaryToDashboardOrder(orderSummary, now);
-        const evaluationResult = evaluationResults[index];
+        const evaluationOutcome = evaluationOutcomes[index];
 
-        if (evaluationResult?.status === "fulfilled") {
-          return applyRefundEvaluationToOrder(baseOrder, evaluationResult.value);
+        if (evaluationOutcome?.status === "fulfilled") {
+          return applyRefundEvaluationToOrder(baseOrder, evaluationOutcome.value);
+        }
+
+        if (evaluationOutcome?.status === "rejected") {
+          orderEvaluationErrors.set(
+            orderSummary.id,
+            evaluationOutcome.reason instanceof Error
+              ? evaluationOutcome.reason.message
+              : "Refund eligibility check failed.",
+          );
         }
 
         return baseOrder;
@@ -82,30 +98,13 @@ export default async function Home({ searchParams }: HomeProps) {
     filteredOrders,
     initialState.selectedOrderId,
   );
-  let selectedOrderError: DashboardOrderErrorState | null = null;
-
-  if (activeSelectedOrder) {
-    try {
-      const result = await checkRefundEligibility(
-        { orderId: activeSelectedOrder.id },
-        { config: DASHBOARD_DEMO_POLICY },
-      );
-
-      orders = orders.map((order) =>
-        order.id === activeSelectedOrder.id
-          ? applyRefundEvaluationToOrder(order, result)
-          : order,
-      );
-    } catch (error) {
-      selectedOrderError = {
-        orderId: activeSelectedOrder.id,
-        message:
-          error instanceof Error
-            ? error.message
-            : "Refund eligibility check failed.",
-      };
-    }
-  }
+  const selectedOrderError: DashboardOrderErrorState | null =
+    activeSelectedOrder && orderEvaluationErrors.has(activeSelectedOrder.id)
+      ? {
+          orderId: activeSelectedOrder.id,
+          message: orderEvaluationErrors.get(activeSelectedOrder.id)!,
+        }
+      : null;
 
   return (
     <Dashboard

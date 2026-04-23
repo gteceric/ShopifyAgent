@@ -66,8 +66,17 @@ export function Dashboard({
     selectedOrderError?.orderId === activeSelectedOrderId
       ? selectedOrderError.message
       : null;
-
-  const summary = getSummary(orders);
+  const hasActiveFilters =
+    dashboardState.search.trim().length > 0 ||
+    dashboardState.decisionFilter !== "all" ||
+    dashboardState.ageFilter !== "all";
+  const summary = getSummary(filteredOrders);
+  const emptyDetailsMessage =
+    ordersLoadError && orders.length === 0
+      ? "Live Shopify orders could not be loaded. Fix the connection details or retry the order feed."
+      : filteredOrders.length === 0 && orders.length > 0
+        ? "No order matches the current search and filters. Adjust the queue to inspect refund guidance."
+        : "Select an order to inspect refund posture, policy reasoning, and next-step guidance.";
 
   function updateDashboardState(
     nextState: DashboardUrlState,
@@ -98,10 +107,13 @@ export function Dashboard({
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(180,138,56,0.23),transparent_28%),radial-gradient(circle_at_top_right,rgba(80,100,67,0.18),transparent_24%),linear-gradient(180deg,#fbf7ef_0%,#f1e5d5_100%)] px-4 py-6 text-stone-950 sm:px-6 lg:px-8">
       <div className="mx-auto grid max-w-[1380px] gap-6">
         <DashboardHero
-          totalOrders={summary.total}
+          totalOrders={orders.length}
+          visibleOrders={filteredOrders.length}
           eligibleCount={summary.eligibleCount}
           manualReviewCount={summary.manualReviewCount}
           blockedCount={summary.blockedCount}
+          hasActiveFilters={hasActiveFilters}
+          isUsingLiveOrders={!ordersLoadError}
         />
 
         {ordersLoadError ? (
@@ -113,10 +125,12 @@ export function Dashboard({
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(340px,0.85fr)] xl:items-start">
           <OrdersPanel
             orders={filteredOrders}
+            totalOrders={orders.length}
             search={dashboardState.search}
             decisionFilter={dashboardState.decisionFilter}
             ageFilter={dashboardState.ageFilter}
             selectedOrderId={displaySelectedOrderId}
+            ordersLoadError={ordersLoadError}
             onSearchChange={(nextValue) => {
               updateDashboardState({
                 ...dashboardState,
@@ -145,6 +159,7 @@ export function Dashboard({
           <OrderDetailsPanel
             order={displayedOrder}
             errorMessage={displayedOrderError}
+            emptyMessage={emptyDetailsMessage}
             isPending={isPending}
           />
         </section>

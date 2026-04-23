@@ -204,6 +204,8 @@ async function loadRefundContextFromShopify(
   input: LoadRefundContextInput,
   deps: LoadShopifyRefundContextDeps,
 ): Promise<RefundPolicyInput> {
+  // The policy engine needs both the order record and Shopify's separate
+  // returnable-fulfillments view to decide whether a refund path is actually open.
   const orderResponse =
     await shopifyAdminFetch<ShopifyRefundOrderContextResponse>(
       REFUND_ORDER_CONTEXT_QUERY,
@@ -235,6 +237,8 @@ async function loadRefundContextFromShopify(
   );
 }
 
+// take orderId
+// fetch/load the order context from Shopify or mock data
 export async function loadRefundContext(
   input: LoadRefundContextInput,
   deps: LoadShopifyRefundContextDeps = {},
@@ -249,6 +253,8 @@ export async function loadRefundContext(
     return loadRefundContextFromShopify(input, deps);
   }
 
+  // In mock mode, this loader still returns the same platform-neutral
+  // RefundPolicyInput shape that the domain policy evaluator consumes.
   const order = MOCK_SHOPIFY_ORDERS[input.orderId];
 
   if (!order) {

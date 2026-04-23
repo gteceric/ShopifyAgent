@@ -1,15 +1,21 @@
 interface DashboardHeroProps {
   totalOrders: number;
+  visibleOrders: number;
   eligibleCount: number;
   manualReviewCount: number;
   blockedCount: number;
+  hasActiveFilters: boolean;
+  isUsingLiveOrders: boolean;
 }
 
 export function DashboardHero({
   totalOrders,
+  visibleOrders,
   eligibleCount,
   manualReviewCount,
   blockedCount,
+  hasActiveFilters,
+  isUsingLiveOrders,
 }: DashboardHeroProps) {
   return (
     <section className="relative overflow-hidden rounded-[28px] border border-stone-900/10 bg-stone-50/85 shadow-[0_18px_48px_rgba(66,45,23,0.12)] backdrop-blur-xl">
@@ -17,7 +23,7 @@ export function DashboardHero({
       <div className="relative z-10 grid gap-5 p-6 sm:p-8">
         <span className="inline-flex items-center gap-3 text-[11px] font-medium uppercase tracking-[0.22em] text-stone-500">
           <span className="h-px w-7 bg-current" />
-          Merchant Operations
+          {isUsingLiveOrders ? "Live Shopify Triage" : "Refund Operations"}
         </span>
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(300px,0.8fr)] lg:items-end">
           <div className="grid gap-4">
@@ -31,18 +37,25 @@ export function DashboardHero({
               Refund work without the tab chaos.
             </h1>
             <p className="max-w-3xl text-sm leading-7 text-stone-600 sm:text-base">
-              Start with a practical triage board: search orders, see their
-              refund posture, and understand the next support move without
-              bouncing through five merchant tools.
+              {hasActiveFilters
+                ? `Showing ${visibleOrders} of ${totalOrders} orders in the current view, with live refund posture and next-step guidance for the filtered queue.`
+                : `Track ${totalOrders} live orders, see their refund posture, and understand the next support move without bouncing through five merchant tools.`}
             </p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <article className="rounded-2xl border border-stone-900/10 bg-stone-50/80 p-4">
               <p className="mb-2 text-[11px] uppercase tracking-[0.18em] text-stone-500">
-                Orders In View
+                {hasActiveFilters ? "Orders In View" : "Orders Loaded"}
               </p>
-              <p className="text-3xl font-semibold">{totalOrders}</p>
+              <p className="text-3xl font-semibold">{visibleOrders}</p>
+              <p className="mt-2 text-sm text-stone-500">
+                {hasActiveFilters
+                  ? `${totalOrders} total orders loaded`
+                  : isUsingLiveOrders
+                    ? "Live Shopify order feed"
+                    : "Fallback mode or error state"}
+              </p>
             </article>
             <article className="rounded-2xl border border-stone-900/10 bg-stone-50/80 p-4">
               <p className="mb-2 text-[11px] uppercase tracking-[0.18em] text-stone-500">

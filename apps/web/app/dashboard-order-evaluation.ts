@@ -103,8 +103,8 @@ export function mapOrderSummaryToDashboardOrder(
         ? "Cancellation and refund policy"
         : "Refund policy",
     reasonDetails: [
-      "This row is seeded from the order summary feed.",
-      "Selecting the order loads the latest refund eligibility details.",
+      "This row was loaded from the current order feed.",
+      "The latest refund posture is layered on top of the live order context.",
     ],
     evidence: [
       { label: "Order Age", value: `${orderAgeDays} days` },
@@ -121,11 +121,11 @@ export function mapOrderSummaryToDashboardOrder(
     timeline: [
       {
         title: "Order summary loaded",
-        detail: "This order came from the current Shopify order feed.",
+        detail: "This order came from the latest order feed available to the workspace.",
       },
       {
         title: "Refund check pending",
-        detail: "Select the order to run the latest refund policy evaluation.",
+        detail: "Refund guidance will refresh during the current server evaluation cycle.",
       },
     ],
   };
