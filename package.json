@@ -20,7 +20,7 @@
     "mcp": "npm run build && node --env-file=.env --enable-source-maps build/src/mcp/run-stdio-server.js",
     "scenario-matrix": "npm run build && node --env-file=.env build/src/tools/run-refund-scenario-matrix.js",
     "test:core": "npm --workspace @shopify-agent/core run test",
-    "test:app": "npm run cleanbuild && node --test build/tests/**/*.test.js",
+    "test:app": "npm run cleanbuild && node --test build/tests/**/*.test.js build/apps/web/tests/**/*.test.js",
     "test": "npm run test:core && npm run test:app",
     "web:dev": "npm run build:core && npm --workspace @shopify-agent/web run dev",
     "web:build": "npm run build:core && npm --workspace @shopify-agent/web run build",
