@@ -3,6 +3,7 @@ import {
   decisionPillClassName,
   getDecisionLabel,
 } from "./dashboard-helpers";
+import { MerchantQuestionPanel } from "./merchant-question-panel";
 
 interface OrderDetailsPanelProps {
   order: DashboardOrder | null;
@@ -118,6 +119,12 @@ export function OrderDetailsPanel({
               ))}
             </div>
           </section>
+
+          <MerchantQuestionPanel
+            key={order.id}
+            orderId={order.id}
+            decision={order.decision}
+          />
         </>
       ) : (
         <div className="text-sm leading-6 text-stone-600">
