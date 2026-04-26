@@ -3,17 +3,15 @@
 import { useState } from "react";
 import type { RefundDecision } from "./mock-orders";
 import { getDecisionLabel } from "./dashboard-helpers";
+import type {
+  RefundAgentErrorResponse,
+  RefundAgentRequest,
+  RefundAgentResponse,
+} from "./refund-agent-contract";
 
 interface MerchantQuestionPanelProps {
   orderId: string;
   decision: RefundDecision;
-}
-
-interface AgentReply {
-  response: string;
-  decision: RefundDecision;
-  recommendedNextAction: string;
-  reasons: string[];
 }
 
 const STARTER_QUESTIONS = [
@@ -27,7 +25,7 @@ export function MerchantQuestionPanel({
   decision,
 }: MerchantQuestionPanelProps) {
   const [question, setQuestion] = useState("");
-  const [reply, setReply] = useState<AgentReply | null>(null);
+  const [reply, setReply] = useState<RefundAgentResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -43,19 +41,20 @@ export function MerchantQuestionPanel({
     setErrorMessage(null);
 
     try {
+      const requestBody: RefundAgentRequest = {
+        orderId,
+        question: trimmedQuestion,
+      };
       const response = await fetch("/api/refund-agent", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          orderId,
-          question: trimmedQuestion,
-        }),
+        body: JSON.stringify(requestBody),
       });
       const payload = (await response.json()) as
-        | AgentReply
-        | { error?: string };
+        | RefundAgentResponse
+        | RefundAgentErrorResponse;
 
       if (!response.ok || !("response" in payload)) {
         throw new Error(

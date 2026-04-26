@@ -1,29 +1,39 @@
 import { checkRefundEligibility } from "@shopify-agent/core";
 import { NextResponse } from "next/server";
 import { DASHBOARD_DEMO_POLICY } from "../../dashboard-order-evaluation";
+import type {
+  RefundAgentErrorResponse,
+  RefundAgentRequestBody,
+  RefundAgentResponse,
+} from "../../refund-agent-contract";
 import { formatMerchantRefundAgentResponse } from "../../refund-agent-response";
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as {
-      orderId?: unknown;
-      question?: unknown;
-    };
+    const body = (await request.json()) as RefundAgentRequestBody;
     const orderId =
       typeof body.orderId === "string" ? body.orderId.trim() : "";
     const question =
       typeof body.question === "string" ? body.question.trim() : "";
 
     if (!orderId) {
+      const errorResponse: RefundAgentErrorResponse = {
+        error: "Missing orderId.",
+      };
+
       return NextResponse.json(
-        { error: "Missing orderId." },
+        errorResponse,
         { status: 400 },
       );
     }
 
     if (!question) {
+      const errorResponse: RefundAgentErrorResponse = {
+        error: "Enter a question for the refund agent.",
+      };
+
       return NextResponse.json(
-        { error: "Enter a question for the refund agent." },
+        errorResponse,
         { status: 400 },
       );
     }
@@ -35,21 +45,24 @@ export async function POST(request: Request) {
       { config: DASHBOARD_DEMO_POLICY },
     );
     const response = formatMerchantRefundAgentResponse(question, result);
-
-    return NextResponse.json({
+    const responseBody: RefundAgentResponse = {
       response,
       decision: result.decision,
       recommendedNextAction: result.recommendedNextAction,
       reasons: result.reasons.map((reason) => reason.message),
-    });
+    };
+
+    return NextResponse.json(responseBody);
   } catch (error) {
+    const errorResponse: RefundAgentErrorResponse = {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Refund agent request failed.",
+    };
+
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Refund agent request failed.",
-      },
+      errorResponse,
       { status: 500 },
     );
   }
