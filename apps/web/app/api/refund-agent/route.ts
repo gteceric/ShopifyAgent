@@ -1,5 +1,5 @@
 import { checkRefundEligibility } from "@shopify-agent/core";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { DASHBOARD_DEMO_POLICY } from "../../dashboard-order-evaluation";
 import type {
   RefundAgentErrorResponse,
@@ -8,7 +8,7 @@ import type {
 } from "../../refund-agent-contract";
 import { formatMerchantRefundAgentResponse } from "../../refund-agent-response";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as RefundAgentRequestBody;
     const orderId =
