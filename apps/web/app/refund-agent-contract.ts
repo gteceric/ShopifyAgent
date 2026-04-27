@@ -8,12 +8,15 @@ export interface RefundAgentRequest {
   question: string;
 }
 
+export type RefundAgentProvider = "openai" | "ollama" | "fallback";
+
 export interface RefundAgentResponse {
   response: string;
   decision: RefundDecision;
   recommendedNextAction: RecommendedRefundAction;
   reasons: string[];
   usedFallback: boolean;
+  provider: RefundAgentProvider;
 }
 
 export interface RefundAgentErrorResponse {

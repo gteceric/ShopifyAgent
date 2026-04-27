@@ -3,12 +3,20 @@ import {
   type RefundAgentResponseContext,
 } from "./generate-refund-agent-response-with-openai";
 import { generateRefundAgentResponseWithOllama } from "./generate-refund-agent-response-with-ollama";
+import type { RefundAgentProvider } from "../../refund-agent-contract";
 
 export type RefundAgentResponder = (
   context: RefundAgentResponseContext,
 ) => Promise<string | undefined>;
 
-export function selectRefundAgentResponder(): RefundAgentResponder | undefined {
+export interface SelectedRefundAgentResponder {
+  provider: Exclude<RefundAgentProvider, "fallback">;
+  generateResponse: RefundAgentResponder;
+}
+
+export function selectRefundAgentResponder():
+  | SelectedRefundAgentResponder
+  | undefined {
   // Precedence:
   // 1. RESPONSE_MODEL_PROVIDER=none -> deterministic fallback only
   // 2. RESPONSE_MODEL_PROVIDER=ollama -> force Ollama
@@ -20,16 +28,28 @@ export function selectRefundAgentResponder(): RefundAgentResponder | undefined {
   }
 
   if (process.env.RESPONSE_MODEL_PROVIDER === "ollama") {
-    return generateRefundAgentResponseWithOllama;
+    return {
+      provider: "ollama",
+      generateResponse: generateRefundAgentResponseWithOllama,
+    };
   }
 
   if (process.env.RESPONSE_MODEL_PROVIDER === "openai") {
-    return generateRefundAgentResponseWithOpenAI;
+    return {
+      provider: "openai",
+      generateResponse: generateRefundAgentResponseWithOpenAI,
+    };
   }
 
   if (process.env.OLLAMA_MODEL || process.env.OLLAMA_ENDPOINT) {
-    return generateRefundAgentResponseWithOllama;
+    return {
+      provider: "ollama",
+      generateResponse: generateRefundAgentResponseWithOllama,
+    };
   }
 
-  return generateRefundAgentResponseWithOpenAI;
+  return {
+    provider: "openai",
+    generateResponse: generateRefundAgentResponseWithOpenAI,
+  };
 }

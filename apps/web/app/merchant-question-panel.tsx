@@ -5,6 +5,7 @@ import type { RefundDecision } from "./mock-orders";
 import { getDecisionLabel } from "./dashboard-helpers";
 import type {
   RefundAgentErrorResponse,
+  RefundAgentProvider,
   RefundAgentRequest,
   RefundAgentResponse,
 } from "./refund-agent-contract";
@@ -19,6 +20,17 @@ const STARTER_QUESTIONS = [
   "Should this be escalated to manual review?",
   "What should the support agent do next?",
 ];
+
+function getProviderLabel(provider: RefundAgentProvider): string {
+  switch (provider) {
+    case "openai":
+      return "OpenAI";
+    case "ollama":
+      return "Ollama";
+    case "fallback":
+      return "Deterministic fallback";
+  }
+}
 
 export function MerchantQuestionPanel({
   orderId,
@@ -151,6 +163,9 @@ export function MerchantQuestionPanel({
             </span>
             <span className="rounded-full border border-stone-900/10 bg-stone-50 px-3 py-1.5">
               Response mode: {reply.usedFallback ? "Deterministic fallback" : "AI-assisted"}
+            </span>
+            <span className="rounded-full border border-stone-900/10 bg-stone-50 px-3 py-1.5">
+              Provider: {getProviderLabel(reply.provider)}
             </span>
           </div>
 

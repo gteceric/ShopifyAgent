@@ -27,13 +27,14 @@ export async function POST(request: NextRequest) {
       { config: DASHBOARD_DEMO_POLICY },
     );
     const fallbackResponse = formatMerchantRefundAgentResponse(question, result);
-    const generateResponse = selectRefundAgentResponder();
+    const selectedResponder = selectRefundAgentResponder();
     let response = fallbackResponse;
     let usedFallback = true;
+    let provider: RefundAgentResponse["provider"] = "fallback";
 
-    if (generateResponse) {
+    if (selectedResponder) {
       try {
-        const generatedResponse = await generateResponse({
+        const generatedResponse = await selectedResponder.generateResponse({
           question,
           fallbackResponse,
           result,
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest) {
         if (generatedResponse) {
           response = generatedResponse;
           usedFallback = false;
+          provider = selectedResponder.provider;
         }
       } catch (error) {
         console.warn(
@@ -62,6 +64,7 @@ export async function POST(request: NextRequest) {
       recommendedNextAction: result.recommendedNextAction,
       reasons: result.reasons.map((reason) => reason.message),
       usedFallback,
+      provider,
     };
 
     return NextResponse.json(responseBody);
