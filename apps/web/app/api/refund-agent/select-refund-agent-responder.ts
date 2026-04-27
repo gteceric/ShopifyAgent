@@ -9,6 +9,12 @@ export type RefundAgentResponder = (
 ) => Promise<string | undefined>;
 
 export function selectRefundAgentResponder(): RefundAgentResponder | undefined {
+  // Precedence:
+  // 1. RESPONSE_MODEL_PROVIDER=none -> deterministic fallback only
+  // 2. RESPONSE_MODEL_PROVIDER=ollama -> force Ollama
+  // 3. RESPONSE_MODEL_PROVIDER=openai -> force OpenAI
+  // 4. implicit Ollama when OLLAMA_MODEL or OLLAMA_ENDPOINT is set
+  // 5. otherwise default to OpenAI
   if (process.env.RESPONSE_MODEL_PROVIDER === "none") {
     return undefined;
   }
