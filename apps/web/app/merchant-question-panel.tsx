@@ -149,6 +149,9 @@ export function MerchantQuestionPanel({
             <span className="rounded-full border border-stone-900/10 bg-stone-50 px-3 py-1.5">
               Next step: {reply.recommendedNextAction}
             </span>
+            <span className="rounded-full border border-stone-900/10 bg-stone-50 px-3 py-1.5">
+              Response mode: {reply.usedFallback ? "Deterministic fallback" : "AI-assisted"}
+            </span>
           </div>
 
           <p className="text-sm leading-7 text-stone-800">{reply.response}</p>

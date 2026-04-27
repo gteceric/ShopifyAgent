@@ -38,8 +38,11 @@ export function formatMerchantRefundAgentResponse(
   result: CheckRefundEligibilityResult,
 ): string {
   const opening = formatOpening(question, result);
-  const reasonSummary = result.reasons.map((reason) => reason.message).join(" ");
+  const reasonSummary = result.reasons
+    .map((reason) => reason.message)
+    .join(" ");
   const nextStep = formatNextStep(result);
 
+  //filter(Boolean) remove falsy value like "", false, undefined, null, 0
   return [opening, reasonSummary, nextStep].filter(Boolean).join(" ").trim();
 }

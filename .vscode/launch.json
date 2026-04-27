@@ -5,10 +5,22 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Debug Web App",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "web:dev"], // npm run web:dev
+      "env": {
+        "NODE_OPTIONS": "--inspect"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
       "name": "Debug MCP server test",
       "type": "node",
       "request": "launch",
-      "runtimeExecutable": "node",
+      "runtimeExecutable": "node", // run specific js file
       "runtimeArgs": [
         "--enable-source-maps",
         "--test",

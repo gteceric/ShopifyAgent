@@ -1,6 +1,7 @@
 import { checkRefundEligibility } from "@shopify-agent/core";
 import { NextRequest, NextResponse } from "next/server";
 import { parseRefundAgentRequest } from "./refund-agent-request";
+import { selectRefundAgentResponder } from "./select-refund-agent-responder";
 import { DASHBOARD_DEMO_POLICY } from "../../dashboard-order-evaluation";
 import type {
   RefundAgentErrorResponse,
@@ -25,12 +26,42 @@ export async function POST(request: NextRequest) {
       { orderId },
       { config: DASHBOARD_DEMO_POLICY },
     );
-    const response = formatMerchantRefundAgentResponse(question, result);
+    const fallbackResponse = formatMerchantRefundAgentResponse(question, result);
+    const generateResponse = selectRefundAgentResponder();
+    let response = fallbackResponse;
+    let usedFallback = true;
+
+    if (generateResponse) {
+      try {
+        const generatedResponse = await generateResponse({
+          question,
+          fallbackResponse,
+          result,
+        });
+
+        if (generatedResponse) {
+          response = generatedResponse;
+          usedFallback = false;
+        }
+      } catch (error) {
+        console.warn(
+          "Model-backed web refund responder failed. Falling back to deterministic response.",
+        );
+
+        if (error instanceof Error) {
+          console.warn(error.message);
+        } else {
+          console.warn(error);
+        }
+      }
+    }
+
     const responseBody: RefundAgentResponse = {
       response,
       decision: result.decision,
       recommendedNextAction: result.recommendedNextAction,
       reasons: result.reasons.map((reason) => reason.message),
+      usedFallback,
     };
 
     return NextResponse.json(responseBody);

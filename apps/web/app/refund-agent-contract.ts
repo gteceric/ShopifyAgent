@@ -13,6 +13,7 @@ export interface RefundAgentResponse {
   decision: RefundDecision;
   recommendedNextAction: RecommendedRefundAction;
   reasons: string[];
+  usedFallback: boolean;
 }
 
 export interface RefundAgentErrorResponse {
