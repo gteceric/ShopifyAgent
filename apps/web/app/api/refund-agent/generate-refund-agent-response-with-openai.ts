@@ -2,6 +2,7 @@ import type { CheckRefundEligibilityResult } from "@shopify-agent/core";
 
 const DEFAULT_OPENAI_MODEL = "gpt-5.2";
 const DEFAULT_OPENAI_ENDPOINT = "https://api.openai.com/v1/responses";
+const DEFAULT_OPENAI_TIMEOUT_MS = 8000;
 
 export interface RefundAgentResponseContext {
   question: string;
@@ -14,6 +15,7 @@ export interface OpenAIRefundAgentResponderOptions {
   model?: string;
   endpoint?: string;
   fetchImpl?: typeof fetch;
+  timeoutMs?: number;
 }
 
 function buildSystemPrompt(): string {
@@ -63,37 +65,51 @@ export async function generateRefundAgentResponseWithOpenAI(
   const fetchImpl = options.fetchImpl ?? fetch;
   const endpoint = options.endpoint ?? DEFAULT_OPENAI_ENDPOINT;
   const model = options.model ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_OPENAI_TIMEOUT_MS;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  const response = await fetchImpl(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      max_output_tokens: 220,
-      input: [
-        {
-          role: "system",
-          content: [{ type: "input_text", text: buildSystemPrompt() }],
-        },
-        {
-          role: "user",
-          content: [{ type: "input_text", text: buildUserPrompt(context) }],
-        },
-      ],
-    }),
-  });
+  try {
+    const response = await fetchImpl(endpoint, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        max_output_tokens: 220,
+        input: [
+          {
+            role: "system",
+            content: [{ type: "input_text", text: buildSystemPrompt() }],
+          },
+          {
+            role: "user",
+            content: [{ type: "input_text", text: buildUserPrompt(context) }],
+          },
+        ],
+      }),
+    });
 
-  if (!response.ok) {
-    throw new Error(
-      `OpenAI responder failed with status ${response.status}: ${await response.text()}`,
-    );
+    if (!response.ok) {
+      throw new Error(
+        `OpenAI responder failed with status ${response.status}: ${await response.text()}`,
+      );
+    }
+
+    const payload = (await response.json()) as { output_text?: string };
+    const outputText = payload.output_text?.trim();
+
+    return outputText && outputText.length > 0 ? outputText : undefined;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`OpenAI responder timed out after ${timeoutMs}ms`);
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  const payload = (await response.json()) as { output_text?: string };
-  const outputText = payload.output_text?.trim();
-
-  return outputText && outputText.length > 0 ? outputText : undefined;
 }

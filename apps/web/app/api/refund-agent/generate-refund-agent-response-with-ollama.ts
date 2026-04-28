@@ -2,6 +2,7 @@ import type { CheckRefundEligibilityResult } from "@shopify-agent/core";
 
 const DEFAULT_OLLAMA_MODEL = "qwen3-coder:30b-a3b-q8_0";
 const DEFAULT_OLLAMA_ENDPOINT = "http://localhost:11434/api/chat";
+const DEFAULT_OLLAMA_TIMEOUT_MS = 8000;
 
 export interface RefundAgentResponseContext {
   question: string;
@@ -13,6 +14,7 @@ export interface OllamaRefundAgentResponderOptions {
   model?: string;
   endpoint?: string;
   fetchImpl?: typeof fetch;
+  timeoutMs?: number;
 }
 
 function buildSystemPrompt(): string {
@@ -56,38 +58,52 @@ export async function generateRefundAgentResponseWithOllama(
   const fetchImpl = options.fetchImpl ?? fetch;
   const endpoint = options.endpoint ?? DEFAULT_OLLAMA_ENDPOINT;
   const model = options.model ?? process.env.OLLAMA_MODEL ?? DEFAULT_OLLAMA_MODEL;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_OLLAMA_TIMEOUT_MS;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  const response = await fetchImpl(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      stream: false,
-      messages: [
-        {
-          role: "system",
-          content: buildSystemPrompt(),
-        },
-        {
-          role: "user",
-          content: buildUserPrompt(context),
-        },
-      ],
-    }),
-  });
+  try {
+    const response = await fetchImpl(endpoint, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        stream: false,
+        messages: [
+          {
+            role: "system",
+            content: buildSystemPrompt(),
+          },
+          {
+            role: "user",
+            content: buildUserPrompt(context),
+          },
+        ],
+      }),
+    });
 
-  if (!response.ok) {
-    throw new Error(
-      `Ollama responder failed with status ${response.status}: ${await response.text()}`,
-    );
+    if (!response.ok) {
+      throw new Error(
+        `Ollama responder failed with status ${response.status}: ${await response.text()}`,
+      );
+    }
+
+    const payload = (await response.json()) as {
+      message?: { content?: string };
+    };
+    const outputText = payload.message?.content?.trim();
+
+    return outputText && outputText.length > 0 ? outputText : undefined;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`Ollama responder timed out after ${timeoutMs}ms`);
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  const payload = (await response.json()) as {
-    message?: { content?: string };
-  };
-  const outputText = payload.message?.content?.trim();
-
-  return outputText && outputText.length > 0 ? outputText : undefined;
 }

@@ -67,3 +67,20 @@ test("returns output_text from the OpenAI Responses API payload", async () => {
 
   assert.equal(response, "AI-assisted refund answer.");
 });
+
+test("throws a timeout error when the OpenAI request is aborted", async () => {
+  await assert.rejects(
+    () =>
+      generateRefundAgentResponseWithOpenAI(makeContext(), {
+        apiKey: "test-key",
+        timeoutMs: 10,
+        fetchImpl: (_input, init) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => {
+              reject(new DOMException("Request aborted", "AbortError"));
+            });
+          }),
+      }),
+    /OpenAI responder timed out after 10ms/,
+  );
+});
