@@ -1,14 +1,9 @@
 import type { CheckRefundEligibilityResult } from "@shopify-agent/core";
+import { readTimeoutMs } from "./read-timeout-ms";
 
 const DEFAULT_OLLAMA_MODEL = "qwen3-coder:30b-a3b-q8_0";
 const DEFAULT_OLLAMA_ENDPOINT = "http://localhost:11434/api/chat";
 const DEFAULT_OLLAMA_TIMEOUT_MS = 8000;
-
-function readTimeoutMs(value: string | undefined, defaultValue: number): number {
-  const parsed = Number(value);
-
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : defaultValue;
-}
 
 export interface RefundAgentResponseContext {
   question: string;

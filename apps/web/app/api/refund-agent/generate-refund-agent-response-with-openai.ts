@@ -1,14 +1,9 @@
 import type { CheckRefundEligibilityResult } from "@shopify-agent/core";
+import { readTimeoutMs } from "./read-timeout-ms";
 
 const DEFAULT_OPENAI_MODEL = "gpt-5.2";
 const DEFAULT_OPENAI_ENDPOINT = "https://api.openai.com/v1/responses";
 const DEFAULT_OPENAI_TIMEOUT_MS = 8000;
-
-function readTimeoutMs(value: string | undefined, defaultValue: number): number {
-  const parsed = Number(value);
-
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : defaultValue;
-}
 
 export interface RefundAgentResponseContext {
   question: string;
