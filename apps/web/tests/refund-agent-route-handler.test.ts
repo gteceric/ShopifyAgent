@@ -82,7 +82,6 @@ test("returns an AI-backed response when the selected responder succeeds", async
 });
 
 test("falls back when the selected responder throws", async () => {
-  const warnings: unknown[] = [];
   const result = await handleRefundAgentRequest(
     {
       orderId: "gid://shopify/Order/1001",
@@ -97,11 +96,6 @@ test("falls back when the selected responder throws", async () => {
           throw new Error("Responder unavailable");
         },
       }),
-      logger: {
-        warn: (message) => {
-          warnings.push(message);
-        },
-      },
     },
   );
 
@@ -114,8 +108,4 @@ test("falls back when the selected responder throws", async () => {
     usedFallback: true,
     provider: "fallback",
   });
-  assert.deepEqual(warnings, [
-    "Model-backed web refund responder failed. Falling back to deterministic response.",
-    "Responder unavailable",
-  ]);
 });

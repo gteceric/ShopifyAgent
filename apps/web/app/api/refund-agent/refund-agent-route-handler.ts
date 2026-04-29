@@ -12,6 +12,7 @@ import type {
   RefundAgentResponse,
 } from "../../refund-agent-contract";
 import { formatMerchantRefundAgentResponse } from "../../refund-agent-response";
+import { logger } from "../../logger";
 
 export interface RefundAgentRouteHandlerDeps {
   checkRefundEligibilityFn?: (
@@ -23,7 +24,6 @@ export interface RefundAgentRouteHandlerDeps {
     result: CheckRefundEligibilityResult,
   ) => string;
   selectResponder?: () => SelectedRefundAgentResponder | undefined;
-  logger?: Pick<Console, "warn">;
 }
 
 export type RefundAgentRouteHandlerResult = {
@@ -35,6 +35,8 @@ export async function handleRefundAgentRequest(
   body: RefundAgentRequestBody,
   deps: RefundAgentRouteHandlerDeps = {},
 ): Promise<RefundAgentRouteHandlerResult> {
+  const logPrefix = "[handleRefundAgentRequest]";
+  const startedAt = Date.now();
   const parsedRequest = parseRefundAgentRequest(body);
 
   if (!parsedRequest.ok) {
@@ -50,7 +52,6 @@ export async function handleRefundAgentRequest(
   const formatResponse =
     deps.formatResponse ?? formatMerchantRefundAgentResponse;
   const selectResponder = deps.selectResponder ?? selectRefundAgentResponder;
-  const logger = deps.logger ?? console;
 
   const result = await checkRefundEligibilityFn(
     { orderId },
@@ -77,16 +78,23 @@ export async function handleRefundAgentRequest(
       }
     } catch (error) {
       logger.warn(
-        "Model-backed web refund responder failed. Falling back to deterministic response.",
+        `${logPrefix} Model-backed web refund responder failed. Falling back to deterministic response.`,
+      );
+      logger.warn(
+        `${logPrefix} Refund agent provider: ${selectedResponder.provider}`,
       );
 
       if (error instanceof Error) {
-        logger.warn(error.message);
+        logger.warn(`${logPrefix} ${error.message}`);
       } else {
-        logger.warn(error);
+        logger.warn(`${logPrefix} ${String(error)}`);
       }
     }
   }
+
+  logger.info(
+    `${logPrefix} Refund agent response completed in ${Date.now() - startedAt}ms (provider=${provider}, usedFallback=${usedFallback})`,
+  );
 
   return {
     status: 200,
