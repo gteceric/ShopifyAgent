@@ -4,6 +4,12 @@ const DEFAULT_OPENAI_MODEL = "gpt-5.2";
 const DEFAULT_OPENAI_ENDPOINT = "https://api.openai.com/v1/responses";
 const DEFAULT_OPENAI_TIMEOUT_MS = 8000;
 
+function readTimeoutMs(value: string | undefined, defaultValue: number): number {
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : defaultValue;
+}
+
 export interface RefundAgentResponseContext {
   question: string;
   fallbackResponse: string;
@@ -65,7 +71,9 @@ export async function generateRefundAgentResponseWithOpenAI(
   const fetchImpl = options.fetchImpl ?? fetch;
   const endpoint = options.endpoint ?? DEFAULT_OPENAI_ENDPOINT;
   const model = options.model ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
-  const timeoutMs = options.timeoutMs ?? DEFAULT_OPENAI_TIMEOUT_MS;
+  const timeoutMs =
+    options.timeoutMs ??
+    readTimeoutMs(process.env.OPENAI_TIMEOUT_MS, DEFAULT_OPENAI_TIMEOUT_MS);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 

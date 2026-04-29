@@ -4,6 +4,12 @@ const DEFAULT_OLLAMA_MODEL = "qwen3-coder:30b-a3b-q8_0";
 const DEFAULT_OLLAMA_ENDPOINT = "http://localhost:11434/api/chat";
 const DEFAULT_OLLAMA_TIMEOUT_MS = 8000;
 
+function readTimeoutMs(value: string | undefined, defaultValue: number): number {
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : defaultValue;
+}
+
 export interface RefundAgentResponseContext {
   question: string;
   fallbackResponse: string;
@@ -58,7 +64,9 @@ export async function generateRefundAgentResponseWithOllama(
   const fetchImpl = options.fetchImpl ?? fetch;
   const endpoint = options.endpoint ?? DEFAULT_OLLAMA_ENDPOINT;
   const model = options.model ?? process.env.OLLAMA_MODEL ?? DEFAULT_OLLAMA_MODEL;
-  const timeoutMs = options.timeoutMs ?? DEFAULT_OLLAMA_TIMEOUT_MS;
+  const timeoutMs =
+    options.timeoutMs ??
+    readTimeoutMs(process.env.OLLAMA_TIMEOUT_MS, DEFAULT_OLLAMA_TIMEOUT_MS);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
