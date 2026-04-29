@@ -109,3 +109,30 @@ test("falls back when the selected responder throws", async () => {
     provider: "fallback",
   });
 });
+
+test("falls back when the selected responder returns an empty response", async () => {
+  const result = await handleRefundAgentRequest(
+    {
+      orderId: "gid://shopify/Order/1001",
+      question: "Can I refund this order?",
+    },
+    {
+      checkRefundEligibilityFn: async () => makeResult(),
+      formatResponse: () => "Fallback response.",
+      selectResponder: (): SelectedRefundAgentResponder => ({
+        provider: "ollama",
+        generateResponse: async () => "", // empty response => need to use fallback
+      }),
+    },
+  );
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body, {
+    response: "Fallback response.",
+    decision: RefundDecision.Ineligible,
+    recommendedNextAction: RecommendedRefundAction.Deny,
+    reasons: ["Order is outside the 30-day refund window."],
+    usedFallback: true,
+    provider: "fallback",
+  });
+});
