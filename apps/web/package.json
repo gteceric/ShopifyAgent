@@ -9,7 +9,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import tsx --test tests/**/*.test.ts"
+    "test": "NODE_ENV=test node --import tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
     "next": "16.2.3",
