@@ -31,13 +31,18 @@ function makeContext(): RefundAgentResponseContext {
       evidence: {
         orderAgeDays: 7,
         refundWindowDays: 30,
+        effectiveRefundWindowDays: 30,
         cancelWindowDays: 30,
+        effectiveCancelWindowDays: 30,
         orderTotalAmount: 48,
         financialStatus: "paid",
         fulfillmentStatus: "fulfilled",
         hasReturnableFulfillments: true,
         alreadyFullyRefunded: false,
         allItemsFinalSale: false,
+        itemCategories: [],
+        policyTags: [],
+        matchedCategoryWindowCategories: [],
         flags: {
           fraudHold: false,
           manualReview: false,

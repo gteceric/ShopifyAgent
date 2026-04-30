@@ -9,6 +9,7 @@ export type RefundDecision =
 
 export const RefundReasonCode = {
   ManualReviewRequired: "manual_review_required",
+  MerchantExceptionRuleApplied: "merchant_exception_rule_applied",
   FinancialStatusReviewRequired: "financial_status_review_required",
   HighValueOrderReviewRequired: "high_value_order_review_required",
   PartialFulfillmentReviewRequired: "partial_fulfillment_review_required",
@@ -58,12 +59,28 @@ export const FulfillmentStatus = {
 export type FulfillmentStatus =
   (typeof FulfillmentStatus)[keyof typeof FulfillmentStatus];
 
+export interface RefundPolicyCategoryWindowOverride {
+  category: string;
+  refundWindowDays?: number;
+  cancelWindowDays?: number;
+}
+
+export interface RefundPolicyExceptionRule {
+  tag: string;
+  decision:
+    | typeof RefundDecision.Eligible
+    | typeof RefundDecision.ManualReview;
+  message: string;
+}
+
 // Policy settings are code-defined for now, but this type is meant to become
 // the persisted merchant-configurable policy contract later.
 export interface RefundPolicyConfig {
   refundWindowDays: number;
   cancelWindowDays?: number;
   highValueOrderThreshold?: number;
+  categoryWindowOverrides?: RefundPolicyCategoryWindowOverride[];
+  exceptionRules?: RefundPolicyExceptionRule[];
   finalSaleUnfulfilledDecision?:
     | typeof RefundDecision.Eligible
     | typeof RefundDecision.Ineligible
@@ -94,13 +111,17 @@ export interface RefundPolicyInput {
   hasReturnableFulfillments: boolean;
   alreadyFullyRefunded: boolean;
   allItemsFinalSale: boolean;
+  itemCategories?: string[];
+  policyTags?: string[];
   flags?: RefundPolicyFlags;
 }
 
 export interface RefundPolicyEvidence {
   orderAgeDays: number;
   refundWindowDays: number;
+  effectiveRefundWindowDays: number;
   cancelWindowDays: number;
+  effectiveCancelWindowDays: number;
   orderTotalAmount: number;
   highValueOrderThreshold?: number;
   financialStatus: FinancialStatus;
@@ -108,6 +129,10 @@ export interface RefundPolicyEvidence {
   hasReturnableFulfillments: boolean;
   alreadyFullyRefunded: boolean;
   allItemsFinalSale: boolean;
+  itemCategories: string[];
+  policyTags: string[];
+  matchedCategoryWindowCategories: string[];
+  matchedExceptionRuleTag?: string;
   flags: Required<RefundPolicyFlags>;
 }
 

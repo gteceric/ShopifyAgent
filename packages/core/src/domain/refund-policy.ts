@@ -5,8 +5,10 @@ import {
   RefundReasonCode,
 } from "./refund-policy.types.js";
 import type {
+  RefundPolicyCategoryWindowOverride,
   RefundPolicyConfig,
   RefundPolicyEvidence,
+  RefundPolicyExceptionRule,
   RefundPolicyFlags,
   RefundPolicyInput,
   RefundPolicyResult,
@@ -17,6 +19,8 @@ const DEFAULT_POLICY: Required<RefundPolicyConfig> = {
   refundWindowDays: 30,
   cancelWindowDays: 30,
   highValueOrderThreshold: Number.POSITIVE_INFINITY,
+  categoryWindowOverrides: [],
+  exceptionRules: [],
   finalSaleUnfulfilledDecision: RefundDecision.Ineligible,
   unfulfilledOutsideWindowDecision: RefundDecision.ManualReview,
   alreadyFullyRefundedDecision: RefundDecision.Ineligible,
@@ -94,6 +98,66 @@ function preFulfillmentCancellationReviewRequiredMessage(
   return `Order is unfulfilled but older than the ${cancelWindowDays}-day cancellation window and requires human review.`;
 }
 
+function normalizeStringArray(values?: string[]): string[] {
+  if (!values) {
+    return [];
+  }
+
+  return values
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+}
+
+function findMatchingCategoryOverrides(
+  itemCategories: string[],
+  overrides: RefundPolicyCategoryWindowOverride[],
+): RefundPolicyCategoryWindowOverride[] {
+  const normalizedCategories = new Set(
+    itemCategories.map((category) => category.toLowerCase()),
+  );
+
+  return overrides.filter((override) =>
+    normalizedCategories.has(override.category.trim().toLowerCase()),
+  );
+}
+
+function resolveEffectiveRefundWindowDays(
+  defaultWindowDays: number,
+  overrides: RefundPolicyCategoryWindowOverride[],
+): number {
+  const categoryWindowDays = overrides
+    .map((override) => override.refundWindowDays)
+    .filter((value): value is number => value !== undefined);
+
+  return categoryWindowDays.length > 0
+    ? Math.min(...categoryWindowDays)
+    : defaultWindowDays;
+}
+
+function resolveEffectiveCancelWindowDays(
+  defaultWindowDays: number,
+  overrides: RefundPolicyCategoryWindowOverride[],
+): number {
+  const categoryWindowDays = overrides
+    .map((override) => override.cancelWindowDays)
+    .filter((value): value is number => value !== undefined);
+
+  return categoryWindowDays.length > 0
+    ? Math.min(...categoryWindowDays)
+    : defaultWindowDays;
+}
+
+function findMatchingExceptionRule(
+  policyTags: string[],
+  exceptionRules: RefundPolicyExceptionRule[],
+): RefundPolicyExceptionRule | undefined {
+  const normalizedTags = new Set(policyTags.map((tag) => tag.toLowerCase()));
+
+  return exceptionRules.find((rule) =>
+    normalizedTags.has(rule.tag.trim().toLowerCase()),
+  );
+}
+
 function normalizeFlags(
   flags?: RefundPolicyFlags,
 ): Required<RefundPolicyFlags> {
@@ -117,6 +181,8 @@ export function evaluateRefundPolicy(
     ...config,
   };
   const flags = normalizeFlags(input.flags);
+  const itemCategories = normalizeStringArray(input.itemCategories);
+  const policyTags = normalizeStringArray(input.policyTags);
   const isUnfulfilledOrder =
     input.fulfillmentStatus === FulfillmentStatus.Unfulfilled;
   const isPartiallyFulfilledOrder =
@@ -136,10 +202,27 @@ export function evaluateRefundPolicy(
     input.financialStatus === FinancialStatus.Unknown;
   const isUnfulfilledFinalSaleOrder =
     isUnfulfilledOrder && input.allItemsFinalSale && !flags.vipOverride;
+  const matchingCategoryOverrides = findMatchingCategoryOverrides(
+    itemCategories,
+    effectiveConfig.categoryWindowOverrides,
+  );
+  const effectiveRefundWindowDays = resolveEffectiveRefundWindowDays(
+    effectiveConfig.refundWindowDays,
+    matchingCategoryOverrides,
+  );
+  const effectiveCancelWindowDays = resolveEffectiveCancelWindowDays(
+    effectiveConfig.cancelWindowDays,
+    matchingCategoryOverrides,
+  );
+  const matchedCategoryWindowCategories = matchingCategoryOverrides.map(
+    (override) => override.category,
+  );
   const evidence: RefundPolicyEvidence = {
     orderAgeDays: input.orderAgeDays,
     refundWindowDays: effectiveConfig.refundWindowDays,
+    effectiveRefundWindowDays,
     cancelWindowDays: effectiveConfig.cancelWindowDays,
+    effectiveCancelWindowDays,
     orderTotalAmount: input.orderTotalAmount,
     highValueOrderThreshold: isHighValueOrderThresholdFinite
       ? effectiveConfig.highValueOrderThreshold
@@ -149,6 +232,9 @@ export function evaluateRefundPolicy(
     hasReturnableFulfillments: input.hasReturnableFulfillments,
     alreadyFullyRefunded: input.alreadyFullyRefunded,
     allItemsFinalSale: input.allItemsFinalSale,
+    itemCategories,
+    policyTags,
+    matchedCategoryWindowCategories,
     flags,
   };
   const reviewReasons: RefundReason[] = [];
@@ -310,7 +396,7 @@ export function evaluateRefundPolicy(
 
   if (
     isUnfulfilledOrder &&
-    input.orderAgeDays > effectiveConfig.cancelWindowDays &&
+    input.orderAgeDays > effectiveCancelWindowDays &&
     !flags.vipOverride
   ) {
     switch (effectiveConfig.unfulfilledOutsideWindowDecision) {
@@ -324,7 +410,7 @@ export function evaluateRefundPolicy(
             ),
             makeReason(
               RefundReasonCode.OutsideCancelWindow,
-              outsideCancelWindowMessage(effectiveConfig.cancelWindowDays),
+              outsideCancelWindowMessage(effectiveCancelWindowDays),
             ),
           ],
           evidence,
@@ -333,7 +419,7 @@ export function evaluateRefundPolicy(
         blockingReasons.push(
           makeReason(
             RefundReasonCode.OutsideCancelWindow,
-            outsideCancelWindowMessage(effectiveConfig.cancelWindowDays),
+            outsideCancelWindowMessage(effectiveCancelWindowDays),
           ),
         );
         break;
@@ -342,7 +428,7 @@ export function evaluateRefundPolicy(
           makeReason(
             RefundReasonCode.PreFulfillmentCancellationReviewRequired,
             preFulfillmentCancellationReviewRequiredMessage(
-              effectiveConfig.cancelWindowDays,
+              effectiveCancelWindowDays,
             ),
           ),
         );
@@ -356,25 +442,53 @@ export function evaluateRefundPolicy(
   }
 
   if (
-    input.orderAgeDays > effectiveConfig.refundWindowDays &&
+    !isUnfulfilledOrder &&
+    input.orderAgeDays > effectiveRefundWindowDays &&
     !flags.vipOverride
   ) {
     blockingReasons.push(
       makeReason(
         RefundReasonCode.OutsideRefundWindow,
-        outsideRefundWindowMessage(effectiveConfig.refundWindowDays),
+        outsideRefundWindowMessage(effectiveRefundWindowDays),
       ),
     );
   } else if (
-    input.orderAgeDays > effectiveConfig.refundWindowDays &&
+    !isUnfulfilledOrder &&
+    input.orderAgeDays > effectiveRefundWindowDays &&
     flags.vipOverride
   ) {
     overrideReasons.push(
       makeReason(
         RefundReasonCode.VipOverrideApplied,
-        vipOverrideOutsideRefundWindowMessage(effectiveConfig.refundWindowDays),
+        vipOverrideOutsideRefundWindowMessage(effectiveRefundWindowDays),
       ),
     );
+  }
+
+  if (blockingReasons.length > 0) {
+    const matchingExceptionRule = findMatchingExceptionRule(
+      policyTags,
+      effectiveConfig.exceptionRules,
+    );
+
+    if (matchingExceptionRule) {
+      const reasons = [
+        makeReason(
+          RefundReasonCode.MerchantExceptionRuleApplied,
+          matchingExceptionRule.message,
+        ),
+        blockingReasons[0]!,
+      ];
+
+      return {
+        decision: matchingExceptionRule.decision,
+        reasons,
+        evidence: {
+          ...evidence,
+          matchedExceptionRuleTag: matchingExceptionRule.tag,
+        },
+      };
+    }
   }
 
   if (
@@ -418,7 +532,7 @@ export function evaluateRefundPolicy(
           ? [
               makeReason(
                 RefundReasonCode.WithinCancelWindow,
-                withinCancelWindowMessage(effectiveConfig.cancelWindowDays),
+                withinCancelWindowMessage(effectiveCancelWindowDays),
               ),
               makeReason(
                 RefundReasonCode.CancelableBeforeFulfillment,
@@ -428,7 +542,7 @@ export function evaluateRefundPolicy(
           : [
               makeReason(
                 RefundReasonCode.WithinRefundWindow,
-                withinRefundWindowMessage(effectiveConfig.refundWindowDays),
+                withinRefundWindowMessage(effectiveRefundWindowDays),
               ),
               makeReason(
                 RefundReasonCode.ReturnableFulfillmentsAvailable,

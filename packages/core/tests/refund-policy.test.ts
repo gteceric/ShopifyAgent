@@ -301,6 +301,105 @@ test("returns manual_review for stale unfulfilled orders when merchant policy fo
   );
 });
 
+test("uses the configured fulfilled refund window for delivered orders", () => {
+  const result = evaluateRefundPolicy(
+    makeInput({
+      orderAgeDays: 20,
+    }),
+    {
+      refundWindowDays: 14,
+      alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+    },
+  );
+
+  assert.equal(result.decision, RefundDecision.Ineligible);
+  assert.ok(
+    result.reasons.some(
+      (reason) => reason.code === RefundReasonCode.OutsideRefundWindow,
+    ),
+  );
+  assert.equal(result.evidence.effectiveRefundWindowDays, 14);
+});
+
+test("uses the configured unfulfilled cancellation window for pre-shipment orders", () => {
+  const result = evaluateRefundPolicy(
+    makeInput({
+      orderAgeDays: 10,
+      fulfillmentStatus: FulfillmentStatus.Unfulfilled,
+      hasReturnableFulfillments: false,
+    }),
+    {
+      refundWindowDays: 30,
+      cancelWindowDays: 7,
+      alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+    },
+  );
+
+  assert.equal(result.decision, RefundDecision.ManualReview);
+  assert.ok(
+    result.reasons.some(
+      (reason) =>
+        reason.code ===
+        RefundReasonCode.PreFulfillmentCancellationReviewRequired,
+    ),
+  );
+  assert.equal(result.evidence.effectiveCancelWindowDays, 7);
+});
+
+test("uses the strictest matching category refund window for fulfilled orders", () => {
+  const result = evaluateRefundPolicy(
+    makeInput({
+      orderAgeDays: 20,
+      itemCategories: ["apparel", "accessories"],
+    }),
+    {
+      refundWindowDays: 30,
+      categoryWindowOverrides: [
+        { category: "apparel", refundWindowDays: 14 },
+        { category: "accessories", refundWindowDays: 21 },
+      ],
+      alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+    },
+  );
+
+  assert.equal(result.decision, RefundDecision.Ineligible);
+  assert.equal(result.evidence.effectiveRefundWindowDays, 14);
+  assert.deepEqual(result.evidence.matchedCategoryWindowCategories, [
+    "apparel",
+    "accessories",
+  ]);
+});
+
+test("applies merchant exception rules when policy tags match a blocking refund case", () => {
+  const result = evaluateRefundPolicy(
+    makeInput({
+      orderAgeDays: 45,
+      policyTags: ["loyalty_recovery"],
+    }),
+    {
+      refundWindowDays: 30,
+      exceptionRules: [
+        {
+          tag: "loyalty_recovery",
+          decision: RefundDecision.Eligible,
+          message:
+            "Merchant loyalty recovery rule allows a refund outside the standard window.",
+        },
+      ],
+      alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+    },
+  );
+
+  assert.equal(result.decision, RefundDecision.Eligible);
+  assert.ok(
+    result.reasons.some(
+      (reason) =>
+        reason.code === RefundReasonCode.MerchantExceptionRuleApplied,
+    ),
+  );
+  assert.equal(result.evidence.matchedExceptionRuleTag, "loyalty_recovery");
+});
+
 test("returns ineligible when order is outside the refund window", () => {
   const result = evaluateRefundPolicy(makeInput({ orderAgeDays: 45 }));
 
