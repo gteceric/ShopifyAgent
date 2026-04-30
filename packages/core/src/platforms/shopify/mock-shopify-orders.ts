@@ -6,6 +6,7 @@ import {
 export interface ShopifyLineItem {
   sku: string;
   finalSale: boolean;
+  category?: string;
 }
 
 export interface ShopifyRiskFlags {
@@ -39,7 +40,13 @@ export const MOCK_SHOPIFY_ORDERS: Record<string, ShopifyOrderRecord> = {
     displayFulfillmentStatus: FulfillmentStatus.Fulfilled,
     returnableFulfillmentsCount: 1,
     isFullyRefunded: false,
-    lineItems: [{ sku: "ARCHIVE-JACKET", finalSale: false }],
+    lineItems: [
+      {
+        sku: "ARCHIVE-JACKET",
+        finalSale: false,
+        category: "Apparel & Accessories > Clothing > Outerwear",
+      },
+    ],
   },
   "gid://shopify/Order/6261109358705": {
     id: "gid://shopify/Order/6261109358705",
@@ -51,7 +58,13 @@ export const MOCK_SHOPIFY_ORDERS: Record<string, ShopifyOrderRecord> = {
     displayFulfillmentStatus: FulfillmentStatus.Unfulfilled,
     returnableFulfillmentsCount: 0,
     isFullyRefunded: false,
-    lineItems: [{ sku: "LATE-CANCEL", finalSale: false }],
+    lineItems: [
+      {
+        sku: "LATE-CANCEL",
+        finalSale: false,
+        category: "Office Supplies",
+      },
+    ],
   },
   "gid://shopify/Order/1001": {
     id: "gid://shopify/Order/1001",
@@ -63,7 +76,13 @@ export const MOCK_SHOPIFY_ORDERS: Record<string, ShopifyOrderRecord> = {
     displayFulfillmentStatus: FulfillmentStatus.Fulfilled,
     returnableFulfillmentsCount: 1,
     isFullyRefunded: false,
-    lineItems: [{ sku: "DEMO-TEE", finalSale: false }],
+    lineItems: [
+      {
+        sku: "DEMO-TEE",
+        finalSale: false,
+        category: "Apparel & Accessories > Clothing > Shirts & Tops",
+      },
+    ],
   },
   "gid://shopify/Order/1044": {
     id: "gid://shopify/Order/1044",
@@ -75,7 +94,13 @@ export const MOCK_SHOPIFY_ORDERS: Record<string, ShopifyOrderRecord> = {
     displayFulfillmentStatus: FulfillmentStatus.Fulfilled,
     returnableFulfillmentsCount: 1,
     isFullyRefunded: false,
-    lineItems: [{ sku: "HIGH-VALUE", finalSale: false }],
+    lineItems: [
+      {
+        sku: "HIGH-VALUE",
+        finalSale: false,
+        category: "Electronics",
+      },
+    ],
   },
   "gid://shopify/Order/1089": {
     id: "gid://shopify/Order/1089",
@@ -87,7 +112,13 @@ export const MOCK_SHOPIFY_ORDERS: Record<string, ShopifyOrderRecord> = {
     displayFulfillmentStatus: FulfillmentStatus.Fulfilled,
     returnableFulfillmentsCount: 1,
     isFullyRefunded: false,
-    lineItems: [{ sku: "SPRING-MUG", finalSale: false }],
+    lineItems: [
+      {
+        sku: "SPRING-MUG",
+        finalSale: false,
+        category: "Home & Garden > Kitchen & Dining",
+      },
+    ],
   },
   "gid://shopify/Order/1127": {
     id: "gid://shopify/Order/1127",
@@ -99,7 +130,13 @@ export const MOCK_SHOPIFY_ORDERS: Record<string, ShopifyOrderRecord> = {
     displayFulfillmentStatus: FulfillmentStatus.Fulfilled,
     returnableFulfillmentsCount: 1,
     isFullyRefunded: false,
-    lineItems: [{ sku: "WINTER-SET", finalSale: false }],
+    lineItems: [
+      {
+        sku: "WINTER-SET",
+        finalSale: false,
+        category: "Apparel & Accessories > Clothing",
+      },
+    ],
   },
   "gid://shopify/Order/1182": {
     id: "gid://shopify/Order/1182",
@@ -111,7 +148,13 @@ export const MOCK_SHOPIFY_ORDERS: Record<string, ShopifyOrderRecord> = {
     displayFulfillmentStatus: FulfillmentStatus.Fulfilled,
     returnableFulfillmentsCount: 1,
     isFullyRefunded: false,
-    lineItems: [{ sku: "PREMIUM-BUNDLE", finalSale: false }],
+    lineItems: [
+      {
+        sku: "PREMIUM-BUNDLE",
+        finalSale: false,
+        category: "Electronics",
+      },
+    ],
   },
   "gid://shopify/Order/1215": {
     id: "gid://shopify/Order/1215",
@@ -123,7 +166,13 @@ export const MOCK_SHOPIFY_ORDERS: Record<string, ShopifyOrderRecord> = {
     displayFulfillmentStatus: FulfillmentStatus.Unfulfilled,
     returnableFulfillmentsCount: 0,
     isFullyRefunded: false,
-    lineItems: [{ sku: "OPS-HOLD", finalSale: false }],
+    lineItems: [
+      {
+        sku: "OPS-HOLD",
+        finalSale: false,
+        category: "Office Supplies",
+      },
+    ],
   },
   "gid://shopify/Order/1279": {
     id: "gid://shopify/Order/1279",
@@ -135,7 +184,13 @@ export const MOCK_SHOPIFY_ORDERS: Record<string, ShopifyOrderRecord> = {
     displayFulfillmentStatus: FulfillmentStatus.Unfulfilled,
     returnableFulfillmentsCount: 0,
     isFullyRefunded: false,
-    lineItems: [{ sku: "QUICK-CANCEL", finalSale: false }],
+    lineItems: [
+      {
+        sku: "QUICK-CANCEL",
+        finalSale: false,
+        category: "Office Supplies",
+      },
+    ],
   },
   "gid://shopify/Order/1002": {
     id: "gid://shopify/Order/1002",
@@ -147,6 +202,12 @@ export const MOCK_SHOPIFY_ORDERS: Record<string, ShopifyOrderRecord> = {
     displayFulfillmentStatus: FulfillmentStatus.Fulfilled,
     returnableFulfillmentsCount: 0,
     isFullyRefunded: true,
-    lineItems: [{ sku: "DEMO-MUG", finalSale: false }],
+    lineItems: [
+      {
+        sku: "DEMO-MUG",
+        finalSale: false,
+        category: "Home & Garden > Kitchen & Dining",
+      },
+    ],
   },
 };

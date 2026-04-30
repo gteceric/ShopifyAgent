@@ -25,6 +25,9 @@ test("uses mock Shopify orders when Admin API env vars are missing", async () =>
   assert.equal(result.financialStatus, FinancialStatus.Paid);
   assert.equal(result.fulfillmentStatus, FulfillmentStatus.Fulfilled);
   assert.equal(result.hasReturnableFulfillments, true);
+  assert.deepEqual(result.itemCategories, [
+    "Apparel & Accessories > Clothing > Shirts & Tops",
+  ]);
 });
 
 test("uses mock Shopify orders unless USE_REAL_SHOPIFY=true", async () => {
@@ -63,6 +66,11 @@ test("maps live Shopify Admin responses into RefundPolicyInput", async () => {
               {
                 id: "gid://shopify/LineItem/1",
                 currentQuantity: 1,
+                product: {
+                  category: {
+                    fullName: "Electronics > Audio > Headphones",
+                  },
+                },
                 customAttributes: [{ key: "final_sale", value: "false" }],
               },
             ],
@@ -124,6 +132,9 @@ test("maps live Shopify Admin responses into RefundPolicyInput", async () => {
   assert.equal(result.hasReturnableFulfillments, true);
   assert.equal(result.alreadyFullyRefunded, false);
   assert.equal(result.allItemsFinalSale, false);
+  assert.deepEqual(result.itemCategories, [
+    "Electronics > Audio > Headphones",
+  ]);
   assert.equal(result.flags?.vipOverride, true);
 });
 
@@ -160,6 +171,11 @@ test("maps admin helper fields for final sale, statuses, and flags safely", () =
           {
             id: "gid://shopify/LineItem/2",
             currentQuantity: 1,
+            product: {
+              category: {
+                fullName: "Apparel & Accessories > Shoes",
+              },
+            },
             customAttributes: [{ key: "is_final_sale", value: "true" }],
           },
         ],
@@ -182,6 +198,9 @@ test("maps admin helper fields for final sale, statuses, and flags safely", () =
   assert.equal(result.alreadyFullyRefunded, true);
   assert.equal(result.hasReturnableFulfillments, false);
   assert.equal(result.allItemsFinalSale, true);
+  assert.deepEqual(result.itemCategories, [
+    "Apparel & Accessories > Shoes",
+  ]);
   assert.equal(result.flags?.fraudHold, true);
   assert.equal(result.flags?.manualReview, true);
   assert.equal(result.flags?.vipOverride, false);

@@ -10,9 +10,11 @@ import type {
 import { MOCK_SHOPIFY_ORDERS } from "./mock-shopify-orders.js";
 import type { ShopifyOrderRecord } from "./mock-shopify-orders.js";
 import {
-  hasShopifyAdminConfig,
   REFUND_ORDER_CONTEXT_QUERY,
   REFUND_RETURNABLE_FULFILLMENTS_QUERY,
+} from "./shopify-queries.js";
+import {
+  hasShopifyAdminConfig,
   shopifyAdminFetch,
 } from "./shopify-admin.js";
 
@@ -33,6 +35,11 @@ interface ShopifyMetafieldValue {
 interface ShopifyAdminLineItem {
   id: string;
   currentQuantity: number;
+  product?: {
+    category?: {
+      fullName?: string | null;
+    } | null;
+  } | null;
   customAttributes: Array<{
     key: string;
     value: string;
@@ -140,7 +147,31 @@ function isFinalSaleLineItem(lineItem: ShopifyAdminLineItem): boolean {
   });
 }
 
-function mapShopifyOrderToRefundPolicyInput(
+function normalizeStringArray(values: Array<string | undefined | null>): string[] {
+  return [
+    ...new Set(
+      values
+        .map((value) => value?.trim())
+        .filter((value): value is string => Boolean(value)),
+    ),
+  ];
+}
+
+function collectMockLineItemCategories(order: ShopifyOrderRecord): string[] {
+  return normalizeStringArray(
+    order.lineItems.map((lineItem) => lineItem.category),
+  );
+}
+
+function collectAdminLineItemCategories(
+  lineItems: ShopifyAdminLineItem[],
+): string[] {
+  return normalizeStringArray(
+    lineItems.map((lineItem) => lineItem.product?.category?.fullName),
+  );
+}
+
+function mapShopifyMockOrderToRefundPolicyInput(
   order: ShopifyOrderRecord,
   now: Date,
 ): RefundPolicyInput {
@@ -158,6 +189,7 @@ function mapShopifyOrderToRefundPolicyInput(
     allItemsFinalSale:
       order.lineItems.length > 0 &&
       order.lineItems.every((lineItem) => lineItem.finalSale),
+    itemCategories: collectMockLineItemCategories(order),
     flags: {
       fraudHold: order.flags?.fraudHold ?? false,
       manualReview: order.flags?.manualReview ?? false,
@@ -192,6 +224,7 @@ export function mapAdminOrderToRefundPolicyInput(
     allItemsFinalSale:
       order.lineItems.nodes.length > 0 &&
       order.lineItems.nodes.every(isFinalSaleLineItem),
+    itemCategories: collectAdminLineItemCategories(order.lineItems.nodes),
     flags: {
       fraudHold: parseBooleanFlag(order.fraudHoldFlag?.value),
       manualReview: parseBooleanFlag(order.manualReviewFlag?.value),
@@ -264,7 +297,7 @@ export async function loadRefundContext(
     );
   }
 
-  return mapShopifyOrderToRefundPolicyInput(order, deps.now ?? new Date());
+  return mapShopifyMockOrderToRefundPolicyInput(order, deps.now ?? new Date());
 }
 
 export function createShopifyRefundContextAdapter(

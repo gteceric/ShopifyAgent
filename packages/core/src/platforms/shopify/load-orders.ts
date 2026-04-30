@@ -6,9 +6,9 @@ import { MOCK_SHOPIFY_ORDERS } from "./mock-shopify-orders.js";
 import type { ShopifyOrderRecord } from "./mock-shopify-orders.js";
 import {
   hasShopifyAdminConfig,
-  SHOPIFY_ORDERS_LIST_QUERY,
   shopifyAdminFetch,
 } from "./shopify-admin.js";
+import { SHOPIFY_ORDERS_LIST_QUERY } from "./shopify-queries.js";
 
 export interface ShopifyOrderSummary {
   id: string;
