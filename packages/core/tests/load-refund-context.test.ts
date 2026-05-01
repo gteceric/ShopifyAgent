@@ -28,6 +28,7 @@ test("uses mock Shopify orders when Admin API env vars are missing", async () =>
   assert.deepEqual(result.itemCategories, [
     "Apparel & Accessories > Clothing > Shirts & Tops",
   ]);
+  assert.deepEqual(result.policyTags, []);
 });
 
 test("uses mock Shopify orders unless USE_REAL_SHOPIFY=true", async () => {
@@ -53,6 +54,7 @@ test("maps live Shopify Admin responses into RefundPolicyInput", async () => {
         order: {
           id: "gid://shopify/Order/900000000301",
           name: "#3001",
+          tags: ["vip-exception", "  loyalty_recovery  "],
           createdAt: "2026-03-20T00:00:00.000Z",
           totalPriceSet: {
             shopMoney: {
@@ -135,6 +137,7 @@ test("maps live Shopify Admin responses into RefundPolicyInput", async () => {
   assert.deepEqual(result.itemCategories, [
     "Electronics > Audio > Headphones",
   ]);
+  assert.deepEqual(result.policyTags, ["vip-exception", "loyalty_recovery"]);
   assert.equal(result.flags?.vipOverride, true);
 });
 
@@ -158,6 +161,7 @@ test("maps admin helper fields for final sale, statuses, and flags safely", () =
     {
       id: "gid://shopify/Order/900000000302",
       name: "#3002",
+      tags: ["ops_review_hold"],
       createdAt: "2026-03-01T00:00:00.000Z",
       totalPriceSet: {
         shopMoney: {
@@ -201,6 +205,7 @@ test("maps admin helper fields for final sale, statuses, and flags safely", () =
   assert.deepEqual(result.itemCategories, [
     "Apparel & Accessories > Shoes",
   ]);
+  assert.deepEqual(result.policyTags, ["ops_review_hold"]);
   assert.equal(result.flags?.fraudHold, true);
   assert.equal(result.flags?.manualReview, true);
   assert.equal(result.flags?.vipOverride, false);

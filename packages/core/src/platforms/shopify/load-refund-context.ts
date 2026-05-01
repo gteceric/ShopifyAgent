@@ -50,6 +50,7 @@ interface ShopifyRefundOrderContextResponse {
   order: {
     id: string;
     name: string;
+    tags?: string[] | null;
     createdAt: string;
     totalPriceSet?: {
       shopMoney?: {
@@ -190,6 +191,7 @@ function mapShopifyMockOrderToRefundPolicyInput(
       order.lineItems.length > 0 &&
       order.lineItems.every((lineItem) => lineItem.finalSale),
     itemCategories: collectMockLineItemCategories(order),
+    policyTags: normalizeStringArray(order.policyTags ?? []),
     flags: {
       fraudHold: order.flags?.fraudHold ?? false,
       manualReview: order.flags?.manualReview ?? false,
@@ -225,6 +227,7 @@ export function mapAdminOrderToRefundPolicyInput(
       order.lineItems.nodes.length > 0 &&
       order.lineItems.nodes.every(isFinalSaleLineItem),
     itemCategories: collectAdminLineItemCategories(order.lineItems.nodes),
+    policyTags: normalizeStringArray(order.tags ?? []),
     flags: {
       fraudHold: parseBooleanFlag(order.fraudHoldFlag?.value),
       manualReview: parseBooleanFlag(order.manualReviewFlag?.value),

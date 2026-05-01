@@ -3,6 +3,7 @@ export const REFUND_ORDER_CONTEXT_QUERY = /* GraphQL */ `
     order(id: $id) {
       id
       name
+      tags
       createdAt
       totalPriceSet {
         shopMoney {

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import { checkRefundEligibility } from "../src/application/check-refund-eligibility.js";
 import { RecommendedRefundAction } from "../src/application/check-refund-eligibility.js";
+import { createShopifyRefundContextAdapter } from "../src/platforms/shopify/load-refund-context.js";
 import {
   FinancialStatus,
   FulfillmentStatus,
@@ -139,4 +140,37 @@ test("marks VIP overrides as an active exception without requiring escalation", 
       (reason) => reason.code === RefundReasonCode.VipOverrideApplied,
     ),
   );
+});
+
+test("applies merchant exception rules through the Shopify adapter when mock order tags match", async () => {
+  const result = await checkRefundEligibility(
+    { orderId: "gid://shopify/Order/1127" },
+    {
+      adapter: createShopifyRefundContextAdapter({
+        env: {},
+        now: new Date("2026-03-30T00:00:00.000Z"),
+      }),
+      config: {
+        refundWindowDays: 30,
+        alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+        exceptionRules: [
+          {
+            tag: "loyalty_recovery",
+            decision: RefundDecision.Eligible,
+            message:
+              "Merchant loyalty recovery rule allows a refund outside the standard window.",
+          },
+        ],
+      },
+    },
+  );
+
+  assert.equal(result.decision, RefundDecision.Eligible);
+  assert.ok(
+    result.reasons.some(
+      (reason) =>
+        reason.code === RefundReasonCode.MerchantExceptionRuleApplied,
+    ),
+  );
+  assert.equal(result.evidence.matchedExceptionRuleTag, "loyalty_recovery");
 });
