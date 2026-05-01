@@ -29,7 +29,10 @@ async function getFormattedResponse(id: RefundScenarioId): Promise<string> {
   const scenario = getScenario(id);
   const result = await checkRefundEligibility(scenario.toolInput, {
     config: scenario.config,
-    loadContext: async () => scenario.context,
+    adapter: {
+      platform: "test",
+      loadRefundContext: async () => scenario.context,
+    },
   });
 
   return formatRefundEligibilityResponse(scenario.agentQuestion, result);

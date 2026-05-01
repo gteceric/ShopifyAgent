@@ -8,11 +8,10 @@ import {
 } from "../domain/refund-policy.types.js";
 import type {
   RefundPolicyConfig,
-  RefundPolicyInput,
   RefundPolicyResult,
 } from "../domain/refund-policy.types.js";
 import type { RefundContextPlatformAdapter } from "./refund-context-adapter.js";
-import { createShopifyRefundContextAdapter } from "../platforms/shopify/load-refund-context.js";
+import { createDefaultShopifyRefundContextAdapter } from "../platforms/shopify/load-refund-context.js";
 
 // Keep the tool input minimal for v1. This can grow later if the caller needs
 // merchant context, request metadata, or line-item-level refund requests.
@@ -41,9 +40,6 @@ export interface CheckRefundEligibilityResult extends RefundPolicyResult {
 export interface CheckRefundEligibilityDeps {
   config?: RefundPolicyConfig;
   adapter?: RefundContextPlatformAdapter;
-  loadContext?: (
-    input: CheckRefundEligibilityInput,
-  ) => Promise<RefundPolicyInput>;
 }
 
 function hasVipOverrideApplied(result: RefundPolicyResult): boolean {
@@ -69,14 +65,8 @@ export async function checkRefundEligibility(
   input: CheckRefundEligibilityInput,
   deps: CheckRefundEligibilityDeps = {},
 ): Promise<CheckRefundEligibilityResult> {
-  const adapter = deps.adapter;
-  const loadContext =
-    deps.loadContext ??
-    (adapter
-      ? (request: CheckRefundEligibilityInput) =>
-          adapter.loadRefundContext(request)
-      : createShopifyRefundContextAdapter().loadRefundContext);
-  const context = await loadContext(input);
+  const adapter = deps.adapter ?? createDefaultShopifyRefundContextAdapter();
+  const context = await adapter.loadRefundContext(input);
   const result = evaluateRefundPolicy(context, deps.config ?? DEFAULT_POLICY);
 
   return {

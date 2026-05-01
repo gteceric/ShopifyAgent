@@ -13,10 +13,7 @@ import {
   REFUND_ORDER_CONTEXT_QUERY,
   REFUND_RETURNABLE_FULFILLMENTS_QUERY,
 } from "./shopify-queries.js";
-import {
-  hasShopifyAdminConfig,
-  shopifyAdminFetch,
-} from "./shopify-admin.js";
+import { hasShopifyAdminConfig, shopifyAdminFetch } from "./shopify-admin.js";
 
 export interface LoadShopifyRefundContextDeps {
   env?: NodeJS.ProcessEnv;
@@ -148,7 +145,9 @@ function isFinalSaleLineItem(lineItem: ShopifyAdminLineItem): boolean {
   });
 }
 
-function normalizeStringArray(values: Array<string | undefined | null>): string[] {
+function normalizeStringArray(
+  values: Array<string | undefined | null>,
+): string[] {
   return [
     ...new Set(
       values
@@ -273,24 +272,10 @@ async function loadRefundContextFromShopify(
   );
 }
 
-// take orderId
-// fetch/load the order context from Shopify or mock data
-export async function loadRefundContext(
+async function loadRefundContextFromMockShopify(
   input: LoadRefundContextInput,
   deps: LoadShopifyRefundContextDeps = {},
 ): Promise<RefundPolicyInput> {
-  if (shouldUseRealShopify(deps.env)) {
-    if (!hasShopifyAdminConfig(deps.env)) {
-      throw new Error(
-        "USE_REAL_SHOPIFY=true requires SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_TOKEN.",
-      );
-    }
-
-    return loadRefundContextFromShopify(input, deps);
-  }
-
-  // In mock mode, this loader still returns the same platform-neutral
-  // RefundPolicyInput shape that the domain policy evaluator consumes.
   const order = MOCK_SHOPIFY_ORDERS[input.orderId];
 
   if (!order) {
@@ -303,13 +288,49 @@ export async function loadRefundContext(
   return mapShopifyMockOrderToRefundPolicyInput(order, deps.now ?? new Date());
 }
 
-export function createShopifyRefundContextAdapter(
+export function createMockShopifyRefundContextAdapter(
   deps: LoadShopifyRefundContextDeps = {},
 ): RefundContextPlatformAdapter {
   return {
-    platform: "shopify",
+    platform: "shopify-mock",
     loadRefundContext(input) {
-      return loadRefundContext(input, deps);
+      return loadRefundContextFromMockShopify(input, deps);
     },
   };
+}
+
+export function createShopifyAdminRefundContextAdapter(
+  deps: LoadShopifyRefundContextDeps = {},
+): RefundContextPlatformAdapter {
+  return {
+    platform: "shopify-admin",
+    loadRefundContext(input) {
+      if (!hasShopifyAdminConfig(deps.env)) {
+        throw new Error(
+          "USE_REAL_SHOPIFY=true requires SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_TOKEN.",
+        );
+      }
+
+      return loadRefundContextFromShopify(input, deps);
+    },
+  };
+}
+
+export function createDefaultShopifyRefundContextAdapter(
+  deps: LoadShopifyRefundContextDeps = {},
+): RefundContextPlatformAdapter {
+  return shouldUseRealShopify(deps.env)
+    ? createShopifyAdminRefundContextAdapter(deps)
+    : createMockShopifyRefundContextAdapter(deps);
+}
+
+// Keep this convenience wrapper for callers that don't care about the specific
+// Shopify data source yet. It now delegates to explicit adapter choices.
+export async function loadRefundContext(
+  input: LoadRefundContextInput,
+  deps: LoadShopifyRefundContextDeps = {},
+): Promise<RefundPolicyInput> {
+  return createDefaultShopifyRefundContextAdapter(deps).loadRefundContext(
+    input,
+  );
 }

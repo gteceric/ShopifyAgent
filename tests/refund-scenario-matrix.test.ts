@@ -7,7 +7,10 @@ for (const scenario of REFUND_SCENARIO_MATRIX) {
   test(`scenario matrix: ${scenario.id}`, async () => {
     const result = await checkRefundEligibility(scenario.toolInput, {
       config: scenario.config,
-      loadContext: async () => scenario.context,
+      adapter: {
+        platform: "test",
+        loadRefundContext: async () => scenario.context,
+      },
     });
 
     assert.equal(result.decision, scenario.expectedDecision);

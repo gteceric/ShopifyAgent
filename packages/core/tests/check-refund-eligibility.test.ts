@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { checkRefundEligibility } from "../src/application/check-refund-eligibility.js";
 import { RecommendedRefundAction } from "../src/application/check-refund-eligibility.js";
-import { createShopifyRefundContextAdapter } from "../src/platforms/shopify/load-refund-context.js";
+import { createMockShopifyRefundContextAdapter } from "../src/platforms/shopify/load-refund-context.js";
 import {
   FinancialStatus,
   FulfillmentStatus,
@@ -31,15 +31,18 @@ function makeContext(
   };
 }
 
-test("uses injected loadContext and returns structured eligibility result", async () => {
+test("uses an injected adapter and returns structured eligibility result", async () => {
   const result = await checkRefundEligibility(
     { orderId: "gid://shopify/Order/900000000101" },
     {
-      loadContext: async (input) =>
-        makeContext({
-          orderId: input.orderId,
-          orderName: "#2002",
-        }),
+      adapter: {
+        platform: "test",
+        loadRefundContext: async (input) =>
+          makeContext({
+            orderId: input.orderId,
+            orderName: "#2002",
+          }),
+      },
     },
   );
 
@@ -63,11 +66,14 @@ test("uses injected merchant config when evaluating refunded orders", async () =
         refundWindowDays: 30,
         alreadyFullyRefundedDecision: RefundDecision.ManualReview,
       },
-      loadContext: async (input) =>
-        makeContext({
-          orderId: input.orderId,
-          alreadyFullyRefunded: true,
-        }),
+      adapter: {
+        platform: "test",
+        loadRefundContext: async (input) =>
+          makeContext({
+            orderId: input.orderId,
+            alreadyFullyRefunded: true,
+          }),
+      },
     },
   );
 
@@ -120,14 +126,17 @@ test("marks VIP overrides as an active exception without requiring escalation", 
         refundWindowDays: 30,
         alreadyFullyRefundedDecision: RefundDecision.Ineligible,
       },
-      loadContext: async (input) =>
-        makeContext({
-          orderId: input.orderId,
-          orderAgeDays: 45,
-          flags: {
-            vipOverride: true,
-          },
-        }),
+      adapter: {
+        platform: "test",
+        loadRefundContext: async (input) =>
+          makeContext({
+            orderId: input.orderId,
+            orderAgeDays: 45,
+            flags: {
+              vipOverride: true,
+            },
+          }),
+      },
     },
   );
 
@@ -146,7 +155,7 @@ test("applies merchant exception rules through the Shopify adapter when mock ord
   const result = await checkRefundEligibility(
     { orderId: "gid://shopify/Order/1127" },
     {
-      adapter: createShopifyRefundContextAdapter({
+      adapter: createMockShopifyRefundContextAdapter({
         env: {},
         now: new Date("2026-03-30T00:00:00.000Z"),
       }),

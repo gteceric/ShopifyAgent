@@ -24,7 +24,10 @@ test("uses the deterministic fallback when no responder is provided", async () =
     scenario.agentQuestion,
     {
       config: scenario.config,
-      loadContext: async () => scenario.context,
+      adapter: {
+        platform: "test",
+        loadRefundContext: async () => scenario.context,
+      },
     },
   );
 
@@ -41,7 +44,10 @@ test("uses the injected responder output when it succeeds", async () => {
     scenario.agentQuestion,
     {
       config: scenario.config,
-      loadContext: async () => scenario.context,
+      adapter: {
+        platform: "test",
+        loadRefundContext: async () => scenario.context,
+      },
       generateResponse: async ({ result, fallbackResponse }) =>
         `Model reply: ${result.decision}. ${fallbackResponse}`,
     },
@@ -59,7 +65,10 @@ test("falls back when the injected responder throws", async () => {
     scenario.agentQuestion,
     {
       config: scenario.config,
-      loadContext: async () => scenario.context,
+      adapter: {
+        platform: "test",
+        loadRefundContext: async () => scenario.context,
+      },
       generateResponse: async () => {
         throw new Error("Responder unavailable");
       },
@@ -78,7 +87,10 @@ test("falls back when the injected responder returns an empty response", async (
     scenario.agentQuestion,
     {
       config: scenario.config,
-      loadContext: async () => scenario.context,
+      adapter: {
+        platform: "test",
+        loadRefundContext: async () => scenario.context,
+      },
       generateResponse: async () => "   ",
     },
   );

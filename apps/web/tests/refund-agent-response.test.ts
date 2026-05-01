@@ -25,7 +25,10 @@ async function getEligibilityResult(id: RefundScenarioId) {
 
   return checkRefundEligibility(scenario.toolInput, {
     config: scenario.config,
-    loadContext: async () => scenario.context,
+    adapter: {
+      platform: "test",
+      loadRefundContext: async () => scenario.context,
+    },
   });
 }
 

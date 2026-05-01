@@ -29,7 +29,10 @@ async function main(): Promise<void> {
         scenario.agentQuestion,
         {
           config: scenario.config,
-          loadContext: async () => scenario.context,
+          adapter: {
+            platform: "test",
+            loadRefundContext: async () => scenario.context,
+          },
           generateResponse,
         },
       );

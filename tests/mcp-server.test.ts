@@ -152,11 +152,14 @@ test("tools/call returns structured refund eligibility output", async () => {
       highValueOrderThreshold: 500,
       alreadyFullyRefundedDecision: RefundDecision.Ineligible,
     },
-    loadContext: async (input) =>
-      makeContext({
-        orderId: input.orderId,
-        orderTotalAmount: 750,
-      }),
+    adapter: {
+      platform: "test",
+      loadRefundContext: async (input) =>
+        makeContext({
+          orderId: input.orderId,
+          orderTotalAmount: 750,
+        }),
+    },
   });
 
   const response = await server.handleMessage({
@@ -254,8 +257,11 @@ test("tools/call rejects order IDs that are not Shopify order GIDs", async () =>
 
 test("tools/call returns a tool error result when evaluation fails", async () => {
   const server = createShopifyAgentMcpServer({
-    loadContext: async () => {
-      throw new Error("Shopify lookup failed");
+    adapter: {
+      platform: "test",
+      loadRefundContext: async () => {
+        throw new Error("Shopify lookup failed");
+      },
     },
   });
 
