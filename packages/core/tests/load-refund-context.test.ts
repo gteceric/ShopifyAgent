@@ -6,18 +6,20 @@ import {
   FulfillmentStatus,
 } from "../src/domain/refund-policy.types.js";
 import {
-  loadRefundContext,
+  createDefaultShopifyRefundContextAdapter,
+  createMockShopifyRefundContextAdapter,
+  createShopifyAdminRefundContextAdapter,
   mapAdminOrderToRefundPolicyInput,
 } from "../src/platforms/shopify/load-refund-context.js";
 
-test("uses mock Shopify orders when Admin API env vars are missing", async () => {
-  const result = await loadRefundContext(
-    { orderId: "gid://shopify/Order/1001" },
-    {
-      now: new Date("2026-03-30T00:00:00.000Z"),
-      env: {},
-    },
-  );
+test("default Shopify adapter uses mock orders when Admin API env vars are missing", async () => {
+  const adapter = createDefaultShopifyRefundContextAdapter({
+    now: new Date("2026-03-30T00:00:00.000Z"),
+    env: {},
+  });
+  const result = await adapter.loadRefundContext({
+    orderId: "gid://shopify/Order/1001",
+  });
 
   assert.equal(result.orderId, "gid://shopify/Order/1001");
   assert.equal(result.orderName, "#1001");
@@ -31,23 +33,23 @@ test("uses mock Shopify orders when Admin API env vars are missing", async () =>
   assert.deepEqual(result.policyTags, []);
 });
 
-test("uses mock Shopify orders unless USE_REAL_SHOPIFY=true", async () => {
-  const result = await loadRefundContext(
-    { orderId: "gid://shopify/Order/1001" },
-    {
-      now: new Date("2026-03-30T00:00:00.000Z"),
-      env: {
-        SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
-        SHOPIFY_ADMIN_TOKEN: "shpat_test",
-      },
+test("default Shopify adapter uses mock orders unless USE_REAL_SHOPIFY=true", async () => {
+  const adapter = createDefaultShopifyRefundContextAdapter({
+    now: new Date("2026-03-30T00:00:00.000Z"),
+    env: {
+      SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
+      SHOPIFY_ADMIN_TOKEN: "shpat_test",
     },
-  );
+  });
+  const result = await adapter.loadRefundContext({
+    orderId: "gid://shopify/Order/1001",
+  });
 
   assert.equal(result.orderId, "gid://shopify/Order/1001");
   assert.equal(result.orderName, "#1001");
 });
 
-test("maps live Shopify Admin responses into RefundPolicyInput", async () => {
+test("Shopify Admin adapter maps live Admin responses into RefundPolicyInput", async () => {
   const responses = [
     {
       data: {
@@ -112,18 +114,18 @@ test("maps live Shopify Admin responses into RefundPolicyInput", async () => {
       headers: { "Content-Type": "application/json" },
     });
 
-  const result = await loadRefundContext(
-    { orderId: "gid://shopify/Order/900000000301" },
-    {
-      now: new Date("2026-03-30T00:00:00.000Z"),
-      env: {
-        USE_REAL_SHOPIFY: "true",
-        SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
-        SHOPIFY_ADMIN_TOKEN: "shpat_test",
-      },
-      fetchImpl,
+  const adapter = createShopifyAdminRefundContextAdapter({
+    now: new Date("2026-03-30T00:00:00.000Z"),
+    env: {
+      USE_REAL_SHOPIFY: "true",
+      SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
+      SHOPIFY_ADMIN_TOKEN: "shpat_test",
     },
-  );
+    fetchImpl,
+  });
+  const result = await adapter.loadRefundContext({
+    orderId: "gid://shopify/Order/900000000301",
+  });
 
   assert.equal(result.orderId, "gid://shopify/Order/900000000301");
   assert.equal(result.orderName, "#3001");
@@ -141,19 +143,32 @@ test("maps live Shopify Admin responses into RefundPolicyInput", async () => {
   assert.equal(result.flags?.vipOverride, true);
 });
 
-test("throws when USE_REAL_SHOPIFY=true but Shopify Admin env vars are incomplete", async () => {
-  await assert.rejects(
+test("Shopify Admin adapter throws when Admin env vars are incomplete", async () => {
+  assert.throws(
     () =>
-      loadRefundContext(
-        { orderId: "gid://shopify/Order/1001" },
-        {
-          env: {
-            USE_REAL_SHOPIFY: "true",
-          },
+      createShopifyAdminRefundContextAdapter({
+        env: {
+          USE_REAL_SHOPIFY: "true",
         },
-      ),
+      }).loadRefundContext({
+        orderId: "gid://shopify/Order/1001",
+      }),
     /USE_REAL_SHOPIFY=true requires SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_TOKEN\./,
   );
+});
+
+test("mock Shopify adapter loads mock orders directly", async () => {
+  const adapter = createMockShopifyRefundContextAdapter({
+    now: new Date("2026-03-30T00:00:00.000Z"),
+  });
+  const result = await adapter.loadRefundContext({
+    orderId: "gid://shopify/Order/1001",
+  });
+
+  assert.equal(result.orderId, "gid://shopify/Order/1001");
+  assert.deepEqual(result.itemCategories, [
+    "Apparel & Accessories > Clothing > Shirts & Tops",
+  ]);
 });
 
 test("maps admin helper fields for final sale, statuses, and flags safely", () => {

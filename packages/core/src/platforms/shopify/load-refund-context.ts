@@ -323,14 +323,3 @@ export function createDefaultShopifyRefundContextAdapter(
     ? createShopifyAdminRefundContextAdapter(deps)
     : createMockShopifyRefundContextAdapter(deps);
 }
-
-// Keep this convenience wrapper for callers that don't care about the specific
-// Shopify data source yet. It now delegates to explicit adapter choices.
-export async function loadRefundContext(
-  input: LoadRefundContextInput,
-  deps: LoadShopifyRefundContextDeps = {},
-): Promise<RefundPolicyInput> {
-  return createDefaultShopifyRefundContextAdapter(deps).loadRefundContext(
-    input,
-  );
-}
