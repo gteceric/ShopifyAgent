@@ -1,10 +1,13 @@
 import readline from "node:readline";
 import { z } from "zod";
 
+import { createRefundContextAdapter } from "@shopify-agent/core";
 import { createShopifyAgentMcpServer } from "./server.js";
 import { JsonRpcRequestSchema } from "./schemas.js";
 
-const server = createShopifyAgentMcpServer();
+const server = createShopifyAgentMcpServer({
+  adapter: createRefundContextAdapter(),
+});
 
 async function main(): Promise<void> {
   const rl = readline.createInterface({

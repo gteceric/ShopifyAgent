@@ -9,6 +9,7 @@ import {
   RefundReasonCode,
 } from "@shopify-agent/core";
 import { generateRefundAgentResponseWithOllama } from "../app/api/refund-agent/generate-refund-agent-response-with-ollama.js";
+import { RefundAgentResponseContext } from "@/app/api/refund-agent/refund-agent-response-context.js";
 
 function makeContext() {
   return {
@@ -30,13 +31,18 @@ function makeContext() {
       evidence: {
         orderAgeDays: 7,
         refundWindowDays: 30,
+        effectiveRefundWindowDays: 30,
         cancelWindowDays: 30,
+        effectiveCancelWindowDays: 30,
         orderTotalAmount: 48,
         financialStatus: FinancialStatus.Paid,
         fulfillmentStatus: FulfillmentStatus.Fulfilled,
         hasReturnableFulfillments: true,
         alreadyFullyRefunded: false,
         allItemsFinalSale: false,
+        itemCategories: [],
+        policyTags: [],
+        matchedCategoryWindowCategories: [],
         flags: {
           fraudHold: false,
           manualReview: false,
@@ -44,7 +50,7 @@ function makeContext() {
         },
       },
     },
-  };
+  } satisfies RefundAgentResponseContext;
 }
 
 test("returns message content from the Ollama chat payload", async () => {

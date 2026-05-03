@@ -1,21 +1,19 @@
-import {
-  generateRefundAgentResponseWithOpenAI,
-  type RefundAgentResponseContext,
-} from "./generate-refund-agent-response-with-openai";
+import { generateRefundAgentResponseWithOpenAI } from "./generate-refund-agent-response-with-openai";
 import { generateRefundAgentResponseWithOllama } from "./generate-refund-agent-response-with-ollama";
+import type { RefundAgentResponseContext } from "./refund-agent-response-context";
 import type { RefundAgentProvider } from "../../refund-agent-contract";
 
-export type RefundAgentResponder = (
+export type RefundAgentResponseGenerator = (
   context: RefundAgentResponseContext,
 ) => Promise<string | undefined>;
 
-export interface SelectedRefundAgentResponder {
+export interface RefundAgentResponder {
   provider: Exclude<RefundAgentProvider, "fallback">;
-  generateResponse: RefundAgentResponder;
+  generateResponse: RefundAgentResponseGenerator;
 }
 
-export function selectRefundAgentResponder():
-  | SelectedRefundAgentResponder
+export function createRefundAgentResponder():
+  | RefundAgentResponder
   | undefined {
   // Precedence:
   // 1. RESPONSE_MODEL_PROVIDER=none -> deterministic fallback only

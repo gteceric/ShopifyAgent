@@ -1,5 +1,6 @@
 import {
   checkRefundEligibility,
+  createRefundContextAdapter,
   loadOrders,
 } from "@shopify-agent/core";
 import { Dashboard } from "./dashboard";
@@ -28,6 +29,7 @@ export default async function Home({ searchParams }: HomeProps) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const now = new Date();
   const allowMockOrdersFallback = shouldAllowMockOrdersFallback();
+  const refundContextAdapter = createRefundContextAdapter();
   let orders: DashboardOrder[] = [];
   let ordersLoadError: string | null = null;
   // Keep row-level refund-check failures separate from top-level order-feed
@@ -46,7 +48,10 @@ export default async function Home({ searchParams }: HomeProps) {
         orderSummaries.map((order) =>
           checkRefundEligibility(
             { orderId: order.id },
-            { config: DASHBOARD_DEMO_POLICY },
+            {
+              config: DASHBOARD_DEMO_POLICY,
+              adapter: refundContextAdapter,
+            },
           ),
         ),
       );
@@ -58,7 +63,10 @@ export default async function Home({ searchParams }: HomeProps) {
         const evaluationOutcome = evaluationOutcomes[index];
 
         if (evaluationOutcome?.status === "fulfilled") {
-          return applyRefundEvaluationToOrder(baseOrder, evaluationOutcome.value);
+          return applyRefundEvaluationToOrder(
+            baseOrder,
+            evaluationOutcome.value,
+          );
         }
 
         if (evaluationOutcome?.status === "rejected") {
@@ -84,10 +92,7 @@ export default async function Home({ searchParams }: HomeProps) {
     }
   }
 
-  const initialState = parseDashboardUrlState(
-    resolvedSearchParams,
-    orders,
-  );
+  const initialState = parseDashboardUrlState(resolvedSearchParams, orders);
   const filteredOrders = filterOrders(
     orders,
     initialState.search,

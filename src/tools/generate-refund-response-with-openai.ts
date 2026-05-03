@@ -1,4 +1,7 @@
-import type { RefundAgentResponseContext } from "./get-refund-response.js";
+import type {
+  RefundAgentResponseContext,
+  RefundResponseResponder,
+} from "./get-refund-response.js";
 
 const DEFAULT_OPENAI_MODEL = "gpt-5.2";
 const DEFAULT_OPENAI_ENDPOINT = "https://api.openai.com/v1/responses";
@@ -85,6 +88,10 @@ export async function generateRefundResponseWithOpenAI(
 
 export function createOpenAIRefundResponder(
   options: OpenAIRefundResponderOptions = {},
-): (context: RefundAgentResponseContext) => Promise<string | undefined> {
-  return async (context) => generateRefundResponseWithOpenAI(context, options);
+): RefundResponseResponder {
+  return {
+    async generateResponse(context: RefundAgentResponseContext) {
+      return generateRefundResponseWithOpenAI(context, options);
+    },
+  };
 }

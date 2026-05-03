@@ -4,12 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "pretest": "npm --workspace @shopify-agent/core run build",
     "dev": "next dev",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "test": "NODE_ENV=test node --import tsx --test tests/**/*.test.ts"
+    "test": "node --import tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
     "next": "16.2.3",

@@ -169,7 +169,7 @@ const CHECK_REFUND_ELIGIBILITY_TOOL = {
 } as const;
 
 export function createCheckRefundEligibilityTool(
-  deps: CheckRefundEligibilityDeps = {},
+  deps: CheckRefundEligibilityDeps,
 ): McpTool<CheckRefundEligibilityInput, CheckRefundEligibilityResult> {
   return {
     name: CHECK_REFUND_ELIGIBILITY_TOOL_NAME,

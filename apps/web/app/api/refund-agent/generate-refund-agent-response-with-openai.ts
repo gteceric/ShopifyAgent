@@ -1,15 +1,9 @@
-import type { CheckRefundEligibilityResult } from "@shopify-agent/core";
 import { readTimeoutMs } from "./read-timeout-ms";
+import type { RefundAgentResponseContext } from "./refund-agent-response-context";
 
 const DEFAULT_OPENAI_MODEL = "gpt-5.2";
 const DEFAULT_OPENAI_ENDPOINT = "https://api.openai.com/v1/responses";
 const DEFAULT_OPENAI_TIMEOUT_MS = 8000;
-
-export interface RefundAgentResponseContext {
-  question: string;
-  fallbackResponse: string;
-  result: CheckRefundEligibilityResult;
-}
 
 export interface OpenAIRefundAgentResponderOptions {
   apiKey?: string;

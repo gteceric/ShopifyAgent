@@ -32,8 +32,20 @@ function makeContext(
   };
 }
 
+function makeAdapter() {
+  return {
+    platform: "test",
+    loadRefundContext: async (input: { orderId: string }) =>
+      makeContext({
+        orderId: input.orderId,
+      }),
+  };
+}
+
 test("initialize advertises tool capabilities", async () => {
-  const server = createShopifyAgentMcpServer();
+  const server = createShopifyAgentMcpServer({
+    adapter: makeAdapter(),
+  });
   const message: InitializeRequest = {
     jsonrpc: "2.0",
     id: 1,
@@ -68,7 +80,9 @@ test("initialize advertises tool capabilities", async () => {
 });
 
 test("initialize accepts older supported MCP protocol versions", async () => {
-  const server = createShopifyAgentMcpServer();
+  const server = createShopifyAgentMcpServer({
+    adapter: makeAdapter(),
+  });
   const message: InitializeRequest = {
     jsonrpc: "2.0",
     id: 6,
@@ -96,7 +110,9 @@ test("initialize accepts older supported MCP protocol versions", async () => {
 });
 
 test("initialize rejects unsupported MCP protocol versions", async () => {
-  const server = createShopifyAgentMcpServer();
+  const server = createShopifyAgentMcpServer({
+    adapter: makeAdapter(),
+  });
   const message: InitializeRequest = {
     jsonrpc: "2.0",
     id: 7,
@@ -123,7 +139,9 @@ test("initialize rejects unsupported MCP protocol versions", async () => {
 });
 
 test("tools/list returns the refund eligibility tool definition", async () => {
-  const server = createShopifyAgentMcpServer();
+  const server = createShopifyAgentMcpServer({
+    adapter: makeAdapter(),
+  });
   const message: JsonRpcRequest = {
     jsonrpc: "2.0",
     id: 2,
@@ -206,7 +224,9 @@ test("tools/call returns structured refund eligibility output", async () => {
 });
 
 test("tools/call returns invalid params for malformed input", async () => {
-  const server = createShopifyAgentMcpServer();
+  const server = createShopifyAgentMcpServer({
+    adapter: makeAdapter(),
+  });
   const response = await server.handleMessage({
     jsonrpc: "2.0",
     id: 4,
@@ -228,7 +248,9 @@ test("tools/call returns invalid params for malformed input", async () => {
 });
 
 test("tools/call rejects order IDs that are not Shopify order GIDs", async () => {
-  const server = createShopifyAgentMcpServer();
+  const server = createShopifyAgentMcpServer({
+    adapter: makeAdapter(),
+  });
   const response = await server.handleMessage({
     jsonrpc: "2.0",
     id: 8,

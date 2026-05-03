@@ -11,10 +11,14 @@ export interface RefundAgentResponseContext {
   fallbackResponse: string;
 }
 
-export interface GetRefundResponseDeps extends CheckRefundEligibilityDeps {
-  generateResponse?: (
+export interface RefundResponseResponder {
+  generateResponse(
     context: RefundAgentResponseContext,
-  ) => Promise<string | undefined>;
+  ): Promise<string | undefined>;
+}
+
+export interface RefundResponseDeps extends CheckRefundEligibilityDeps {
+  responder: RefundResponseResponder | undefined;
 }
 
 export interface GetRefundResponseResult {
@@ -29,13 +33,16 @@ export interface GetRefundResponseResult {
 export async function getRefundResponse(
   orderId: string,
   agentQuestion: string,
-  deps: GetRefundResponseDeps = {},
+  deps: RefundResponseDeps,
 ): Promise<GetRefundResponseResult> {
   const result = await checkRefundEligibility({ orderId }, deps);
-  const fallbackResponse = formatRefundEligibilityResponse(agentQuestion, result);
+  const fallbackResponse = formatRefundEligibilityResponse(
+    agentQuestion,
+    result,
+  );
 
   // fallback to deterministic response if no custom responder / AI generator
-  if (!deps.generateResponse) {
+  if (!deps.responder) {
     return {
       orderId,
       agentQuestion,
@@ -47,7 +54,7 @@ export async function getRefundResponse(
   }
 
   try {
-    const generatedResponse = await deps.generateResponse({
+    const generatedResponse = await deps.responder.generateResponse({
       agentQuestion,
       result,
       fallbackResponse,

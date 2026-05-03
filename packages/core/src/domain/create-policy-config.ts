@@ -39,7 +39,7 @@ function readOptionalNonNegativeNumberEnv(
   return value;
 }
 
-export function selectPolicyConfig(
+export function createPolicyConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): RefundPolicyConfig {
   const refundWindowDays = readOptionalNonNegativeIntegerEnv(

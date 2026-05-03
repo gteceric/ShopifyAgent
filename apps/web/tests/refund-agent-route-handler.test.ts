@@ -5,48 +5,46 @@ import {
   FinancialStatus,
   FulfillmentStatus,
   RecommendedRefundAction,
+  type RefundContextPlatformAdapter,
   RefundDecision,
-  RefundReasonCode,
+  RefundPolicyInput,
 } from "@shopify-agent/core";
 import { handleRefundAgentRequest } from "../app/api/refund-agent/refund-agent-route-handler.js";
-import type { SelectedRefundAgentResponder } from "../app/api/refund-agent/select-refund-agent-responder.js";
 
-function makeResult() {
+function makeAdapter(): RefundContextPlatformAdapter {
   return {
-    orderId: "gid://shopify/Order/1001",
-    decision: RefundDecision.Ineligible,
-    exceptionAvailable: false,
-    escalationRequired: false,
-    recommendedNextAction: RecommendedRefundAction.Deny,
-    reasons: [
-      {
-        code: RefundReasonCode.OutsideRefundWindow,
-        message: "Order is outside the 30-day refund window.",
-      },
-    ],
-    evidence: {
-      orderAgeDays: 167,
-      refundWindowDays: 30,
-      cancelWindowDays: 30,
-      orderTotalAmount: 48,
-      financialStatus: FinancialStatus.Paid,
-      fulfillmentStatus: FulfillmentStatus.Fulfilled,
-      hasReturnableFulfillments: true,
-      alreadyFullyRefunded: false,
-      allItemsFinalSale: false,
-      flags: {
-        fraudHold: false,
-        manualReview: false,
-        vipOverride: false,
-      },
-    },
+    platform: "test",
+    loadRefundContext: async () =>
+      ({
+        orderId: "gid://shopify/Order/1001",
+        orderName: "#1001",
+        orderCreatedAt: "2025-10-17T00:00:00.000Z",
+        orderAgeDays: 167,
+        orderTotalAmount: 48,
+        financialStatus: FinancialStatus.Paid,
+        fulfillmentStatus: FulfillmentStatus.Fulfilled,
+        hasReturnableFulfillments: true,
+        alreadyFullyRefunded: false,
+        allItemsFinalSale: false,
+        flags: {
+          fraudHold: false,
+          manualReview: false,
+          vipOverride: false,
+        },
+      }) satisfies RefundPolicyInput,
   };
 }
 
 test("returns a 400 error when the request body is invalid", async () => {
-  const result = await handleRefundAgentRequest({
-    question: "Can I refund this order?",
-  });
+  const result = await handleRefundAgentRequest(
+    {
+      question: "Can I refund this order?",
+    },
+    {
+      adapter: makeAdapter(),
+      responder: undefined,
+    },
+  );
 
   assert.deepEqual(result, {
     status: 400,
@@ -61,12 +59,11 @@ test("returns an AI-backed response when the selected responder succeeds", async
       question: "Can I refund this order?",
     },
     {
-      checkRefundEligibilityFn: async () => makeResult(),
-      formatResponse: () => "Fallback response.",
-      selectResponder: (): SelectedRefundAgentResponder => ({
+      adapter: makeAdapter(),
+      responder: {
         provider: "ollama",
         generateResponse: async () => "AI-assisted route answer.",
-      }),
+      },
     },
   );
 
@@ -88,20 +85,20 @@ test("falls back when the selected responder throws", async () => {
       question: "Can I refund this order?",
     },
     {
-      checkRefundEligibilityFn: async () => makeResult(),
-      formatResponse: () => "Fallback response.",
-      selectResponder: (): SelectedRefundAgentResponder => ({
+      adapter: makeAdapter(),
+      responder: {
         provider: "openai",
         generateResponse: async () => {
           throw new Error("Responder unavailable");
         },
-      }),
+      },
     },
   );
 
   assert.equal(result.status, 200);
   assert.deepEqual(result.body, {
-    response: "Fallback response.",
+    response:
+      "No. Order is outside the 30-day refund window. Next step: decline the refund request with policy wording.",
     decision: RefundDecision.Ineligible,
     recommendedNextAction: RecommendedRefundAction.Deny,
     reasons: ["Order is outside the 30-day refund window."],
@@ -117,18 +114,18 @@ test("falls back when the selected responder returns an empty response", async (
       question: "Can I refund this order?",
     },
     {
-      checkRefundEligibilityFn: async () => makeResult(),
-      formatResponse: () => "Fallback response.",
-      selectResponder: (): SelectedRefundAgentResponder => ({
+      adapter: makeAdapter(),
+      responder: {
         provider: "ollama",
         generateResponse: async () => "", // empty response => need to use fallback
-      }),
+      },
     },
   );
 
   assert.equal(result.status, 200);
   assert.deepEqual(result.body, {
-    response: "Fallback response.",
+    response:
+      "No. Order is outside the 30-day refund window. Next step: decline the refund request with policy wording.",
     decision: RefundDecision.Ineligible,
     recommendedNextAction: RecommendedRefundAction.Deny,
     reasons: ["Order is outside the 30-day refund window."],

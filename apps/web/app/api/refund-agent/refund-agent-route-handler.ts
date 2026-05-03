@@ -1,29 +1,21 @@
-import { checkRefundEligibility } from "@shopify-agent/core";
-import type { CheckRefundEligibilityResult } from "@shopify-agent/core";
-import { parseRefundAgentRequest } from "./refund-agent-request";
 import {
-  selectRefundAgentResponder,
-  type SelectedRefundAgentResponder,
-} from "./select-refund-agent-responder";
+  checkRefundEligibility,
+  type RefundContextPlatformAdapter,
+} from "@shopify-agent/core";
 import { DASHBOARD_DEMO_POLICY } from "../../dashboard-order-evaluation";
+import { logger } from "../../logger";
 import type {
   RefundAgentErrorResponse,
   RefundAgentRequestBody,
   RefundAgentResponse,
 } from "../../refund-agent-contract";
 import { formatMerchantRefundAgentResponse } from "../../refund-agent-response";
-import { logger } from "../../logger";
+import { parseRefundAgentRequest } from "./refund-agent-request";
+import type { RefundAgentResponder } from "./select-refund-agent-responder";
 
 export interface RefundAgentRouteHandlerDeps {
-  checkRefundEligibilityFn?: (
-    input: { orderId: string },
-    deps: { config: typeof DASHBOARD_DEMO_POLICY },
-  ) => Promise<CheckRefundEligibilityResult>;
-  formatResponse?: (
-    question: string,
-    result: CheckRefundEligibilityResult,
-  ) => string;
-  selectResponder?: () => SelectedRefundAgentResponder | undefined;
+  adapter: RefundContextPlatformAdapter;
+  responder: RefundAgentResponder | undefined;
 }
 
 export type RefundAgentRouteHandlerResult = {
@@ -33,7 +25,7 @@ export type RefundAgentRouteHandlerResult = {
 
 export async function handleRefundAgentRequest(
   body: RefundAgentRequestBody,
-  deps: RefundAgentRouteHandlerDeps = {},
+  deps: RefundAgentRouteHandlerDeps,
 ): Promise<RefundAgentRouteHandlerResult> {
   const logPrefix = "[handleRefundAgentRequest]";
   const startedAt = Date.now();
@@ -47,25 +39,22 @@ export async function handleRefundAgentRequest(
   }
 
   const { orderId, question } = parsedRequest.data;
-  const checkRefundEligibilityFn =
-    deps.checkRefundEligibilityFn ?? checkRefundEligibility;
-  const formatResponse =
-    deps.formatResponse ?? formatMerchantRefundAgentResponse;
-  const selectResponder = deps.selectResponder ?? selectRefundAgentResponder;
-
-  const result = await checkRefundEligibilityFn(
+  const result = await checkRefundEligibility(
     { orderId },
-    { config: DASHBOARD_DEMO_POLICY },
+    {
+      adapter: deps.adapter,
+      config: DASHBOARD_DEMO_POLICY,
+    },
   );
-  const fallbackResponse = formatResponse(question, result);
-  const selectedResponder = selectResponder();
+  const fallbackResponse = formatMerchantRefundAgentResponse(question, result);
+  const responder = deps.responder;
   let response = fallbackResponse;
   let usedFallback = true;
   let provider: RefundAgentResponse["provider"] = "fallback";
 
-  if (selectedResponder) {
+  if (responder) {
     try {
-      const generatedResponse = await selectedResponder.generateResponse({
+      const generatedResponse = await responder.generateResponse({
         question,
         fallbackResponse,
         result,
@@ -74,15 +63,13 @@ export async function handleRefundAgentRequest(
       if (generatedResponse) {
         response = generatedResponse;
         usedFallback = false;
-        provider = selectedResponder.provider;
+        provider = responder.provider;
       }
     } catch (error) {
       logger.warn(
         `${logPrefix} Model-backed web refund responder failed. Falling back to deterministic response.`,
       );
-      logger.warn(
-        `${logPrefix} Refund agent provider: ${selectedResponder.provider}`,
-      );
+      logger.warn(`${logPrefix} Refund agent provider: ${responder.provider}`);
 
       if (error instanceof Error) {
         logger.warn(`${logPrefix} ${error.message}`);

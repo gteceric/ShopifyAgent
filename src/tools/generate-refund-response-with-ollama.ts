@@ -1,4 +1,7 @@
-import type { RefundAgentResponseContext } from "./get-refund-response.js";
+import type {
+  RefundAgentResponseContext,
+  RefundResponseResponder,
+} from "./get-refund-response.js";
 
 const DEFAULT_OLLAMA_MODEL = "qwen3-coder:30b-a3b-q8_0";
 const DEFAULT_OLLAMA_ENDPOINT = "http://localhost:11434/api/chat";
@@ -79,6 +82,10 @@ export async function generateRefundResponseWithOllama(
 
 export function createOllamaRefundResponder(
   options: OllamaRefundResponderOptions = {},
-): (context: RefundAgentResponseContext) => Promise<string | undefined> {
-  return async (context) => generateRefundResponseWithOllama(context, options);
+): RefundResponseResponder {
+  return {
+    async generateResponse(context: RefundAgentResponseContext) {
+      return generateRefundResponseWithOllama(context, options);
+    },
+  };
 }

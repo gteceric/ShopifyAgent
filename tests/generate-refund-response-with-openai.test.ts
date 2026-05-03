@@ -74,8 +74,8 @@ test("returns output_text from the OpenAI Responses API payload", async () => {
   assert.equal(response, "Model refund reply.");
 });
 
-test("createOpenAIRefundResponder returns a generateResponse-compatible function", async () => {
-  const generateResponse = createOpenAIRefundResponder({
+test("createOpenAIRefundResponder returns a responder object", async () => {
+  const responder = createOpenAIRefundResponder({
     apiKey: "test-key",
     fetchImpl: async () =>
       new Response(JSON.stringify({ output_text: "Responder reply." }), {
@@ -84,7 +84,7 @@ test("createOpenAIRefundResponder returns a generateResponse-compatible function
       }),
   });
 
-  const response = await generateResponse(makeContext());
+  const response = await responder.generateResponse(makeContext());
 
   assert.equal(response, "Responder reply.");
 });

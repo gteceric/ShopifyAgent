@@ -4,7 +4,7 @@ import {
 } from "../../domain/refund-policy.types.js";
 import type { RefundPolicyInput } from "../../domain/refund-policy.types.js";
 import type {
-  LoadRefundContextInput,
+  RefundContextInput,
   RefundContextPlatformAdapter,
 } from "../../application/refund-context-adapter.js";
 import { MOCK_SHOPIFY_ORDERS } from "./mock-shopify-orders.js";
@@ -236,7 +236,7 @@ export function mapAdminOrderToRefundPolicyInput(
 }
 
 async function loadRefundContextFromShopify(
-  input: LoadRefundContextInput,
+  input: RefundContextInput,
   deps: LoadShopifyRefundContextDeps,
 ): Promise<RefundPolicyInput> {
   // The policy engine needs both the order record and Shopify's separate
@@ -273,7 +273,7 @@ async function loadRefundContextFromShopify(
 }
 
 async function loadRefundContextFromMockShopify(
-  input: LoadRefundContextInput,
+  input: RefundContextInput,
   deps: LoadShopifyRefundContextDeps = {},
 ): Promise<RefundPolicyInput> {
   const order = MOCK_SHOPIFY_ORDERS[input.orderId];
@@ -316,7 +316,7 @@ export function createShopifyAdminRefundContextAdapter(
   };
 }
 
-export function createDefaultShopifyRefundContextAdapter(
+export function createRefundContextAdapter(
   deps: LoadShopifyRefundContextDeps = {},
 ): RefundContextPlatformAdapter {
   return shouldUseRealShopify(deps.env)

@@ -3,7 +3,7 @@ import { createOpenAIRefundResponder } from "./generate-refund-response-with-ope
 import { getRefundResponse } from "./get-refund-response.js";
 import { REFUND_SCENARIO_MATRIX } from "../../tests/fixtures/refund-scenario-matrix.js";
 
-function selectResponder() {
+function getResponder() {
   if (process.env.RESPONSE_MODEL_PROVIDER === "none") {
     return undefined;
   }
@@ -20,7 +20,7 @@ function selectResponder() {
 }
 
 async function main(): Promise<void> {
-  const generateResponse = selectResponder();
+  const responder = getResponder();
 
   const results = await Promise.all(
     REFUND_SCENARIO_MATRIX.map(async (scenario) => {
@@ -33,7 +33,7 @@ async function main(): Promise<void> {
             platform: "test",
             loadRefundContext: async () => scenario.context,
           },
-          generateResponse,
+          responder,
         },
       );
 

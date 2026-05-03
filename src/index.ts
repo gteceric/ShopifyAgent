@@ -1,11 +1,14 @@
-import { selectPolicyConfig } from "@shopify-agent/core";
+import {
+  createRefundContextAdapter,
+  createPolicyConfig,
+} from "@shopify-agent/core";
 import { createOllamaRefundResponder } from "./tools/generate-refund-response-with-ollama.js";
 import { createOpenAIRefundResponder } from "./tools/generate-refund-response-with-openai.js";
 import { getRefundResponse } from "./tools/get-refund-response.js";
 
 const DEFAULT_DEMO_ORDER_ID = "gid://shopify/Order/1001";
 
-function selectResponder() {
+function createResponder() {
   if (process.env.RESPONSE_MODEL_PROVIDER === "none") {
     return undefined;
   }
@@ -25,7 +28,7 @@ function selectResponder() {
   return createOpenAIRefundResponder();
 }
 
-function selectOrderId(): string {
+function getOrderId(): string {
   if (process.env.USE_REAL_SHOPIFY === "true") {
     const realOrderId = process.env.REFUND_DEMO_ORDER_ID?.trim();
 
@@ -43,11 +46,12 @@ function selectOrderId(): string {
 
 async function main(): Promise<void> {
   const response = await getRefundResponse(
-    selectOrderId(),
+    getOrderId(),
     "Can I refund this order?",
     {
-      config: selectPolicyConfig(),
-      generateResponse: selectResponder(),
+      adapter: createRefundContextAdapter(),
+      config: createPolicyConfig(),
+      responder: createResponder(),
     },
   );
 
