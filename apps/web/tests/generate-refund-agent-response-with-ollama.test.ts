@@ -9,7 +9,7 @@ import {
   RefundReasonCode,
 } from "@shopify-agent/core";
 import { generateRefundAgentResponseWithOllama } from "../app/api/refund-agent/generate-refund-agent-response-with-ollama.js";
-import { RefundAgentResponseContext } from "@/app/api/refund-agent/refund-agent-response-context.js";
+import type { RefundAgentResponseContext } from "../app/api/refund-agent/refund-agent-response-context.js";
 
 function makeContext() {
   return {

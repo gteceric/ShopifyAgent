@@ -9,6 +9,7 @@ import {
   RefundReasonCode,
 } from "@shopify-agent/core";
 import { generateRefundAgentResponseWithOpenAI } from "../app/api/refund-agent/generate-refund-agent-response-with-openai.js";
+import type { RefundAgentResponseContext } from "../app/api/refund-agent/refund-agent-response-context.js";
 
 function makeContext() {
   return {
@@ -49,7 +50,7 @@ function makeContext() {
         },
       },
     },
-  };
+  } satisfies RefundAgentResponseContext;
 }
 
 test("returns undefined when no OpenAI API key is configured", async () => {
