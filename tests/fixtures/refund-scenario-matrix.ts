@@ -1,6 +1,7 @@
 import type {
   CheckRefundEligibilityInput,
   RefundPolicyConfig,
+  RefundPolicyEvidence,
   RefundPolicyInput,
 } from "@shopify-agent/core";
 import {
@@ -28,14 +29,23 @@ export const RefundScenarioId = {
     "manual_review_unfulfilled_final_sale_by_config",
   ManualReviewUnfulfilledOutsideWindow:
     "manual_review_unfulfilled_outside_window",
+  IneligibleAlreadyRefunded: "ineligible_already_refunded",
   ManualReviewAlreadyRefundedByConfig:
     "manual_review_already_refunded_by_config",
+  IneligibleReturnableFulfillmentsUnavailable:
+    "ineligible_returnable_fulfillments_unavailable",
+  ManualReviewManualReviewFlag: "manual_review_manual_review_flag",
+  IneligibleCategoryWindowOverride:
+    "ineligible_category_window_override",
   EligibleVipOverride: "eligible_vip_override",
 } as const;
 
 export type RefundScenarioId =
   (typeof RefundScenarioId)[keyof typeof RefundScenarioId];
 
+// Each scenario describes one merchant-facing refund situation. The test runner
+// feeds `context` through the refund workflow and compares the result with the
+// expected decision, reasons, and selected audit evidence.
 export interface RefundScenario {
   id: RefundScenarioId;
   description: string;
@@ -45,9 +55,12 @@ export interface RefundScenario {
   config?: RefundPolicyConfig;
   expectedDecision: RefundDecision;
   expectedReasonCodes: RefundReasonCode[];
+  expectedEvidence?: Partial<RefundPolicyEvidence>;
   expectedAgentBehavior: string;
 }
 
+// Start each scenario from a normal refundable order, then override only the
+// facts that make that scenario interesting.
 function makeContext(
   orderId: string,
   orderName: string,
@@ -69,6 +82,9 @@ function makeContext(
   };
 }
 
+// Read this matrix as the refund workflow's business coverage map. The
+// `expectedAgentBehavior` text documents product intent for humans; the
+// executable assertions live in refund-scenario-matrix.test.ts.
 export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
   {
     id: RefundScenarioId.EligibleStandard,
@@ -313,6 +329,29 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
       "Do not auto-approve the cancellation refund; route the stale unfulfilled order to human review.",
   },
   {
+    id: RefundScenarioId.IneligibleAlreadyRefunded,
+    description:
+      "Already fully refunded orders should be denied by default to avoid a duplicate refund.",
+    agentQuestion: "Can we refund order #3005 again?",
+    toolInput: { orderId: "gid://shopify/Order/910000000018" },
+    context: makeContext(
+      "gid://shopify/Order/910000000018",
+      "#3005",
+      {
+        alreadyFullyRefunded: true,
+        financialStatus: FinancialStatus.Refunded,
+      },
+    ),
+    expectedDecision: RefundDecision.Ineligible,
+    expectedReasonCodes: [RefundReasonCode.AlreadyFullyRefunded],
+    expectedEvidence: {
+      alreadyFullyRefunded: true,
+      financialStatus: FinancialStatus.Refunded,
+    },
+    expectedAgentBehavior:
+      "Deny the duplicate refund path and tell the operator not to promise another refund.",
+  },
+  {
     id: RefundScenarioId.ManualReviewAlreadyRefundedByConfig,
     description:
       "Merchant config prefers manual review instead of hard denial for already refunded orders.",
@@ -335,6 +374,86 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     expectedReasonCodes: [RefundReasonCode.AlreadyFullyRefunded],
     expectedAgentBehavior:
       "Treat this as an exception flow and avoid telling the customer a second refund is approved.",
+  },
+  {
+    id: RefundScenarioId.IneligibleReturnableFulfillmentsUnavailable,
+    description:
+      "Fulfilled order is inside the refund window but has no returnable fulfillments available.",
+    agentQuestion: "Can we refund order #3015 through the standard return flow?",
+    toolInput: { orderId: "gid://shopify/Order/910000000015" },
+    context: makeContext(
+      "gid://shopify/Order/910000000015",
+      "#3015",
+      {
+        hasReturnableFulfillments: false,
+      },
+    ),
+    expectedDecision: RefundDecision.Ineligible,
+    expectedReasonCodes: [
+      RefundReasonCode.ReturnableFulfillmentsUnavailable,
+    ],
+    expectedEvidence: {
+      hasReturnableFulfillments: false,
+    },
+    expectedAgentBehavior:
+      "Deny the standard return-backed refund path because Shopify has no returnable fulfillment available.",
+  },
+  {
+    id: RefundScenarioId.ManualReviewManualReviewFlag,
+    description:
+      "Explicit manual-review flag should route the order to a human even when the rest of the order looks refundable.",
+    agentQuestion: "This order has an operations review flag. Can we refund it automatically?",
+    toolInput: { orderId: "gid://shopify/Order/910000000016" },
+    context: makeContext(
+      "gid://shopify/Order/910000000016",
+      "#3016",
+      {
+        flags: { manualReview: true },
+      },
+    ),
+    expectedDecision: RefundDecision.ManualReview,
+    expectedReasonCodes: [RefundReasonCode.ManualReviewRequired],
+    expectedEvidence: {
+      flags: {
+        fraudHold: false,
+        manualReview: true,
+        vipOverride: false,
+      },
+    },
+    expectedAgentBehavior:
+      "Route the order to a human reviewer because an internal review flag is active.",
+  },
+  {
+    id: RefundScenarioId.IneligibleCategoryWindowOverride,
+    description:
+      "Category-specific policy window can make an otherwise in-window order ineligible.",
+    agentQuestion: "Can we refund this apparel order #3017?",
+    toolInput: { orderId: "gid://shopify/Order/910000000017" },
+    context: makeContext(
+      "gid://shopify/Order/910000000017",
+      "#3017",
+      {
+        orderAgeDays: 20,
+        itemCategories: ["apparel"],
+      },
+    ),
+    config: {
+      refundWindowDays: 30,
+      cancelWindowDays: 30,
+      categoryWindowOverrides: [
+        { category: "apparel", refundWindowDays: 14 },
+      ],
+      alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+    },
+    expectedDecision: RefundDecision.Ineligible,
+    expectedReasonCodes: [RefundReasonCode.OutsideRefundWindow],
+    expectedEvidence: {
+      effectiveRefundWindowDays: 14,
+      itemCategories: ["apparel"],
+      matchedCategoryWindowCategories: ["apparel"],
+    },
+    expectedAgentBehavior:
+      "Deny based on the stricter category-specific refund window, not the default policy window.",
   },
   {
     id: RefundScenarioId.EligibleVipOverride,
