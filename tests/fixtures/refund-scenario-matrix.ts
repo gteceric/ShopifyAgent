@@ -1,8 +1,9 @@
 import type {
   CheckRefundEligibilityInput,
   RefundPolicyConfig,
-  RefundPolicyEvidence,
-  RefundPolicyInput,
+  RefundPolicySummaryEvidence,
+  RefundContext,
+  RefundContextLineItem,
 } from "@shopify-agent/core";
 import {
   FinancialStatus,
@@ -24,7 +25,8 @@ export const RefundScenarioId = {
   ManualReviewPendingFinancialStatus:
     "manual_review_pending_financial_status",
   ManualReviewPartialFulfillment: "manual_review_partial_fulfillment",
-  ManualReviewPartialRefund: "manual_review_partial_refund",
+  EligiblePartiallyRefundedOrderItem:
+    "eligible_partially_refunded_order_item",
   ManualReviewUnfulfilledFinalSaleByConfig:
     "manual_review_unfulfilled_final_sale_by_config",
   ManualReviewUnfulfilledOutsideWindow:
@@ -43,6 +45,12 @@ export const RefundScenarioId = {
 export type RefundScenarioId =
   (typeof RefundScenarioId)[keyof typeof RefundScenarioId];
 
+type RefundScenarioExpectedEvidence = {
+  order?: Partial<RefundPolicySummaryEvidence["order"]>;
+  policyContext?: Partial<RefundPolicySummaryEvidence["policyContext"]>;
+  evaluatedOrder?: Partial<RefundPolicySummaryEvidence["evaluatedOrder"]>;
+};
+
 // Each scenario describes one merchant-facing refund situation. The test runner
 // feeds `context` through the refund workflow and compares the result with the
 // expected decision, reasons, and selected audit evidence.
@@ -51,34 +59,74 @@ export interface RefundScenario {
   description: string;
   agentQuestion: string;
   toolInput: CheckRefundEligibilityInput;
-  context: RefundPolicyInput;
+  context: RefundContext;
   config?: RefundPolicyConfig;
   expectedDecision: RefundDecision;
   expectedReasonCodes: RefundReasonCode[];
-  expectedEvidence?: Partial<RefundPolicyEvidence>;
+  expectedEvidence?: RefundScenarioExpectedEvidence;
   expectedAgentBehavior: string;
 }
+
+type RefundContextOverrides = Partial<
+  Omit<RefundContext["order"], "flags">
+> & {
+  flags?: Partial<RefundContext["order"]["flags"]>;
+  lineItems?: RefundContextLineItem[];
+  fulfillmentStatus?: FulfillmentStatus;
+  hasReturnableFulfillment?: boolean;
+  alreadyRefunded?: boolean;
+  finalSale?: boolean;
+  itemCategories?: string[];
+};
 
 // Start each scenario from a normal refundable order, then override only the
 // facts that make that scenario interesting.
 function makeContext(
   orderId: string,
   orderName: string,
-  overrides: Partial<RefundPolicyInput> = {},
-): RefundPolicyInput {
-  return {
-    orderId,
-    orderName,
-    orderCreatedAt: "2026-03-01T00:00:00.000Z",
-    orderAgeDays: 7,
-    orderTotalAmount: 48,
+  overrides: RefundContextOverrides = {},
+): RefundContext {
+  const {
+    fulfillmentStatus = FulfillmentStatus.Fulfilled,
+    hasReturnableFulfillment = true,
+    alreadyRefunded = false,
+    finalSale = false,
+    itemCategories,
+    lineItems,
+    flags = {},
+    ...inputOverrides
+  } = overrides;
+  const order = {
+    id: orderId,
+    name: orderName,
+    createdAt: "2026-03-01T00:00:00.000Z",
+    ageDays: 7,
+    totalAmount: 48,
     financialStatus: FinancialStatus.Paid,
-    fulfillmentStatus: FulfillmentStatus.Fulfilled,
-    hasReturnableFulfillments: true,
-    alreadyFullyRefunded: false,
-    allItemsFinalSale: false,
-    flags: {},
-    ...overrides,
+    tags: [],
+    flags: {
+      fraudHold: false,
+      manualReview: false,
+      vipOverride: false,
+      ...flags,
+    },
+    ...inputOverrides,
+  };
+
+  return {
+    order,
+    lineItems: lineItems ?? [
+      {
+        lineItemId: `${orderId}/LineItem/1`,
+        title: "Default item",
+        returnableQuantity: 1,
+        category: itemCategories?.[0],
+        fulfillmentStatus,
+        hasReturnableFulfillment,
+        alreadyRefunded,
+        finalSale,
+      },
+    ],
   };
 }
 
@@ -111,7 +159,7 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
       "#3007",
       {
         fulfillmentStatus: FulfillmentStatus.Unfulfilled,
-        hasReturnableFulfillments: false,
+        hasReturnableFulfillment: false,
       },
     ),
     expectedDecision: RefundDecision.Eligible,
@@ -133,15 +181,15 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
       "#3009",
       {
         fulfillmentStatus: FulfillmentStatus.Unfulfilled,
-        hasReturnableFulfillments: false,
-        allItemsFinalSale: true,
+        hasReturnableFulfillment: false,
+        finalSale: true,
       },
     ),
     config: {
       refundWindowDays: 30,
       cancelWindowDays: 30,
       finalSaleUnfulfilledDecision: RefundDecision.Eligible,
-      alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+      alreadyRefundedDecision: RefundDecision.Ineligible,
     },
     expectedDecision: RefundDecision.Eligible,
     expectedReasonCodes: [RefundReasonCode.FinalSaleUnfulfilledAllowed],
@@ -158,7 +206,7 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
       "gid://shopify/Order/910000000004",
       "#3002",
       {
-        orderAgeDays: 45,
+        ageDays: 45,
       },
     ),
     expectedDecision: RefundDecision.Ineligible,
@@ -172,7 +220,7 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     agentQuestion: "Customer says order #3003 did not fit. Can we refund it?",
     toolInput: { orderId: "gid://shopify/Order/910000000005" },
     context: makeContext("gid://shopify/Order/910000000005", "#3003", {
-      allItemsFinalSale: true,
+      finalSale: true,
     }),
     expectedDecision: RefundDecision.Ineligible,
     expectedReasonCodes: [RefundReasonCode.FinalSaleUnavailableForRefund],
@@ -202,14 +250,14 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
       "gid://shopify/Order/910000000007",
       "#3014",
       {
-        orderTotalAmount: 750,
+        totalAmount: 750,
       },
     ),
     config: {
       refundWindowDays: 30,
       cancelWindowDays: 30,
       highValueOrderThreshold: 500,
-      alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+      alreadyRefundedDecision: RefundDecision.Ineligible,
     },
     expectedDecision: RefundDecision.ManualReview,
     expectedReasonCodes: [
@@ -259,10 +307,10 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
       "Do not auto-approve the refund; mixed fulfillment means a human should review the order first.",
   },
   {
-    id: RefundScenarioId.ManualReviewPartialRefund,
+    id: RefundScenarioId.EligiblePartiallyRefundedOrderItem,
     description:
-      "Partially refunded order should be reviewed by a human before any additional refund is approved.",
-    agentQuestion: "This order already has a partial refund. Can we approve another refund automatically?",
+      "Partially refunded order can still have a separate refundable line item.",
+    agentQuestion: "This order already has a partial refund. Can we refund the remaining item?",
     toolInput: { orderId: "gid://shopify/Order/910000000010" },
     context: makeContext(
       "gid://shopify/Order/910000000010",
@@ -271,12 +319,13 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
         financialStatus: FinancialStatus.PartiallyRefunded,
       },
     ),
-    expectedDecision: RefundDecision.ManualReview,
+    expectedDecision: RefundDecision.Eligible,
     expectedReasonCodes: [
-      RefundReasonCode.PartialRefundReviewRequired,
+      RefundReasonCode.WithinRefundWindow,
+      RefundReasonCode.ReturnableFulfillmentsAvailable,
     ],
     expectedAgentBehavior:
-      "Do not auto-approve another refund; the order already has refund history and needs human review.",
+      "Approve only the refundable line item and avoid blocking it only because another item was already refunded.",
   },
   {
     id: RefundScenarioId.ManualReviewUnfulfilledFinalSaleByConfig,
@@ -289,15 +338,15 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
       "#3010",
       {
         fulfillmentStatus: FulfillmentStatus.Unfulfilled,
-        hasReturnableFulfillments: false,
-        allItemsFinalSale: true,
+        hasReturnableFulfillment: false,
+        finalSale: true,
       },
     ),
     config: {
       refundWindowDays: 30,
       cancelWindowDays: 30,
       finalSaleUnfulfilledDecision: RefundDecision.ManualReview,
-      alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+      alreadyRefundedDecision: RefundDecision.Ineligible,
     },
     expectedDecision: RefundDecision.ManualReview,
     expectedReasonCodes: [
@@ -316,9 +365,9 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
       "gid://shopify/Order/910000000012",
       "#3008",
       {
-        orderAgeDays: 60,
+        ageDays: 60,
         fulfillmentStatus: FulfillmentStatus.Unfulfilled,
-        hasReturnableFulfillments: false,
+        hasReturnableFulfillment: false,
       },
     ),
     expectedDecision: RefundDecision.ManualReview,
@@ -338,15 +387,17 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
       "gid://shopify/Order/910000000018",
       "#3005",
       {
-        alreadyFullyRefunded: true,
+        alreadyRefunded: true,
         financialStatus: FinancialStatus.Refunded,
       },
     ),
     expectedDecision: RefundDecision.Ineligible,
     expectedReasonCodes: [RefundReasonCode.AlreadyFullyRefunded],
     expectedEvidence: {
-      alreadyFullyRefunded: true,
-      financialStatus: FinancialStatus.Refunded,
+      evaluatedOrder: {
+        alreadyFullyRefunded: true,
+        financialStatus: FinancialStatus.Refunded,
+      },
     },
     expectedAgentBehavior:
       "Deny the duplicate refund path and tell the operator not to promise another refund.",
@@ -361,14 +412,14 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
       "gid://shopify/Order/910000000013",
       "#3005",
       {
-        alreadyFullyRefunded: true,
+        alreadyRefunded: true,
         financialStatus: FinancialStatus.Refunded,
       },
     ),
     config: {
       refundWindowDays: 30,
       cancelWindowDays: 30,
-      alreadyFullyRefundedDecision: RefundDecision.ManualReview,
+      alreadyRefundedDecision: RefundDecision.ManualReview,
     },
     expectedDecision: RefundDecision.ManualReview,
     expectedReasonCodes: [RefundReasonCode.AlreadyFullyRefunded],
@@ -385,7 +436,7 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
       "gid://shopify/Order/910000000015",
       "#3015",
       {
-        hasReturnableFulfillments: false,
+        hasReturnableFulfillment: false,
       },
     ),
     expectedDecision: RefundDecision.Ineligible,
@@ -393,7 +444,9 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
       RefundReasonCode.ReturnableFulfillmentsUnavailable,
     ],
     expectedEvidence: {
-      hasReturnableFulfillments: false,
+      evaluatedOrder: {
+        hasReturnableFulfillments: false,
+      },
     },
     expectedAgentBehavior:
       "Deny the standard return-backed refund path because Shopify has no returnable fulfillment available.",
@@ -414,10 +467,12 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     expectedDecision: RefundDecision.ManualReview,
     expectedReasonCodes: [RefundReasonCode.ManualReviewRequired],
     expectedEvidence: {
-      flags: {
-        fraudHold: false,
-        manualReview: true,
-        vipOverride: false,
+      order: {
+        flags: {
+          fraudHold: false,
+          manualReview: true,
+          vipOverride: false,
+        },
       },
     },
     expectedAgentBehavior:
@@ -433,7 +488,7 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
       "gid://shopify/Order/910000000017",
       "#3017",
       {
-        orderAgeDays: 20,
+        ageDays: 20,
         itemCategories: ["apparel"],
       },
     ),
@@ -443,14 +498,18 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
       categoryWindowOverrides: [
         { category: "apparel", refundWindowDays: 14 },
       ],
-      alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+      alreadyRefundedDecision: RefundDecision.Ineligible,
     },
     expectedDecision: RefundDecision.Ineligible,
     expectedReasonCodes: [RefundReasonCode.OutsideRefundWindow],
     expectedEvidence: {
-      effectiveRefundWindowDays: 14,
-      itemCategories: ["apparel"],
-      matchedCategoryWindowCategories: ["apparel"],
+      policyContext: {
+        effectiveRefundWindowDays: 14,
+        matchedCategoryWindowCategories: ["apparel"],
+      },
+      evaluatedOrder: {
+        itemCategories: ["apparel"],
+      },
     },
     expectedAgentBehavior:
       "Deny based on the stricter category-specific refund window, not the default policy window.",
@@ -462,8 +521,8 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     agentQuestion: "Should we make an exception for VIP order #3006?",
     toolInput: { orderId: "gid://shopify/Order/910000000014" },
     context: makeContext("gid://shopify/Order/910000000014", "#3006", {
-      orderAgeDays: 60,
-      hasReturnableFulfillments: false,
+      ageDays: 60,
+      hasReturnableFulfillment: false,
       flags: { vipOverride: true },
     }),
     expectedDecision: RefundDecision.Eligible,

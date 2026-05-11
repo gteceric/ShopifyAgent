@@ -10,24 +10,67 @@ import {
   RefundDecision,
   RefundReasonCode,
 } from "../src/domain/refund-policy.types.js";
-import type { RefundPolicyInput } from "../src/domain/refund-policy.types.js";
+import type {
+  RefundContext,
+  RefundContextLineItem,
+} from "../src/domain/refund-policy.types.js";
+
+type RefundContextOverrides = Partial<
+  Omit<RefundContext["order"], "flags">
+> & {
+  flags?: Partial<RefundContext["order"]["flags"]>;
+  lineItems?: RefundContextLineItem[];
+  fulfillmentStatus?: FulfillmentStatus;
+  hasReturnableFulfillment?: boolean;
+  alreadyRefunded?: boolean;
+  finalSale?: boolean;
+  itemCategories?: string[];
+};
 
 function makeContext(
-  overrides: Partial<RefundPolicyInput> = {},
-): RefundPolicyInput {
-  return {
-    orderId: "gid://shopify/Order/900000000100",
-    orderName: "#2001",
-    orderCreatedAt: "2026-03-01T00:00:00.000Z",
-    orderAgeDays: 5,
-    orderTotalAmount: 48,
+  overrides: RefundContextOverrides = {},
+): RefundContext {
+  const {
+    fulfillmentStatus = FulfillmentStatus.Fulfilled,
+    hasReturnableFulfillment = true,
+    alreadyRefunded = false,
+    finalSale = false,
+    itemCategories,
+    lineItems,
+    flags = {},
+    ...contextOverrides
+  } = overrides;
+  const order = {
+    id: "gid://shopify/Order/900000000100",
+    name: "#2001",
+    createdAt: "2026-03-01T00:00:00.000Z",
+    ageDays: 5,
+    totalAmount: 48,
     financialStatus: FinancialStatus.Paid,
-    fulfillmentStatus: FulfillmentStatus.Fulfilled,
-    hasReturnableFulfillments: true,
-    alreadyFullyRefunded: false,
-    allItemsFinalSale: false,
-    flags: {},
-    ...overrides,
+    tags: [],
+    flags: {
+      fraudHold: false,
+      manualReview: false,
+      vipOverride: false,
+      ...flags,
+    },
+    ...contextOverrides,
+  };
+
+  return {
+    order,
+    lineItems: lineItems ?? [
+      {
+        lineItemId: "gid://shopify/LineItem/1",
+        title: "Default item",
+        returnableQuantity: 1,
+        category: itemCategories?.[0],
+        fulfillmentStatus,
+        hasReturnableFulfillment,
+        alreadyRefunded,
+        finalSale,
+      },
+    ],
   };
 }
 
@@ -39,8 +82,8 @@ test("uses an injected adapter and returns structured eligibility result", async
         platform: "test",
         loadRefundContext: async (input) =>
           makeContext({
-            orderId: input.orderId,
-            orderName: "#2002",
+            id: input.orderId,
+            name: "#2002",
           }),
       },
     },
@@ -58,20 +101,20 @@ test("uses an injected adapter and returns structured eligibility result", async
   );
 });
 
-test("uses injected merchant config when evaluating refunded orders", async () => {
+test("uses injected merchant config when evaluating refunded line items", async () => {
   const result = await checkRefundEligibility(
     { orderId: "gid://shopify/Order/900000000102" },
     {
       config: {
         refundWindowDays: 30,
-        alreadyFullyRefundedDecision: RefundDecision.ManualReview,
+        alreadyRefundedDecision: RefundDecision.ManualReview,
       },
       adapter: {
         platform: "test",
         loadRefundContext: async (input) =>
           makeContext({
-            orderId: input.orderId,
-            alreadyFullyRefunded: true,
+            id: input.orderId,
+            alreadyRefunded: true,
           }),
       },
     },
@@ -99,8 +142,8 @@ test("supports platform adapters as the order-context boundary", async () => {
         platform: "shopify",
         loadRefundContext: async (input) =>
           makeContext({
-            orderId: input.orderId,
-            orderAgeDays: 45,
+            id: input.orderId,
+            ageDays: 45,
           }),
       },
     },
@@ -124,14 +167,14 @@ test("marks VIP overrides as an active exception without requiring escalation", 
     {
       config: {
         refundWindowDays: 30,
-        alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+        alreadyRefundedDecision: RefundDecision.Ineligible,
       },
       adapter: {
         platform: "test",
         loadRefundContext: async (input) =>
           makeContext({
-            orderId: input.orderId,
-            orderAgeDays: 45,
+            id: input.orderId,
+            ageDays: 45,
             flags: {
               vipOverride: true,
             },
@@ -161,7 +204,7 @@ test("applies merchant exception rules through the Shopify adapter when mock ord
       }),
       config: {
         refundWindowDays: 30,
-        alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+        alreadyRefundedDecision: RefundDecision.Ineligible,
         exceptionRules: [
           {
             tag: "loyalty_recovery",
@@ -181,5 +224,5 @@ test("applies merchant exception rules through the Shopify adapter when mock ord
         reason.code === RefundReasonCode.MerchantExceptionRuleApplied,
     ),
   );
-  assert.equal(result.evidence.matchedExceptionRuleTag, "loyalty_recovery");
+  assert.equal(result.evidence.policyContext.matchedExceptionRuleTag, "loyalty_recovery");
 });

@@ -39,6 +39,38 @@ Tests can still stay isolated while following the same architecture as productio
 - Prefer fake providers over bypassing the real orchestration flow.
 - If a test seam makes the production API look misleading, the seam is probably at the wrong level.
 
+## Preserve Intentional Comments
+
+Comments in code and types are part of the design record.
+
+- Keep existing comments when editing nearby code if the comment still matches the behavior.
+- If a code change makes a comment inaccurate, update the comment to match the new behavior instead of silently deleting it.
+- Remove a comment only when it is no longer meaningful, actively misleading, or replaced by clearer nearby documentation.
+
+## Prefer Named Domain Objects
+
+When an object literal represents meaningful domain data, assign it to a named variable before passing it into another helper.
+
+- Name data by what it means in the domain, not by the helper or function that consumes it.
+- Prefer names like `RefundPolicyItemContext` over names like `RefundPolicyRuleEngineInput` when the object represents domain context.
+- Compose nested objects by ownership, such as `itemContext.orderContext.tags`, when it makes the source of a field clearer.
+- Normalize optional boundary data once before core policy evaluation, then let internal context types use required fields.
+- Remove wrapper types when they only duplicate values already available through the composed domain object.
+- Use the type annotation when it helps explain the role of the object.
+- Inline tiny objects only when the meaning is obvious and there is no domain concept worth naming.
+
+## Refund Decisions Are Item-Level
+
+Refund eligibility must be decided from line items, not only from an order-level summary.
+
+- Treat `lineItems` as required refund-policy input.
+- Evaluate each line item independently because category windows, final-sale status, returnable fulfillment availability, and prior refund state can differ by item.
+- Roll item decisions up into one response for the caller, but keep per-item `itemEvaluations` as the evidence for the decision.
+- If item decisions are mixed, return `manual_review` instead of approving or denying the whole order automatically.
+- Do not fall back to order-level eligibility when line items are missing or empty. Missing line items are incomplete refund context, not a valid production path.
+
+Order-level fields can still exist as summary evidence, but they should not replace item-level evaluation. Using only the strictest order-level summary can hide refundable items, and using broad order-level booleans can hide blocked items such as final-sale or already-refunded items.
+
 ## Current Example
 
 For refund eligibility and the refund-agent flow:
@@ -47,3 +79,4 @@ For refund eligibility and the refund-agent flow:
 - route handlers should call `checkRefundEligibility(...)` directly.
 - mock and real Shopify data should both flow through the adapter layer.
 - avoid route-level overrides like `checkRefundEligibilityFn` when adapter injection is enough.
+- Shopify and future commerce adapters should normalize platform-specific order facts into `RefundContext.order` and item facts into `RefundContext.lineItems`.

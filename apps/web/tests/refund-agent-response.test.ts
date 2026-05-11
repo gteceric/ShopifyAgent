@@ -41,7 +41,7 @@ test("formats an eligible answer with a direct opening and next step", async () 
 
   assert.match(response, /^Yes\./);
   assert.match(response, /within the 30-day refund window/i);
-  assert.match(response, /returnable fulfillments available/i);
+  assert.match(response, /returnable fulfillment available/i);
   assert.match(response, /Next step: approve the refund flow\./i);
 });
 

@@ -1,4 +1,4 @@
-import type { RefundPolicyInput } from "../domain/refund-policy.types.js";
+import type { RefundContext } from "../domain/refund-policy.types.js";
 
 export interface RefundContextInput {
   orderId: string;
@@ -6,5 +6,5 @@ export interface RefundContextInput {
 
 export interface RefundContextPlatformAdapter {
   platform: string;
-  loadRefundContext(input: RefundContextInput): Promise<RefundPolicyInput>;
+  loadRefundContext(input: RefundContextInput): Promise<RefundContext>;
 }

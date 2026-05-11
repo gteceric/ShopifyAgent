@@ -17,11 +17,11 @@ export interface DashboardOrderErrorState {
   message: string;
 }
 
-export const DASHBOARD_DEMO_POLICY: RefundPolicyConfig = {
+export const DASHBOARD_POLICY_CONFIG: RefundPolicyConfig = {
   refundWindowDays: 30,
   cancelWindowDays: 30,
   highValueOrderThreshold: 500,
-  alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+  alreadyRefundedDecision: RefundDecision.Ineligible,
   finalSaleUnfulfilledDecision: RefundDecision.Ineligible,
   unfulfilledOutsideWindowDecision: RefundDecision.ManualReview,
 };
@@ -144,7 +144,7 @@ function formatDecisionSummary(result: CheckRefundEligibilityResult): string {
       return "Refund allowed through an active exception path.";
     }
 
-    if (result.evidence.fulfillmentStatus === "unfulfilled") {
+    if (result.evidence.evaluatedOrder.fulfillmentStatus === "unfulfilled") {
       return "Unfulfilled order can be canceled and refunded normally.";
     }
 
@@ -191,7 +191,7 @@ function formatDecisionSummary(result: CheckRefundEligibilityResult): string {
 function formatRecommendedAction(result: CheckRefundEligibilityResult): string {
   switch (result.recommendedNextAction) {
     case RecommendedRefundAction.Approve:
-      return result.evidence.fulfillmentStatus === "unfulfilled"
+      return result.evidence.evaluatedOrder.fulfillmentStatus === "unfulfilled"
         ? "Approve the cancellation and refund flow."
         : "Approve the standard refund flow.";
     case RecommendedRefundAction.Deny:
@@ -203,18 +203,18 @@ function formatRecommendedAction(result: CheckRefundEligibilityResult): string {
 
 function formatPolicyLens(result: CheckRefundEligibilityResult): string {
   if (hasReason(result, RefundReasonCode.HighValueOrderReviewRequired)) {
-    const threshold = result.evidence.highValueOrderThreshold;
+    const threshold = result.evidence.policyContext.highValueOrderThreshold;
 
     return threshold
       ? `High-value review threshold (${threshold.toFixed(2)})`
       : "High-value review threshold";
   }
 
-  if (result.evidence.fulfillmentStatus === "unfulfilled") {
-    return `${result.evidence.cancelWindowDays}-day cancellation and refund window`;
+  if (result.evidence.evaluatedOrder.fulfillmentStatus === "unfulfilled") {
+    return `${result.evidence.policyContext.cancelWindowDays}-day cancellation and refund window`;
   }
 
-  return `${result.evidence.refundWindowDays}-day refund window`;
+  return `${result.evidence.policyContext.refundWindowDays}-day refund window`;
 }
 
 function buildEvidence(
@@ -227,40 +227,40 @@ function buildEvidence(
   const items: DashboardOrder["evidence"] = [
     {
       label: "Order Age",
-      value: `${result.evidence.orderAgeDays} days`,
+      value: `${result.evidence.order.ageDays} days`,
     },
     {
       label:
-        result.evidence.fulfillmentStatus === "unfulfilled"
+        result.evidence.evaluatedOrder.fulfillmentStatus === "unfulfilled"
           ? "Cancellation Window"
           : "Refund Window",
       value: `${
-        result.evidence.fulfillmentStatus === "unfulfilled"
-          ? result.evidence.cancelWindowDays
-          : result.evidence.refundWindowDays
+        result.evidence.evaluatedOrder.fulfillmentStatus === "unfulfilled"
+          ? result.evidence.policyContext.cancelWindowDays
+          : result.evidence.policyContext.refundWindowDays
       } days`,
     },
     {
       label: "Financial Status",
-      value: formatStatusLabel(result.evidence.financialStatus),
+      value: formatStatusLabel(result.evidence.evaluatedOrder.financialStatus),
     },
     {
       label: "Fulfillment",
-      value: formatStatusLabel(result.evidence.fulfillmentStatus),
+      value: formatStatusLabel(result.evidence.evaluatedOrder.fulfillmentStatus),
     },
   ];
 
   if (
     usesHighValueReview &&
-    result.evidence.highValueOrderThreshold !== undefined
+    result.evidence.policyContext.highValueOrderThreshold !== undefined
   ) {
     items[1] = {
       label: "Order Total",
-      value: formatCurrency(result.evidence.orderTotalAmount),
+      value: formatCurrency(result.evidence.order.totalAmount),
     };
     items[2] = {
       label: "Review Threshold",
-      value: formatCurrency(result.evidence.highValueOrderThreshold),
+      value: formatCurrency(result.evidence.policyContext.highValueOrderThreshold),
     };
   }
 

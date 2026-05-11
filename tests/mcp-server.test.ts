@@ -1,9 +1,14 @@
 import {
+  FinancialStatus,
+  FulfillmentStatus,
   RecommendedRefundAction,
   RefundDecision,
   RefundReasonCode,
 } from "@shopify-agent/core";
-import type { RefundPolicyInput } from "@shopify-agent/core";
+import type {
+  RefundContext,
+  RefundContextLineItem,
+} from "@shopify-agent/core";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -13,22 +18,57 @@ import {
 import { JsonRpcRequest } from "../src/mcp/json-rpc.js";
 import { InitializeRequest } from "../src/mcp/schemas.js";
 
-function makeContext(
-  overrides: Partial<RefundPolicyInput> = {},
-): RefundPolicyInput {
+type RefundContextOverrides = Partial<
+  Omit<RefundContext["order"], "flags">
+> & {
+  flags?: Partial<RefundContext["order"]["flags"]>;
+  lineItems?: RefundContextLineItem[];
+  fulfillmentStatus?: FulfillmentStatus;
+  hasReturnableFulfillment?: boolean;
+  alreadyRefunded?: boolean;
+  finalSale?: boolean;
+};
+
+function makeContext(overrides: RefundContextOverrides = {}): RefundContext {
+  const {
+    fulfillmentStatus = FulfillmentStatus.Fulfilled,
+    hasReturnableFulfillment = true,
+    alreadyRefunded = false,
+    finalSale = false,
+    lineItems,
+    flags = {},
+    ...inputOverrides
+  } = overrides;
+  const order = {
+    id: "gid://shopify/Order/900000000200",
+    name: "#2001",
+    createdAt: "2026-03-01T00:00:00.000Z",
+    ageDays: 5,
+    totalAmount: 48,
+    financialStatus: FinancialStatus.Paid,
+    tags: [],
+    flags: {
+      fraudHold: false,
+      manualReview: false,
+      vipOverride: false,
+      ...flags,
+    },
+    ...inputOverrides,
+  };
+
   return {
-    orderId: "gid://shopify/Order/900000000200",
-    orderName: "#2001",
-    orderCreatedAt: "2026-03-01T00:00:00.000Z",
-    orderAgeDays: 5,
-    orderTotalAmount: 48,
-    financialStatus: "paid",
-    fulfillmentStatus: "fulfilled",
-    hasReturnableFulfillments: true,
-    alreadyFullyRefunded: false,
-    allItemsFinalSale: false,
-    flags: {},
-    ...overrides,
+    order,
+    lineItems: lineItems ?? [
+      {
+        lineItemId: `${order.id}/LineItem/1`,
+        title: "Default item",
+        returnableQuantity: 1,
+        fulfillmentStatus,
+        hasReturnableFulfillment,
+        alreadyRefunded,
+        finalSale,
+      },
+    ],
   };
 }
 
@@ -37,7 +77,7 @@ function makeAdapter() {
     platform: "test",
     loadRefundContext: async (input: { orderId: string }) =>
       makeContext({
-        orderId: input.orderId,
+        id: input.orderId,
       }),
   };
 }
@@ -168,14 +208,14 @@ test("tools/call returns structured refund eligibility output", async () => {
       refundWindowDays: 30,
       cancelWindowDays: 30,
       highValueOrderThreshold: 500,
-      alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+      alreadyRefundedDecision: RefundDecision.Ineligible,
     },
     adapter: {
       platform: "test",
       loadRefundContext: async (input) =>
         makeContext({
-          orderId: input.orderId,
-          orderTotalAmount: 750,
+          id: input.orderId,
+          totalAmount: 750,
         }),
     },
   });

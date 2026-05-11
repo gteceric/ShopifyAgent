@@ -21,8 +21,8 @@ test("uses env overrides for policy windows and high-value threshold", () => {
   assert.equal(config.cancelWindowDays, 14);
   assert.equal(config.highValueOrderThreshold, 500.5);
   assert.equal(
-    config.alreadyFullyRefundedDecision,
-    DEFAULT_POLICY.alreadyFullyRefundedDecision,
+    config.alreadyRefundedDecision,
+    DEFAULT_POLICY.alreadyRefundedDecision,
   );
 });
 

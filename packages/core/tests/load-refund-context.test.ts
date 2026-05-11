@@ -9,7 +9,7 @@ import {
   createRefundContextAdapter,
   createMockShopifyRefundContextAdapter,
   createShopifyAdminRefundContextAdapter,
-  mapAdminOrderToRefundPolicyInput,
+  mapAdminOrderToRefundContext,
 } from "../src/platforms/shopify/load-refund-context.js";
 
 test("default Shopify adapter uses mock orders when Admin API env vars are missing", async () => {
@@ -21,16 +21,25 @@ test("default Shopify adapter uses mock orders when Admin API env vars are missi
     orderId: "gid://shopify/Order/1001",
   });
 
-  assert.equal(result.orderId, "gid://shopify/Order/1001");
-  assert.equal(result.orderName, "#1001");
-  assert.equal(result.orderAgeDays, 20);
-  assert.equal(result.financialStatus, FinancialStatus.Paid);
-  assert.equal(result.fulfillmentStatus, FulfillmentStatus.Fulfilled);
-  assert.equal(result.hasReturnableFulfillments, true);
-  assert.deepEqual(result.itemCategories, [
+  assert.equal(result.order.id, "gid://shopify/Order/1001");
+  assert.equal(result.order.name, "#1001");
+  assert.equal(result.order.ageDays, 20);
+  assert.equal(result.order.financialStatus, FinancialStatus.Paid);
+  assert.equal(result.lineItems.length, 1);
+  assert.equal(
+    result.lineItems[0]?.lineItemId,
+    "gid://shopify/Order/1001/LineItem/1",
+  );
+  assert.equal(
+    result.lineItems[0]?.category,
     "Apparel & Accessories > Clothing > Shirts & Tops",
-  ]);
-  assert.deepEqual(result.policyTags, []);
+  );
+  assert.equal(
+    result.lineItems[0]?.fulfillmentStatus,
+    FulfillmentStatus.Fulfilled,
+  );
+  assert.equal(result.lineItems[0]?.hasReturnableFulfillment, true);
+  assert.deepEqual(result.order.tags, []);
 });
 
 test("default Shopify adapter uses mock orders unless USE_REAL_SHOPIFY=true", async () => {
@@ -45,11 +54,11 @@ test("default Shopify adapter uses mock orders unless USE_REAL_SHOPIFY=true", as
     orderId: "gid://shopify/Order/1001",
   });
 
-  assert.equal(result.orderId, "gid://shopify/Order/1001");
-  assert.equal(result.orderName, "#1001");
+  assert.equal(result.order.id, "gid://shopify/Order/1001");
+  assert.equal(result.order.name, "#1001");
 });
 
-test("Shopify Admin adapter maps live Admin responses into RefundPolicyInput", async () => {
+test("Shopify Admin adapter maps live Admin responses into RefundContext", async () => {
   const responses = [
     {
       data: {
@@ -97,6 +106,9 @@ test("Shopify Admin adapter maps live Admin responses into RefundPolicyInput", a
                     quantity: 1,
                     fulfillmentLineItem: {
                       id: "gid://shopify/FulfillmentLineItem/1",
+                      lineItem: {
+                        id: "gid://shopify/LineItem/1",
+                      },
                     },
                   },
                 ],
@@ -127,20 +139,25 @@ test("Shopify Admin adapter maps live Admin responses into RefundPolicyInput", a
     orderId: "gid://shopify/Order/900000000301",
   });
 
-  assert.equal(result.orderId, "gid://shopify/Order/900000000301");
-  assert.equal(result.orderName, "#3001");
-  assert.equal(result.orderAgeDays, 10);
-  assert.equal(result.orderTotalAmount, 149.5);
-  assert.equal(result.financialStatus, FinancialStatus.Paid);
-  assert.equal(result.fulfillmentStatus, FulfillmentStatus.Fulfilled);
-  assert.equal(result.hasReturnableFulfillments, true);
-  assert.equal(result.alreadyFullyRefunded, false);
-  assert.equal(result.allItemsFinalSale, false);
-  assert.deepEqual(result.itemCategories, [
-    "Electronics > Audio > Headphones",
-  ]);
-  assert.deepEqual(result.policyTags, ["vip-exception", "loyalty_recovery"]);
-  assert.equal(result.flags?.vipOverride, true);
+  assert.equal(result.order.id, "gid://shopify/Order/900000000301");
+  assert.equal(result.order.name, "#3001");
+  assert.equal(result.order.ageDays, 10);
+  assert.equal(result.order.totalAmount, 149.5);
+  assert.equal(result.order.financialStatus, FinancialStatus.Paid);
+  assert.equal(result.lineItems.length, 1);
+  assert.equal(result.lineItems[0]?.lineItemId, "gid://shopify/LineItem/1");
+  assert.equal(result.lineItems[0]?.category, "Electronics > Audio > Headphones");
+  assert.equal(
+    result.lineItems[0]?.fulfillmentStatus,
+    FulfillmentStatus.Fulfilled,
+  );
+  assert.equal(
+    result.lineItems[0]?.fulfillmentLineItemId,
+    "gid://shopify/FulfillmentLineItem/1",
+  );
+  assert.equal(result.lineItems[0]?.hasReturnableFulfillment, true);
+  assert.deepEqual(result.order.tags, ["vip-exception", "loyalty_recovery"]);
+  assert.equal(result.order.flags?.vipOverride, true);
 });
 
 test("Shopify Admin adapter throws when Admin env vars are incomplete", async () => {
@@ -165,14 +182,17 @@ test("mock Shopify adapter loads mock orders directly", async () => {
     orderId: "gid://shopify/Order/1001",
   });
 
-  assert.equal(result.orderId, "gid://shopify/Order/1001");
-  assert.deepEqual(result.itemCategories, [
+  assert.equal(result.order.id, "gid://shopify/Order/1001");
+  assert.equal(result.lineItems.length, 1);
+  assert.equal(
+    result.lineItems[0]?.category,
     "Apparel & Accessories > Clothing > Shirts & Tops",
-  ]);
+  );
+  assert.equal(result.lineItems[0]?.finalSale, false);
 });
 
 test("maps admin helper fields for final sale, statuses, and flags safely", () => {
-  const result = mapAdminOrderToRefundPolicyInput(
+  const result = mapAdminOrderToRefundContext(
     {
       id: "gid://shopify/Order/900000000302",
       name: "#3002",
@@ -211,17 +231,19 @@ test("maps admin helper fields for final sale, statuses, and flags safely", () =
     new Date("2026-03-30T00:00:00.000Z"),
   );
 
-  assert.equal(result.financialStatus, FinancialStatus.Refunded);
-  assert.equal(result.orderTotalAmount, 320);
-  assert.equal(result.fulfillmentStatus, FulfillmentStatus.Partial);
-  assert.equal(result.alreadyFullyRefunded, true);
-  assert.equal(result.hasReturnableFulfillments, false);
-  assert.equal(result.allItemsFinalSale, true);
-  assert.deepEqual(result.itemCategories, [
-    "Apparel & Accessories > Shoes",
-  ]);
-  assert.deepEqual(result.policyTags, ["ops_review_hold"]);
-  assert.equal(result.flags?.fraudHold, true);
-  assert.equal(result.flags?.manualReview, true);
-  assert.equal(result.flags?.vipOverride, false);
+  assert.equal(result.order.financialStatus, FinancialStatus.Refunded);
+  assert.equal(result.order.totalAmount, 320);
+  assert.equal(result.lineItems.length, 1);
+  assert.equal(result.lineItems[0]?.lineItemId, "gid://shopify/LineItem/2");
+  assert.equal(result.lineItems[0]?.category, "Apparel & Accessories > Shoes");
+  assert.equal(
+    result.lineItems[0]?.fulfillmentStatus,
+    FulfillmentStatus.Partial,
+  );
+  assert.equal(result.lineItems[0]?.alreadyRefunded, true);
+  assert.equal(result.lineItems[0]?.finalSale, true);
+  assert.deepEqual(result.order.tags, ["ops_review_hold"]);
+  assert.equal(result.order.flags?.fraudHold, true);
+  assert.equal(result.order.flags?.manualReview, true);
+  assert.equal(result.order.flags?.vipOverride, false);
 });

@@ -7,7 +7,7 @@ import {
   RecommendedRefundAction,
   type RefundContextPlatformAdapter,
   RefundDecision,
-  RefundPolicyInput,
+  RefundContext,
 } from "@shopify-agent/core";
 import { handleRefundAgentRequest } from "../app/api/refund-agent/refund-agent-route-handler.js";
 
@@ -16,22 +16,32 @@ function makeAdapter(): RefundContextPlatformAdapter {
     platform: "test",
     loadRefundContext: async () =>
       ({
-        orderId: "gid://shopify/Order/1001",
-        orderName: "#1001",
-        orderCreatedAt: "2025-10-17T00:00:00.000Z",
-        orderAgeDays: 167,
-        orderTotalAmount: 48,
-        financialStatus: FinancialStatus.Paid,
-        fulfillmentStatus: FulfillmentStatus.Fulfilled,
-        hasReturnableFulfillments: true,
-        alreadyFullyRefunded: false,
-        allItemsFinalSale: false,
-        flags: {
-          fraudHold: false,
-          manualReview: false,
-          vipOverride: false,
+        order: {
+          id: "gid://shopify/Order/1001",
+          name: "#1001",
+          createdAt: "2025-10-17T00:00:00.000Z",
+          ageDays: 167,
+          totalAmount: 48,
+          financialStatus: FinancialStatus.Paid,
+          tags: [],
+          flags: {
+            fraudHold: false,
+            manualReview: false,
+            vipOverride: false,
+          },
         },
-      }) satisfies RefundPolicyInput,
+        lineItems: [
+          {
+            lineItemId: "gid://shopify/LineItem/1001",
+            title: "Default item",
+            returnableQuantity: 1,
+            fulfillmentStatus: FulfillmentStatus.Fulfilled,
+            hasReturnableFulfillment: true,
+            alreadyRefunded: false,
+            finalSale: false,
+          },
+        ],
+      }) satisfies RefundContext,
   };
 }
 
@@ -72,7 +82,7 @@ test("returns an AI-backed response when the selected responder succeeds", async
     response: "AI-assisted route answer.",
     decision: RefundDecision.Ineligible,
     recommendedNextAction: RecommendedRefundAction.Deny,
-    reasons: ["Order is outside the 30-day refund window."],
+    reasons: ["Refund subject is outside the 30-day refund window."],
     usedFallback: false,
     provider: "ollama",
   });
@@ -98,10 +108,10 @@ test("falls back when the selected responder throws", async () => {
   assert.equal(result.status, 200);
   assert.deepEqual(result.body, {
     response:
-      "No. Order is outside the 30-day refund window. Next step: decline the refund request with policy wording.",
+      "No. Refund subject is outside the 30-day refund window. Next step: decline the refund request with policy wording.",
     decision: RefundDecision.Ineligible,
     recommendedNextAction: RecommendedRefundAction.Deny,
-    reasons: ["Order is outside the 30-day refund window."],
+    reasons: ["Refund subject is outside the 30-day refund window."],
     usedFallback: true,
     provider: "fallback",
   });
@@ -125,10 +135,10 @@ test("falls back when the selected responder returns an empty response", async (
   assert.equal(result.status, 200);
   assert.deepEqual(result.body, {
     response:
-      "No. Order is outside the 30-day refund window. Next step: decline the refund request with policy wording.",
+      "No. Refund subject is outside the 30-day refund window. Next step: decline the refund request with policy wording.",
     decision: RefundDecision.Ineligible,
     recommendedNextAction: RecommendedRefundAction.Deny,
-    reasons: ["Order is outside the 30-day refund window."],
+    reasons: ["Refund subject is outside the 30-day refund window."],
     usedFallback: true,
     provider: "fallback",
   });

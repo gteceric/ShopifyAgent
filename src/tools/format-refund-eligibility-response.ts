@@ -29,8 +29,6 @@ export const REFUND_RESPONSE_COPY = {
     "This order's payment status needs human review before any refund decision is approved.",
   manualReviewHighValueOrder:
     "This high-value order needs human review before any refund decision is approved.",
-  manualReviewPartialRefund:
-    "This order has already been partially refunded and needs human review before any additional refund decision is approved.",
   manualReviewStandard:
     "This order should be routed to manual review.",
   followupNoteOverride:
@@ -161,11 +159,6 @@ export function formatRefundEligibilityResponse(
 
       if (hasReason(result, RefundReasonCode.HighValueOrderReviewRequired)) {
         return `${opening} ${REFUND_RESPONSE_COPY.manualReviewHighValueOrder} ${reasonSummary} ${REFUND_RESPONSE_COPY.followupReviewStandard}`
-          .trim();
-      }
-
-      if (hasReason(result, RefundReasonCode.PartialRefundReviewRequired)) {
-        return `${opening} ${REFUND_RESPONSE_COPY.manualReviewPartialRefund} ${reasonSummary} ${REFUND_RESPONSE_COPY.followupReviewStandard}`
           .trim();
       }
 

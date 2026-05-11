@@ -8,24 +8,67 @@ import {
   RefundDecision,
   RefundReasonCode,
 } from "../src/domain/refund-policy.types.js";
-import type { RefundPolicyInput } from "../src/domain/refund-policy.types.js";
+import type {
+  RefundContext,
+  RefundContextLineItem,
+} from "../src/domain/refund-policy.types.js";
+
+type RefundContextOverrides = Partial<
+  Omit<RefundContext["order"], "flags">
+> & {
+  flags?: Partial<RefundContext["order"]["flags"]>;
+  lineItems?: RefundContextLineItem[];
+  fulfillmentStatus?: FulfillmentStatus;
+  hasReturnableFulfillment?: boolean;
+  alreadyRefunded?: boolean;
+  finalSale?: boolean;
+  itemCategories?: string[];
+};
 
 function makeInput(
-  overrides: Partial<RefundPolicyInput> = {},
-): RefundPolicyInput {
-  return {
-    orderId: "gid://shopify/Order/1",
-    orderName: "#1001",
-    orderCreatedAt: "2026-03-01T00:00:00.000Z",
-    orderAgeDays: 10,
-    orderTotalAmount: 48,
+  overrides: RefundContextOverrides = {},
+): RefundContext {
+  const {
+    fulfillmentStatus = FulfillmentStatus.Fulfilled,
+    hasReturnableFulfillment = true,
+    alreadyRefunded = false,
+    finalSale = false,
+    itemCategories,
+    lineItems,
+    flags = {},
+    ...inputOverrides
+  } = overrides;
+  const order = {
+    id: "gid://shopify/Order/1",
+    name: "#1001",
+    createdAt: "2026-03-01T00:00:00.000Z",
+    ageDays: 10,
+    totalAmount: 48,
     financialStatus: FinancialStatus.Paid,
-    fulfillmentStatus: FulfillmentStatus.Fulfilled,
-    hasReturnableFulfillments: true,
-    alreadyFullyRefunded: false,
-    allItemsFinalSale: false,
-    flags: {},
-    ...overrides,
+    tags: [],
+    flags: {
+      fraudHold: false,
+      manualReview: false,
+      vipOverride: false,
+      ...flags,
+    },
+    ...inputOverrides,
+  };
+
+  return {
+    order,
+    lineItems: lineItems ?? [
+      {
+        lineItemId: "gid://shopify/LineItem/1",
+        title: "Default item",
+        returnableQuantity: 1,
+        category: itemCategories?.[0],
+        fulfillmentStatus,
+        hasReturnableFulfillment,
+        alreadyRefunded,
+        finalSale,
+      },
+    ],
   };
 }
 
@@ -33,6 +76,8 @@ test("returns eligible for a straightforward refundable order", () => {
   const result = evaluateRefundPolicy(makeInput());
 
   assert.equal(result.decision, RefundDecision.Eligible);
+  assert.equal(result.itemEvaluations.length, 1);
+  assert.equal(result.itemEvaluations[0]?.decision, RefundDecision.Eligible);
   assert.equal(result.reasons[0]?.code, RefundReasonCode.WithinRefundWindow);
   assert.match(
     result.reasons[0]?.message ?? "",
@@ -44,7 +89,7 @@ test("returns eligible for paid unfulfilled orders that can be canceled before s
   const result = evaluateRefundPolicy(
     makeInput({
       fulfillmentStatus: FulfillmentStatus.Unfulfilled,
-      hasReturnableFulfillments: false,
+      hasReturnableFulfillment: false,
     }),
   );
 
@@ -66,7 +111,7 @@ test("returns manual_review for partially fulfilled orders", () => {
   const result = evaluateRefundPolicy(
     makeInput({
       fulfillmentStatus: FulfillmentStatus.Partial,
-      hasReturnableFulfillments: true,
+      hasReturnableFulfillment: true,
     }),
   );
 
@@ -79,31 +124,31 @@ test("returns manual_review for partially fulfilled orders", () => {
   );
 });
 
-test("returns manual_review for partially refunded orders", () => {
+test("does not block a refundable line item only because the order was partially refunded", () => {
   const result = evaluateRefundPolicy(
     makeInput({
       financialStatus: FinancialStatus.PartiallyRefunded,
     }),
   );
 
-  assert.equal(result.decision, RefundDecision.ManualReview);
-  assert.ok(
-    result.reasons.some(
-      (reason) => reason.code === RefundReasonCode.PartialRefundReviewRequired,
-    ),
+  assert.equal(result.decision, RefundDecision.Eligible);
+  assert.equal(result.itemEvaluations[0]?.decision, RefundDecision.Eligible);
+  assert.equal(
+    result.itemEvaluations[0]?.evidence.evaluatedLineItem.financialStatus,
+    FinancialStatus.Paid,
   );
 });
 
 test("returns manual_review for high-value orders when merchant policy configures a threshold", () => {
   const result = evaluateRefundPolicy(
     makeInput({
-      orderTotalAmount: 750,
+      totalAmount: 750,
     }),
     {
       refundWindowDays: 30,
       cancelWindowDays: 30,
       highValueOrderThreshold: 500,
-      alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+      alreadyRefundedDecision: RefundDecision.Ineligible,
     },
   );
 
@@ -142,8 +187,8 @@ test("returns ineligible for unfulfilled final-sale orders by default", () => {
   const result = evaluateRefundPolicy(
     makeInput({
       fulfillmentStatus: FulfillmentStatus.Unfulfilled,
-      hasReturnableFulfillments: false,
-      allItemsFinalSale: true,
+      hasReturnableFulfillment: false,
+      finalSale: true,
     }),
   );
 
@@ -159,13 +204,13 @@ test("returns eligible for unfulfilled final-sale orders when merchant policy al
   const result = evaluateRefundPolicy(
     makeInput({
       fulfillmentStatus: FulfillmentStatus.Unfulfilled,
-      hasReturnableFulfillments: false,
-      allItemsFinalSale: true,
+      hasReturnableFulfillment: false,
+      finalSale: true,
     }),
     {
       refundWindowDays: 30,
       finalSaleUnfulfilledDecision: RefundDecision.Eligible,
-      alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+      alreadyRefundedDecision: RefundDecision.Ineligible,
     },
   );
 
@@ -181,13 +226,13 @@ test("returns manual_review for unfulfilled final-sale orders when merchant poli
   const result = evaluateRefundPolicy(
     makeInput({
       fulfillmentStatus: FulfillmentStatus.Unfulfilled,
-      hasReturnableFulfillments: false,
-      allItemsFinalSale: true,
+      hasReturnableFulfillment: false,
+      finalSale: true,
     }),
     {
       refundWindowDays: 30,
       finalSaleUnfulfilledDecision: RefundDecision.ManualReview,
-      alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+      alreadyRefundedDecision: RefundDecision.Ineligible,
     },
   );
 
@@ -203,9 +248,9 @@ test("returns manual_review for unfulfilled final-sale orders when merchant poli
 test("returns manual_review for stale unfulfilled orders outside the cancellation window", () => {
   const result = evaluateRefundPolicy(
     makeInput({
-      orderAgeDays: 45,
+      ageDays: 45,
       fulfillmentStatus: FulfillmentStatus.Unfulfilled,
-      hasReturnableFulfillments: false,
+      hasReturnableFulfillment: false,
     }),
   );
 
@@ -227,15 +272,15 @@ test("returns manual_review for stale unfulfilled orders outside the cancellatio
 test("returns eligible for stale unfulfilled orders when merchant policy allows it", () => {
   const result = evaluateRefundPolicy(
     makeInput({
-      orderAgeDays: 45,
+      ageDays: 45,
       fulfillmentStatus: FulfillmentStatus.Unfulfilled,
-      hasReturnableFulfillments: false,
+      hasReturnableFulfillment: false,
     }),
     {
       refundWindowDays: 30,
       cancelWindowDays: 30,
       unfulfilledOutsideWindowDecision: RefundDecision.Eligible,
-      alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+      alreadyRefundedDecision: RefundDecision.Ineligible,
     },
   );
 
@@ -256,15 +301,15 @@ test("returns eligible for stale unfulfilled orders when merchant policy allows 
 test("returns ineligible for stale unfulfilled orders when merchant policy forces it", () => {
   const result = evaluateRefundPolicy(
     makeInput({
-      orderAgeDays: 45,
+      ageDays: 45,
       fulfillmentStatus: FulfillmentStatus.Unfulfilled,
-      hasReturnableFulfillments: false,
+      hasReturnableFulfillment: false,
     }),
     {
       refundWindowDays: 30,
       cancelWindowDays: 30,
       unfulfilledOutsideWindowDecision: RefundDecision.Ineligible,
-      alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+      alreadyRefundedDecision: RefundDecision.Ineligible,
     },
   );
 
@@ -279,15 +324,15 @@ test("returns ineligible for stale unfulfilled orders when merchant policy force
 test("returns manual_review for stale unfulfilled orders when merchant policy forces it", () => {
   const result = evaluateRefundPolicy(
     makeInput({
-      orderAgeDays: 45,
+      ageDays: 45,
       fulfillmentStatus: FulfillmentStatus.Unfulfilled,
-      hasReturnableFulfillments: false,
+      hasReturnableFulfillment: false,
     }),
     {
       refundWindowDays: 30,
       cancelWindowDays: 30,
       unfulfilledOutsideWindowDecision: RefundDecision.ManualReview,
-      alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+      alreadyRefundedDecision: RefundDecision.Ineligible,
     },
   );
 
@@ -304,11 +349,11 @@ test("returns manual_review for stale unfulfilled orders when merchant policy fo
 test("uses the configured fulfilled refund window for delivered orders", () => {
   const result = evaluateRefundPolicy(
     makeInput({
-      orderAgeDays: 20,
+      ageDays: 20,
     }),
     {
       refundWindowDays: 14,
-      alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+      alreadyRefundedDecision: RefundDecision.Ineligible,
     },
   );
 
@@ -318,20 +363,20 @@ test("uses the configured fulfilled refund window for delivered orders", () => {
       (reason) => reason.code === RefundReasonCode.OutsideRefundWindow,
     ),
   );
-  assert.equal(result.evidence.effectiveRefundWindowDays, 14);
+  assert.equal(result.evidence.policyContext.effectiveRefundWindowDays, 14);
 });
 
 test("uses the configured unfulfilled cancellation window for pre-shipment orders", () => {
   const result = evaluateRefundPolicy(
     makeInput({
-      orderAgeDays: 10,
+      ageDays: 10,
       fulfillmentStatus: FulfillmentStatus.Unfulfilled,
-      hasReturnableFulfillments: false,
+      hasReturnableFulfillment: false,
     }),
     {
       refundWindowDays: 30,
       cancelWindowDays: 7,
-      alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+      alreadyRefundedDecision: RefundDecision.Ineligible,
     },
   );
 
@@ -343,14 +388,35 @@ test("uses the configured unfulfilled cancellation window for pre-shipment order
         RefundReasonCode.PreFulfillmentCancellationReviewRequired,
     ),
   );
-  assert.equal(result.evidence.effectiveCancelWindowDays, 7);
+  assert.equal(result.evidence.policyContext.effectiveCancelWindowDays, 7);
 });
 
 test("uses the strictest matching category refund window for fulfilled orders", () => {
   const result = evaluateRefundPolicy(
     makeInput({
-      orderAgeDays: 20,
-      itemCategories: ["apparel", "accessories"],
+      ageDays: 20,
+      lineItems: [
+        {
+          lineItemId: "gid://shopify/LineItem/1",
+          title: "Dress",
+          returnableQuantity: 1,
+          category: "apparel",
+          fulfillmentStatus: FulfillmentStatus.Fulfilled,
+          hasReturnableFulfillment: true,
+          alreadyRefunded: false,
+          finalSale: false,
+        },
+        {
+          lineItemId: "gid://shopify/LineItem/2",
+          title: "Phone Case",
+          returnableQuantity: 1,
+          category: "accessories",
+          fulfillmentStatus: FulfillmentStatus.Fulfilled,
+          hasReturnableFulfillment: true,
+          alreadyRefunded: false,
+          finalSale: false,
+        },
+      ],
     }),
     {
       refundWindowDays: 30,
@@ -358,23 +424,34 @@ test("uses the strictest matching category refund window for fulfilled orders", 
         { category: "apparel", refundWindowDays: 14 },
         { category: "accessories", refundWindowDays: 21 },
       ],
-      alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+      alreadyRefundedDecision: RefundDecision.Ineligible,
     },
   );
 
-  assert.equal(result.decision, RefundDecision.Ineligible);
-  assert.equal(result.evidence.effectiveRefundWindowDays, 14);
-  assert.deepEqual(result.evidence.matchedCategoryWindowCategories, [
+  assert.equal(result.decision, RefundDecision.ManualReview);
+  assert.equal(result.evidence.policyContext.effectiveRefundWindowDays, 14);
+  assert.deepEqual(result.evidence.policyContext.matchedCategoryWindowCategories, [
     "apparel",
     "accessories",
   ]);
 });
 
-test("applies merchant exception rules when policy tags match a blocking refund case", () => {
+test("throws when refund policy input has no line items", () => {
+  assert.throws(
+    () =>
+      evaluateRefundPolicy({
+        ...makeInput(),
+        lineItems: [],
+      }),
+    /requires at least one line item/,
+  );
+});
+
+test("applies merchant exception rules when order tags match a blocking refund case", () => {
   const result = evaluateRefundPolicy(
     makeInput({
-      orderAgeDays: 45,
-      policyTags: ["loyalty_recovery"],
+      ageDays: 45,
+      tags: ["loyalty_recovery"],
     }),
     {
       refundWindowDays: 30,
@@ -386,7 +463,7 @@ test("applies merchant exception rules when policy tags match a blocking refund 
             "Merchant loyalty recovery rule allows a refund outside the standard window.",
         },
       ],
-      alreadyFullyRefundedDecision: RefundDecision.Ineligible,
+      alreadyRefundedDecision: RefundDecision.Ineligible,
     },
   );
 
@@ -397,11 +474,11 @@ test("applies merchant exception rules when policy tags match a blocking refund 
         reason.code === RefundReasonCode.MerchantExceptionRuleApplied,
     ),
   );
-  assert.equal(result.evidence.matchedExceptionRuleTag, "loyalty_recovery");
+  assert.equal(result.evidence.policyContext.matchedExceptionRuleTag, "loyalty_recovery");
 });
 
 test("returns ineligible when order is outside the refund window", () => {
-  const result = evaluateRefundPolicy(makeInput({ orderAgeDays: 45 }));
+  const result = evaluateRefundPolicy(makeInput({ ageDays: 45 }));
 
   assert.equal(result.decision, RefundDecision.Ineligible);
   assert.ok(
@@ -411,8 +488,8 @@ test("returns ineligible when order is outside the refund window", () => {
   );
 });
 
-test("returns ineligible when all items are final sale", () => {
-  const result = evaluateRefundPolicy(makeInput({ allItemsFinalSale: true }));
+test("returns ineligible when the line item is final sale", () => {
+  const result = evaluateRefundPolicy(makeInput({ finalSale: true }));
 
   assert.equal(result.decision, RefundDecision.Ineligible);
   assert.ok(
@@ -423,9 +500,9 @@ test("returns ineligible when all items are final sale", () => {
   );
 });
 
-test("returns ineligible when order was already fully refunded", () => {
+test("returns ineligible when the line item was already refunded", () => {
   const result = evaluateRefundPolicy(
-    makeInput({ alreadyFullyRefunded: true }),
+    makeInput({ alreadyRefunded: true }),
   );
 
   assert.equal(result.decision, RefundDecision.Ineligible);
@@ -436,12 +513,12 @@ test("returns ineligible when order was already fully refunded", () => {
   );
 });
 
-test("returns manual_review for refunded orders when merchant config allows it", () => {
+test("returns manual_review for refunded line items when merchant config allows it", () => {
   const result = evaluateRefundPolicy(
-    makeInput({ alreadyFullyRefunded: true }),
+    makeInput({ alreadyRefunded: true }),
     {
       refundWindowDays: 30,
-      alreadyFullyRefundedDecision: RefundDecision.ManualReview,
+      alreadyRefundedDecision: RefundDecision.ManualReview,
     },
   );
 
@@ -469,8 +546,8 @@ test("returns manual_review when fraud or review flags are present", () => {
 test("returns eligible with an explicit override reason for VIP exceptions", () => {
   const result = evaluateRefundPolicy(
     makeInput({
-      orderAgeDays: 60,
-      hasReturnableFulfillments: false,
+      ageDays: 60,
+      hasReturnableFulfillment: false,
       flags: { vipOverride: true },
     }),
   );
@@ -486,4 +563,149 @@ test("returns eligible with an explicit override reason for VIP exceptions", () 
       (reason) => reason.code === RefundReasonCode.WithinRefundWindow,
     ),
   );
+});
+
+test("evaluates line items independently and rolls mixed item eligibility up to manual_review", () => {
+  const result = evaluateRefundPolicy(
+    makeInput({
+      ageDays: 20,
+      lineItems: [
+        {
+          lineItemId: "gid://shopify/LineItem/1",
+          fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/1",
+          title: "Dress",
+          returnableQuantity: 1,
+          category: "apparel",
+          fulfillmentStatus: FulfillmentStatus.Fulfilled,
+          hasReturnableFulfillment: true,
+          alreadyRefunded: false,
+          finalSale: false,
+        },
+        {
+          lineItemId: "gid://shopify/LineItem/2",
+          fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/2",
+          title: "Phone Case",
+          returnableQuantity: 1,
+          category: "accessories",
+          fulfillmentStatus: FulfillmentStatus.Fulfilled,
+          hasReturnableFulfillment: true,
+          alreadyRefunded: false,
+          finalSale: false,
+        },
+      ],
+    }),
+    {
+      refundWindowDays: 30,
+      cancelWindowDays: 30,
+      categoryWindowOverrides: [
+        { category: "apparel", refundWindowDays: 14 },
+      ],
+      alreadyRefundedDecision: RefundDecision.Ineligible,
+    },
+  );
+
+  assert.equal(result.decision, RefundDecision.ManualReview);
+  assert.ok(
+    result.reasons.some(
+      (reason) =>
+        reason.code === RefundReasonCode.MixedItemEligibilityReviewRequired,
+    ),
+  );
+  assert.equal(result.itemEvaluations?.[0]?.decision, RefundDecision.Ineligible);
+  assert.equal(result.itemEvaluations?.[1]?.decision, RefundDecision.Eligible);
+  assert.equal(
+    result.itemEvaluations?.[0]?.evidence.policyContext.effectiveRefundWindowDays,
+    14,
+  );
+  assert.equal(
+    result.itemEvaluations?.[1]?.evidence.policyContext.effectiveRefundWindowDays,
+    30,
+  );
+  assert.deepEqual(result.evidence.evaluatedOrder.itemCategories, [
+    "apparel",
+    "accessories",
+  ]);
+  assert.equal(result.evidence.policyContext.effectiveRefundWindowDays, 14);
+});
+
+test("evaluates final-sale and refundable line items separately", () => {
+  const result = evaluateRefundPolicy(
+    makeInput({
+      lineItems: [
+        {
+          lineItemId: "gid://shopify/LineItem/1",
+          title: "Clearance Socks",
+          returnableQuantity: 1,
+          category: "apparel",
+          fulfillmentStatus: FulfillmentStatus.Fulfilled,
+          hasReturnableFulfillment: true,
+          alreadyRefunded: false,
+          finalSale: true,
+        },
+        {
+          lineItemId: "gid://shopify/LineItem/2",
+          title: "Phone Case",
+          returnableQuantity: 1,
+          category: "accessories",
+          fulfillmentStatus: FulfillmentStatus.Fulfilled,
+          hasReturnableFulfillment: true,
+          alreadyRefunded: false,
+          finalSale: false,
+        },
+      ],
+    }),
+  );
+
+  assert.equal(result.decision, RefundDecision.ManualReview);
+  assert.equal(result.itemEvaluations?.[0]?.decision, RefundDecision.Ineligible);
+  assert.equal(result.itemEvaluations?.[0]?.evidence.evaluatedLineItem.finalSale, true);
+  assert.ok(
+    result.itemEvaluations?.[0]?.reasons.some(
+      (reason) =>
+        reason.code === RefundReasonCode.FinalSaleUnavailableForRefund,
+    ),
+  );
+  assert.equal(result.itemEvaluations?.[1]?.decision, RefundDecision.Eligible);
+  assert.equal(result.itemEvaluations?.[1]?.evidence.evaluatedLineItem.finalSale, false);
+});
+
+test("evaluates already-refunded line items without blocking refundable siblings", () => {
+  const result = evaluateRefundPolicy(
+    makeInput({
+      financialStatus: FinancialStatus.PartiallyRefunded,
+      lineItems: [
+        {
+          lineItemId: "gid://shopify/LineItem/1",
+          title: "Already Refunded Shirt",
+          returnableQuantity: 1,
+          category: "apparel",
+          fulfillmentStatus: FulfillmentStatus.Fulfilled,
+          hasReturnableFulfillment: false,
+          alreadyRefunded: true,
+          finalSale: false,
+        },
+        {
+          lineItemId: "gid://shopify/LineItem/2",
+          title: "Returnable Hat",
+          returnableQuantity: 1,
+          category: "accessories",
+          fulfillmentStatus: FulfillmentStatus.Fulfilled,
+          hasReturnableFulfillment: true,
+          alreadyRefunded: false,
+          finalSale: false,
+        },
+      ],
+    }),
+  );
+
+  assert.equal(result.decision, RefundDecision.ManualReview);
+  assert.equal(result.itemEvaluations?.[0]?.decision, RefundDecision.Ineligible);
+  assert.equal(result.itemEvaluations?.[0]?.evidence.evaluatedLineItem.alreadyRefunded, true);
+  assert.ok(
+    result.itemEvaluations?.[0]?.reasons.some(
+      (reason) => reason.code === RefundReasonCode.AlreadyFullyRefunded,
+    ),
+  );
+  assert.equal(result.itemEvaluations?.[1]?.decision, RefundDecision.Eligible);
+  assert.equal(result.itemEvaluations?.[1]?.evidence.evaluatedLineItem.alreadyRefunded, false);
 });

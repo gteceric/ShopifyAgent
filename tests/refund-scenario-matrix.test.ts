@@ -21,6 +21,28 @@ function getExpectedNextAction(
   }
 }
 
+function assertPartialObject(
+  actual: object | undefined,
+  expected: Record<string, unknown> | undefined,
+  label: string,
+): void {
+  if (!expected) {
+    return;
+  }
+
+  assert.ok(actual, `Expected ${label} to be present`);
+
+  for (const [key, expectedValue] of Object.entries(expected)) {
+    const actualValue = actual as Record<string, unknown>;
+
+    assert.deepEqual(
+      actualValue[key],
+      expectedValue,
+      `Expected ${label}.${key}`,
+    );
+  }
+}
+
 for (const scenario of REFUND_SCENARIO_MATRIX) {
   test(`scenario matrix: ${scenario.id}`, async () => {
     // Use the same application boundary as MCP/web callers, but inject a mock
@@ -60,14 +82,20 @@ for (const scenario of REFUND_SCENARIO_MATRIX) {
 
     // Evidence is the structured audit payload. Scenarios assert only the
     // evidence fields that are important to that case.
-    for (const [evidenceKey, expectedValue] of Object.entries(
-      scenario.expectedEvidence ?? {},
-    )) {
-      assert.deepEqual(
-        result.evidence[evidenceKey as keyof typeof result.evidence],
-        expectedValue,
-        `Expected evidence.${evidenceKey} for scenario ${scenario.id}`,
-      );
-    }
+    assertPartialObject(
+      result.evidence.order,
+      scenario.expectedEvidence?.order,
+      `evidence.order for scenario ${scenario.id}`,
+    );
+    assertPartialObject(
+      result.evidence.policyContext,
+      scenario.expectedEvidence?.policyContext,
+      `evidence.policyContext for scenario ${scenario.id}`,
+    );
+    assertPartialObject(
+      result.evidence.evaluatedOrder,
+      scenario.expectedEvidence?.evaluatedOrder,
+      `evidence.evaluatedOrder for scenario ${scenario.id}`,
+    );
   });
 }

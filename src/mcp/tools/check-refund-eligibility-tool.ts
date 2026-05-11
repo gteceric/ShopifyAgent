@@ -88,67 +88,108 @@ const CHECK_REFUND_ELIGIBILITY_TOOL = {
         type: "object",
         additionalProperties: false,
         properties: {
-          orderAgeDays: {
-            type: "number",
-          },
-          refundWindowDays: {
-            type: "number",
-          },
-          cancelWindowDays: {
-            type: "number",
-          },
-          orderTotalAmount: {
-            type: "number",
-          },
-          highValueOrderThreshold: {
-            type: "number",
-          },
-          financialStatus: {
-            type: "string",
-            enum: Object.values(FinancialStatus),
-          },
-          fulfillmentStatus: {
-            type: "string",
-            enum: Object.values(FulfillmentStatus),
-          },
-          hasReturnableFulfillments: {
-            type: "boolean",
-          },
-          alreadyFullyRefunded: {
-            type: "boolean",
-          },
-          allItemsFinalSale: {
-            type: "boolean",
-          },
-          flags: {
+          order: {
             type: "object",
             additionalProperties: false,
             properties: {
-              fraudHold: {
-                type: "boolean",
+              id: { type: "string" },
+              name: { type: "string" },
+              createdAt: { type: "string" },
+              ageDays: { type: "number" },
+              totalAmount: { type: "number" },
+              financialStatus: {
+                type: "string",
+                enum: Object.values(FinancialStatus),
               },
-              manualReview: {
-                type: "boolean",
+              tags: {
+                type: "array",
+                items: { type: "string" },
               },
-              vipOverride: {
-                type: "boolean",
+              flags: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  fraudHold: { type: "boolean" },
+                  manualReview: { type: "boolean" },
+                  vipOverride: { type: "boolean" },
+                },
+                required: ["fraudHold", "manualReview", "vipOverride"],
               },
             },
-            required: ["fraudHold", "manualReview", "vipOverride"],
+            required: [
+              "id",
+              "name",
+              "createdAt",
+              "ageDays",
+              "totalAmount",
+              "financialStatus",
+              "tags",
+              "flags",
+            ],
+          },
+          policyContext: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              refundWindowDays: { type: "number" },
+              effectiveRefundWindowDays: { type: "number" },
+              cancelWindowDays: { type: "number" },
+              effectiveCancelWindowDays: { type: "number" },
+              highValueOrderThreshold: { type: "number" },
+              matchedCategoryWindowCategories: {
+                type: "array",
+                items: { type: "string" },
+              },
+              matchedExceptionRuleTag: { type: "string" },
+            },
+            required: [
+              "refundWindowDays",
+              "effectiveRefundWindowDays",
+              "cancelWindowDays",
+              "effectiveCancelWindowDays",
+              "matchedCategoryWindowCategories",
+            ],
+          },
+          evaluatedOrder: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              financialStatus: {
+                type: "string",
+                enum: Object.values(FinancialStatus),
+              },
+              fulfillmentStatus: {
+                type: "string",
+                enum: Object.values(FulfillmentStatus),
+              },
+              hasReturnableFulfillments: { type: "boolean" },
+              alreadyFullyRefunded: { type: "boolean" },
+              finalSale: { type: "boolean" },
+              itemCategories: {
+                type: "array",
+                items: { type: "string" },
+              },
+            },
+            required: [
+              "financialStatus",
+              "fulfillmentStatus",
+              "hasReturnableFulfillments",
+              "alreadyFullyRefunded",
+              "finalSale",
+              "itemCategories",
+            ],
           },
         },
-        required: [
-          "orderAgeDays",
-          "refundWindowDays",
-          "cancelWindowDays",
-          "orderTotalAmount",
-          "financialStatus",
-          "fulfillmentStatus",
-          "hasReturnableFulfillments",
-          "alreadyFullyRefunded",
-          "allItemsFinalSale",
-          "flags",
-        ],
+        required: ["order", "policyContext", "evaluatedOrder"],
+      },
+      itemEvaluations: {
+        type: "array",
+        description:
+          "Per-line-item refund decisions and evidence. This is the source of truth for item-level refund eligibility.",
+        items: {
+          type: "object",
+          additionalProperties: true,
+        },
       },
     },
     required: [
@@ -159,6 +200,7 @@ const CHECK_REFUND_ELIGIBILITY_TOOL = {
       "recommendedNextAction",
       "reasons",
       "evidence",
+      "itemEvaluations",
     ],
   },
   annotations: {

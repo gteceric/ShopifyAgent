@@ -15,6 +15,7 @@ export const REFUND_ORDER_CONTEXT_QUERY = /* GraphQL */ `
       lineItems(first: 100) {
         nodes {
           id
+          title
           currentQuantity
           product {
             category {
@@ -56,6 +57,9 @@ export const REFUND_RETURNABLE_FULFILLMENTS_QUERY = /* GraphQL */ `
             quantity
             fulfillmentLineItem {
               id
+              lineItem {
+                id
+              }
             }
           }
         }

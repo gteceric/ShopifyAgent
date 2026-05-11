@@ -26,7 +26,7 @@ export interface ShopifyOrderRecord {
   returnableFulfillmentsCount: number;
   isFullyRefunded: boolean;
   lineItems: ShopifyLineItem[];
-  policyTags?: string[];
+  tags?: string[];
   flags?: ShopifyRiskFlags;
 }
 
@@ -138,7 +138,7 @@ export const MOCK_SHOPIFY_ORDERS: Record<string, ShopifyOrderRecord> = {
         category: "Apparel & Accessories > Clothing",
       },
     ],
-    policyTags: ["loyalty_recovery"],
+    tags: ["loyalty_recovery"],
   },
   "gid://shopify/Order/1182": {
     id: "gid://shopify/Order/1182",

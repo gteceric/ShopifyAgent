@@ -2,7 +2,10 @@ import {
   FinancialStatus,
   FulfillmentStatus,
 } from "../../domain/refund-policy.types.js";
-import type { RefundPolicyInput } from "../../domain/refund-policy.types.js";
+import type {
+  RefundContext,
+  RefundContextLineItem,
+} from "../../domain/refund-policy.types.js";
 import type {
   RefundContextInput,
   RefundContextPlatformAdapter,
@@ -31,6 +34,7 @@ interface ShopifyMetafieldValue {
 
 interface ShopifyAdminLineItem {
   id: string;
+  title?: string | null;
   currentQuantity: number;
   product?: {
     category?: {
@@ -74,6 +78,9 @@ interface ShopifyReturnableFulfillmentsResponse {
           quantity: number;
           fulfillmentLineItem: {
             id: string;
+            lineItem?: {
+              id: string;
+            } | null;
           } | null;
         }>;
       };
@@ -157,88 +164,137 @@ function normalizeStringArray(
   ];
 }
 
-function collectMockLineItemCategories(order: ShopifyOrderRecord): string[] {
-  return normalizeStringArray(
-    order.lineItems.map((lineItem) => lineItem.category),
-  );
-}
-
-function collectAdminLineItemCategories(
-  lineItems: ShopifyAdminLineItem[],
-): string[] {
-  return normalizeStringArray(
-    lineItems.map((lineItem) => lineItem.product?.category?.fullName),
-  );
-}
-
-function mapShopifyMockOrderToRefundPolicyInput(
+function mapMockLineItemsToRefundContextLineItems(
   order: ShopifyOrderRecord,
-  now: Date,
-): RefundPolicyInput {
-  return {
-    orderId: order.id,
-    orderName: order.name,
-    orderCreatedAt: order.createdAt,
-    orderAgeDays: daysBetween(order.createdAt, now),
-    orderTotalAmount: order.totalAmount,
-    financialStatus: order.displayFinancialStatus ?? FinancialStatus.Unknown,
+): RefundContextLineItem[] {
+  return order.lineItems.map((lineItem, index) => ({
+    lineItemId: `${order.id}/LineItem/${index + 1}`,
+    title: lineItem.sku,
+    returnableQuantity: 1,
+    category: lineItem.category,
     fulfillmentStatus:
       order.displayFulfillmentStatus ?? FulfillmentStatus.Unknown,
-    hasReturnableFulfillments: order.returnableFulfillmentsCount > 0,
-    alreadyFullyRefunded: order.isFullyRefunded,
-    allItemsFinalSale:
-      order.lineItems.length > 0 &&
-      order.lineItems.every((lineItem) => lineItem.finalSale),
-    itemCategories: collectMockLineItemCategories(order),
-    policyTags: normalizeStringArray(order.policyTags ?? []),
-    flags: {
-      fraudHold: order.flags?.fraudHold ?? false,
-      manualReview: order.flags?.manualReview ?? false,
-      vipOverride: order.flags?.vipOverride ?? false,
+    hasReturnableFulfillment: order.returnableFulfillmentsCount > 0,
+    alreadyRefunded: order.isFullyRefunded,
+    finalSale: lineItem.finalSale,
+  }));
+}
+
+function mapShopifyMockOrderToRefundContext(
+  order: ShopifyOrderRecord,
+  now: Date,
+): RefundContext {
+  return {
+    order: {
+      id: order.id,
+      name: order.name,
+      createdAt: order.createdAt,
+      ageDays: daysBetween(order.createdAt, now),
+      totalAmount: order.totalAmount,
+      financialStatus: order.displayFinancialStatus ?? FinancialStatus.Unknown,
+      tags: normalizeStringArray(order.tags ?? []),
+      flags: {
+        fraudHold: order.flags?.fraudHold ?? false,
+        manualReview: order.flags?.manualReview ?? false,
+        vipOverride: order.flags?.vipOverride ?? false,
+      },
     },
+    lineItems: mapMockLineItemsToRefundContextLineItems(order),
   };
 }
 
-// Map Shopify order context into the platform-neutral refund policy input.
-export function mapAdminOrderToRefundPolicyInput(
+function collectReturnableLineItems(
+  returnable: ShopifyReturnableFulfillmentsResponse,
+): Map<string, { fulfillmentLineItemId: string; returnableQuantity: number }> {
+  const returnableLineItems = new Map<
+    string,
+    { fulfillmentLineItemId: string; returnableQuantity: number }
+  >();
+
+  for (const fulfillment of returnable.returnableFulfillments.nodes) {
+    for (const lineItem of fulfillment.returnableFulfillmentLineItems.nodes) {
+      const lineItemId = lineItem.fulfillmentLineItem?.lineItem?.id;
+      const fulfillmentLineItemId = lineItem.fulfillmentLineItem?.id;
+
+      if (!lineItemId || !fulfillmentLineItemId || lineItem.quantity <= 0) {
+        continue;
+      }
+
+      returnableLineItems.set(lineItemId, {
+        fulfillmentLineItemId,
+        returnableQuantity: lineItem.quantity,
+      });
+    }
+  }
+
+  return returnableLineItems;
+}
+
+function mapAdminLineItemsToRefundContextLineItems(
+  order: NonNullable<ShopifyRefundOrderContextResponse["order"]>,
+  returnable: ShopifyReturnableFulfillmentsResponse,
+  financialStatus: FinancialStatus,
+): RefundContextLineItem[] {
+  const returnableLineItems = collectReturnableLineItems(returnable);
+  const orderFulfillmentStatus = mapFulfillmentStatus(
+    order.displayFulfillmentStatus,
+  );
+
+  return order.lineItems.nodes.map((lineItem) => {
+    const returnableLineItem = returnableLineItems.get(lineItem.id);
+
+    return {
+      lineItemId: lineItem.id,
+      fulfillmentLineItemId: returnableLineItem?.fulfillmentLineItemId,
+      title: lineItem.title ?? undefined,
+      returnableQuantity:
+        returnableLineItem?.returnableQuantity ?? lineItem.currentQuantity,
+      category: lineItem.product?.category?.fullName ?? undefined,
+      fulfillmentStatus: orderFulfillmentStatus,
+      hasReturnableFulfillment: returnableLineItem !== undefined,
+      alreadyRefunded:
+        financialStatus === FinancialStatus.Refunded ||
+        lineItem.currentQuantity <= 0,
+      finalSale: isFinalSaleLineItem(lineItem),
+    };
+  });
+}
+
+// Map Shopify order context into the platform-neutral refund context.
+export function mapAdminOrderToRefundContext(
   order: NonNullable<ShopifyRefundOrderContextResponse["order"]>,
   returnable: ShopifyReturnableFulfillmentsResponse,
   now: Date,
-): RefundPolicyInput {
+): RefundContext {
   const financialStatus = mapFinancialStatus(order.displayFinancialStatus);
 
   return {
-    orderId: order.id,
-    orderName: order.name,
-    orderCreatedAt: order.createdAt,
-    orderAgeDays: daysBetween(order.createdAt, now),
-    orderTotalAmount: Number(order.totalPriceSet?.shopMoney?.amount ?? "0"),
-    financialStatus,
-    fulfillmentStatus: mapFulfillmentStatus(order.displayFulfillmentStatus),
-    hasReturnableFulfillments: returnable.returnableFulfillments.nodes.some(
-      (fulfillment) =>
-        fulfillment.returnableFulfillmentLineItems.nodes.some(
-          (lineItem) => lineItem.quantity > 0,
-        ),
-    ),
-    alreadyFullyRefunded: financialStatus === FinancialStatus.Refunded,
-    allItemsFinalSale:
-      order.lineItems.nodes.length > 0 &&
-      order.lineItems.nodes.every(isFinalSaleLineItem),
-    itemCategories: collectAdminLineItemCategories(order.lineItems.nodes),
-    policyTags: normalizeStringArray(order.tags ?? []),
-    flags: {
-      fraudHold: parseBooleanFlag(order.fraudHoldFlag?.value),
-      manualReview: parseBooleanFlag(order.manualReviewFlag?.value),
-      vipOverride: parseBooleanFlag(order.vipOverrideFlag?.value),
+    order: {
+      id: order.id,
+      name: order.name,
+      createdAt: order.createdAt,
+      ageDays: daysBetween(order.createdAt, now),
+      totalAmount: Number(order.totalPriceSet?.shopMoney?.amount ?? "0"),
+      financialStatus,
+      tags: normalizeStringArray(order.tags ?? []),
+      flags: {
+        fraudHold: parseBooleanFlag(order.fraudHoldFlag?.value),
+        manualReview: parseBooleanFlag(order.manualReviewFlag?.value),
+        vipOverride: parseBooleanFlag(order.vipOverrideFlag?.value),
+      },
     },
+    lineItems: mapAdminLineItemsToRefundContextLineItems(
+      order,
+      returnable,
+      financialStatus,
+    ),
   };
 }
 
 async function loadRefundContextFromShopify(
   input: RefundContextInput,
   deps: LoadShopifyRefundContextDeps,
-): Promise<RefundPolicyInput> {
+): Promise<RefundContext> {
   // The policy engine needs both the order record and Shopify's separate
   // returnable-fulfillments view to decide whether a refund path is actually open.
   const orderResponse =
@@ -265,7 +321,7 @@ async function loadRefundContextFromShopify(
       },
     );
 
-  return mapAdminOrderToRefundPolicyInput(
+  return mapAdminOrderToRefundContext(
     orderResponse.order,
     returnableResponse,
     deps.now ?? new Date(),
@@ -275,7 +331,7 @@ async function loadRefundContextFromShopify(
 async function loadRefundContextFromMockShopify(
   input: RefundContextInput,
   deps: LoadShopifyRefundContextDeps = {},
-): Promise<RefundPolicyInput> {
+): Promise<RefundContext> {
   const order = MOCK_SHOPIFY_ORDERS[input.orderId];
 
   if (!order) {
@@ -285,7 +341,7 @@ async function loadRefundContextFromMockShopify(
     );
   }
 
-  return mapShopifyMockOrderToRefundPolicyInput(order, deps.now ?? new Date());
+  return mapShopifyMockOrderToRefundContext(order, deps.now ?? new Date());
 }
 
 export function createMockShopifyRefundContextAdapter(

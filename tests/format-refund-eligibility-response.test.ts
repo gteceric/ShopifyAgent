@@ -49,7 +49,7 @@ test("formats a standard eligible result as an approval response", async () => {
     new RegExp(escapeRegExp(REFUND_RESPONSE_COPY.eligibleStandard), "i"),
   );
   assert.match(response, /within the 30-day refund window/i);
-  assert.match(response, /returnable fulfillments available/i);
+  assert.match(response, /returnable fulfillment available/i);
   assert.match(
     response,
     new RegExp(escapeRegExp(REFUND_RESPONSE_COPY.followupStandardRefund), "i"),
@@ -194,23 +194,20 @@ test("formats a pending-payment order as a manual-review response", async () => 
   );
 });
 
-test("formats a partially refunded order as a manual-review response", async () => {
+test("formats a refundable item from a partially refunded order as eligible", async () => {
   const response = await getFormattedResponse(
-    RefundScenarioId.ManualReviewPartialRefund,
+    RefundScenarioId.EligiblePartiallyRefundedOrderItem,
   );
 
-  assert.match(response, /^Not automatically\./);
+  assert.match(response, /^Yes\./);
   assert.match(
     response,
-    new RegExp(
-      escapeRegExp(REFUND_RESPONSE_COPY.manualReviewPartialRefund),
-      "i",
-    ),
+    new RegExp(escapeRegExp(REFUND_RESPONSE_COPY.eligibleStandard), "i"),
   );
-  assert.match(response, /already been partially refunded/i);
+  assert.match(response, /within the 30-day refund window/i);
   assert.match(
     response,
-    new RegExp(escapeRegExp(REFUND_RESPONSE_COPY.followupReviewStandard), "i"),
+    new RegExp(escapeRegExp(REFUND_RESPONSE_COPY.followupStandardRefund), "i"),
   );
 });
 

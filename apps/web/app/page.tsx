@@ -6,7 +6,7 @@ import {
 import { Dashboard } from "./dashboard";
 import {
   applyRefundEvaluationToOrder,
-  DASHBOARD_DEMO_POLICY,
+  DASHBOARD_POLICY_CONFIG,
   mapOrderSummaryToDashboardOrder,
   type DashboardOrderErrorState,
 } from "./dashboard-order-evaluation";
@@ -45,15 +45,18 @@ export default async function Home({ searchParams }: HomeProps) {
       // Each loaded row gets its own refund evaluation so the queue can show
       // real posture immediately instead of only enriching the selected order.
       const evaluationOutcomes = await Promise.allSettled(
-        orderSummaries.map((order) =>
-          checkRefundEligibility(
-            { orderId: order.id },
-            {
-              config: DASHBOARD_DEMO_POLICY,
-              adapter: refundContextAdapter,
-            },
-          ),
-        ),
+        orderSummaries.map((order) => {
+          const refundEligibilityInput = { orderId: order.id };
+          const refundEligibilityDeps = {
+            config: DASHBOARD_POLICY_CONFIG,
+            adapter: refundContextAdapter,
+          };
+
+          return checkRefundEligibility(
+            refundEligibilityInput,
+            refundEligibilityDeps,
+          );
+        }),
       );
 
       orders = orderSummaries.map((orderSummary, index) => {
