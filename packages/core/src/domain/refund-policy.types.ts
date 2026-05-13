@@ -135,7 +135,7 @@ export interface RefundReason {
   message: string;
 }
 
-export interface RefundPolicyEvidencePolicyContext {
+export interface ResolvedPolicyContext {
   refundWindowDays: number;
   effectiveRefundWindowDays: number;
   cancelWindowDays: number;
@@ -171,14 +171,14 @@ export interface EvaluatedRefundPolicyLineItem {
 // order level
 export interface RefundPolicyOrderEvidence {
   order: RefundContextOrder;
-  policyContext: RefundPolicyEvidencePolicyContext;
+  policyContext: ResolvedPolicyContext;
   evaluatedOrder: EvaluatedRefundPolicyOrder;
 }
 
 // item level
 export interface RefundPolicyLineItemEvidence {
   order: RefundContextOrder;
-  policyContext: RefundPolicyEvidencePolicyContext;
+  policyContext: ResolvedPolicyContext;
   evaluatedLineItem: EvaluatedRefundPolicyLineItem;
 }
 

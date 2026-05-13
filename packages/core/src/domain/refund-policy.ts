@@ -13,7 +13,7 @@ import type {
   RefundPolicyLineItemEvaluation,
   RefundPolicyLineItemEvidence,
   RefundContextLineItem,
-  RefundPolicyEvidencePolicyContext,
+  ResolvedPolicyContext,
   RefundPolicyResult,
   RefundPolicyOrderEvidence,
   EvaluatedRefundPolicyOrder,
@@ -32,19 +32,9 @@ interface RefundPolicyItemContext {
   itemCategories: string[]; // normalized Shopify product category data
 }
 
-interface RefundPolicyRuleEvaluationContext {
-  itemContext: RefundPolicyItemContext; // normalized facts used for the policy decision
-  refundWindowDays: number; // configured default fulfilled-order refund window
-  effectiveRefundWindowDays: number; // refund window after category overrides
-  cancelWindowDays: number; // configured default pre-fulfillment cancel window
-  effectiveCancelWindowDays: number; // cancel window after category overrides
-  highValueOrderThreshold?: number; // configured threshold when finite
-  matchedCategoryWindowCategories: string[]; // category overrides matched during evaluation
-  matchedExceptionRuleTag?: string; // merchant exception tag matched during evaluation
-}
-
 interface RefundPolicyEvaluationResult {
-  ruleContext: RefundPolicyRuleEvaluationContext; // derived context used by the rules
+  itemContext: RefundPolicyItemContext; // normalized facts used for the policy decision
+  policyContext: ResolvedPolicyContext; // resolved policy values used for this item
   decision: RefundDecision; // policy outcome
   reasons: RefundReason[]; // human-readable policy reasons
 }
@@ -196,12 +186,10 @@ function createEffectivePolicyConfig(
   };
 }
 
-// RefundPolicyRuleEvaluationContext is derived during rule evaluation:
-// effective windows, matched rules, and evaluated item facts.
-function createRuleEvaluationContext(
+function resolveLineItemPolicyContext(
   itemContext: RefundPolicyItemContext,
   config: Required<RefundPolicyConfig>,
-): RefundPolicyRuleEvaluationContext {
+): ResolvedPolicyContext {
   const isHighValueOrderThresholdFinite = Number.isFinite(
     config.highValueOrderThreshold,
   );
@@ -221,7 +209,6 @@ function createRuleEvaluationContext(
     (override) => override.category,
   );
   return {
-    itemContext,
     refundWindowDays: config.refundWindowDays,
     effectiveRefundWindowDays,
     cancelWindowDays: config.cancelWindowDays,
@@ -239,11 +226,14 @@ function evaluateRefundPolicyItemContext(
 ): RefundPolicyEvaluationResult {
   const order = itemContext.order;
   const effectiveConfig = createEffectivePolicyConfig(config);
-  const ruleContext = createRuleEvaluationContext(itemContext, effectiveConfig);
+  const policyContext = resolveLineItemPolicyContext(
+    itemContext,
+    effectiveConfig,
+  );
   const flags = order.flags;
   const tags = order.tags;
-  const effectiveRefundWindowDays = ruleContext.effectiveRefundWindowDays;
-  const effectiveCancelWindowDays = ruleContext.effectiveCancelWindowDays;
+  const effectiveRefundWindowDays = policyContext.effectiveRefundWindowDays;
+  const effectiveCancelWindowDays = policyContext.effectiveCancelWindowDays;
   const isUnfulfilledRefundSubject =
     itemContext.fulfillmentStatus === FulfillmentStatus.Unfulfilled;
   const isPartiallyFulfilledRefundSubject =
@@ -276,7 +266,8 @@ function evaluateRefundPolicyItemContext(
     return {
       decision: RefundDecision.ManualReview,
       reasons: reviewReasons,
-      ruleContext,
+      itemContext,
+      policyContext,
     };
   }
 
@@ -294,7 +285,8 @@ function evaluateRefundPolicyItemContext(
     return {
       decision: RefundDecision.ManualReview,
       reasons: reviewReasons,
-      ruleContext,
+      itemContext,
+      policyContext,
     };
   }
 
@@ -311,7 +303,8 @@ function evaluateRefundPolicyItemContext(
     return {
       decision: RefundDecision.ManualReview,
       reasons: reviewReasons,
-      ruleContext,
+      itemContext,
+      policyContext,
     };
   }
 
@@ -326,7 +319,8 @@ function evaluateRefundPolicyItemContext(
     return {
       decision: RefundDecision.ManualReview,
       reasons: reviewReasons,
-      ruleContext,
+      itemContext,
+      policyContext,
     };
   }
 
@@ -344,7 +338,8 @@ function evaluateRefundPolicyItemContext(
       return {
         decision: RefundDecision.ManualReview,
         reasons: reviewReasons,
-        ruleContext,
+        itemContext,
+        policyContext,
       };
     }
 
@@ -377,7 +372,8 @@ function evaluateRefundPolicyItemContext(
         return {
           decision: RefundDecision.ManualReview,
           reasons: reviewReasons,
-          ruleContext,
+          itemContext,
+          policyContext,
         };
       case RefundDecision.Ineligible:
         blockingReasons.push(
@@ -423,7 +419,8 @@ function evaluateRefundPolicyItemContext(
               outsideCancelWindowMessage(effectiveCancelWindowDays),
             ),
           ],
-          ruleContext,
+          itemContext,
+          policyContext,
         };
       case RefundDecision.Ineligible:
         blockingReasons.push(
@@ -446,7 +443,8 @@ function evaluateRefundPolicyItemContext(
         return {
           decision: RefundDecision.ManualReview,
           reasons: reviewReasons,
-          ruleContext,
+          itemContext,
+          policyContext,
         };
     }
   }
@@ -517,8 +515,9 @@ function evaluateRefundPolicyItemContext(
       return {
         decision: matchingExceptionRule.decision,
         reasons,
-        ruleContext: {
-          ...ruleContext,
+        itemContext,
+        policyContext: {
+          ...policyContext,
           matchedExceptionRuleTag: matchingExceptionRule.tag,
         },
       };
@@ -529,7 +528,8 @@ function evaluateRefundPolicyItemContext(
     return {
       decision: RefundDecision.Ineligible,
       reasons: blockingReasons,
-      ruleContext,
+      itemContext,
+      policyContext,
     };
   }
 
@@ -559,7 +559,8 @@ function evaluateRefundPolicyItemContext(
                 REFUND_POLICY_REASON_COPY.returnableFulfillmentsAvailable,
               ),
             ],
-    ruleContext,
+    itemContext,
+    policyContext,
   };
 }
 
@@ -610,21 +611,12 @@ function createLineItemEvidence(
   lineItem: RefundContextLineItem,
   result: RefundPolicyEvaluationResult,
 ): RefundPolicyLineItemEvidence {
-  const itemContext = result.ruleContext.itemContext;
+  const itemContext = result.itemContext;
   const order = itemContext.order;
 
   return {
     order,
-    policyContext: {
-      refundWindowDays: result.ruleContext.refundWindowDays,
-      effectiveRefundWindowDays: result.ruleContext.effectiveRefundWindowDays,
-      cancelWindowDays: result.ruleContext.cancelWindowDays,
-      effectiveCancelWindowDays: result.ruleContext.effectiveCancelWindowDays,
-      highValueOrderThreshold: result.ruleContext.highValueOrderThreshold,
-      matchedCategoryWindowCategories:
-        result.ruleContext.matchedCategoryWindowCategories,
-      matchedExceptionRuleTag: result.ruleContext.matchedExceptionRuleTag,
-    },
+    policyContext: result.policyContext,
     evaluatedLineItem: {
       lineItemId: lineItem.lineItemId,
       fulfillmentLineItemId: lineItem.fulfillmentLineItemId,
@@ -793,11 +785,13 @@ function createEvaluatedOrder(
   };
 }
 
-// builds the order-level policy evidence from the already-computed line-item evaluations.
-function createOrderEvidencePolicyContext(
+// Aggregate the resolved policy contexts from each line-item evaluation into
+// the order-level policy context shown in final evidence
+// (used to explain the final result)
+function resolveOrderPolicyContext(
   config: Required<RefundPolicyConfig>,
   itemEvaluations: RefundPolicyLineItemEvaluation[],
-): RefundPolicyEvidencePolicyContext {
+): ResolvedPolicyContext {
   const itemPolicyContexts = itemEvaluations.map(
     (itemEvaluation) => itemEvaluation.evidence.policyContext,
   );
@@ -846,10 +840,7 @@ function createOrderEvidence(
 
   return {
     order: input.order,
-    policyContext: createOrderEvidencePolicyContext(
-      effectiveConfig,
-      itemEvaluations,
-    ),
+    policyContext: resolveOrderPolicyContext(effectiveConfig, itemEvaluations),
     evaluatedOrder,
   };
 }
@@ -886,8 +877,7 @@ function evaluateItemLevelRefundPolicy(
 }
 
 // RefundContext contains normalized facts from Shopify / adapter.
-// RefundPolicyRuleEvaluationContext is derived during rule evaluation:
-// effective windows, matched rules, and evaluated item facts.
+// ResolvedPolicyContext contains effective windows and matched policy rules.
 // RefundPolicyResult is the final decision with reasons and evidence.
 export function evaluateRefundPolicy(
   input: RefundContext,
