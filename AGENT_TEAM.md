@@ -17,12 +17,14 @@ Reusable multi-agent operating guide for this workspace.
 Use `Scout` first when the shape of the codebase is unclear.
 
 Responsibilities:
+
 - Find the relevant files, routes, components, handlers, and tests
 - Map data flow and dependencies
 - Call out risks, edge cases, and likely edit points
 - Suggest how work can be split safely
 
 Good outputs:
+
 - "These files control the feature"
 - "This route uses this server action"
 - "These tests already cover part of the behavior"
@@ -32,6 +34,7 @@ Good outputs:
 `Builder` owns the code change unless the task is large enough to justify splitting.
 
 Responsibilities:
+
 - Implement the requested behavior
 - Preserve existing project patterns
 - Make small, readable changes
@@ -40,10 +43,12 @@ Responsibilities:
 For Next.js projects, default to one `Builder`.
 
 Why:
+
 - UI, server actions, route handlers, validation, and shared types often overlap
 - One end-to-end owner usually reduces coordination overhead
 
 Split `Builder` into separate builders only when:
+
 - The change is large and clearly separable
 - The UI and server work touch different files with minimal overlap
 - Multiple independent feature slices can be built in parallel
@@ -51,6 +56,7 @@ Split `Builder` into separate builders only when:
 If a split is needed, prefer feature ownership over generic frontend/backend ownership.
 
 Examples:
+
 - Good split: `Checkout Builder` and `Account Builder`
 - Sometimes okay: `UI Builder` and `API Builder`
 - Avoid by default: splitting every Next.js task into frontend vs backend
@@ -60,21 +66,26 @@ Examples:
 Use `Reviewer` after implementation or when the task is high risk.
 
 Responsibilities:
+
 - Look for regressions, missed edge cases, and confusing logic
 - Check whether tests are missing or too weak
 - Flag risky assumptions
 - Focus on findings before summaries
+- Check if function names are easy to understand or follow
+- Check if code is readable
 
 ### `DocsBot`
 
 Use `DocsBot` on demand instead of for every task.
 
 Responsibilities:
+
 - Answer framework and API questions
 - Check best practices when implementation details are uncertain
 - Help compare approaches before we commit to one
 
 Good uses:
+
 - Next.js routing or server action behavior
 - Library API usage
 - Version-specific implementation questions
@@ -84,6 +95,7 @@ Good uses:
 Use `Tester` whenever behavior changes in a meaningful way.
 
 Responsibilities:
+
 - Add or update unit tests
 - Strengthen weak assertions
 - Cover success paths, failure paths, and edge cases
@@ -108,10 +120,12 @@ Responsibilities:
 ## Next.js Default
 
 For this workspace, prefer:
+
 - one `Builder` by default
 - splitting builders only when `Scout` identifies clean boundaries
 
 This keeps full-stack feature work coherent across:
+
 - App Router pages and layouts
 - React components
 - route handlers

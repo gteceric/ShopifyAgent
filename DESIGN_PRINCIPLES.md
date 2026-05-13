@@ -53,6 +53,8 @@ When an object literal represents meaningful domain data, assign it to a named v
 
 - Name data by what it means in the domain, not by the helper or function that consumes it.
 - Prefer names like `RefundPolicyItemContext` over names like `RefundPolicyRuleEngineInput` when the object represents domain context.
+- Do not reuse a type just because another concept has the same fields. Same shape does not mean same domain meaning.
+- If a type name implies a specific scope, use it only for that scope. Create or reuse a broader domain name only when the concept is genuinely broader.
 - Compose nested objects by ownership, such as `itemContext.orderContext.tags`, when it makes the source of a field clearer.
 - Normalize optional boundary data once before core policy evaluation, then let internal context types use required fields.
 - Remove wrapper types when they only duplicate values already available through the composed domain object.

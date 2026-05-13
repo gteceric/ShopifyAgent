@@ -51,10 +51,10 @@ function makeContext(): RefundAgentResponseContext {
           matchedCategoryWindowCategories: [],
         },
         evaluatedOrder: {
-          financialStatus: "paid",
+          effectiveFinancialStatus: "paid",
           fulfillmentStatus: "fulfilled",
           hasReturnableFulfillments: true,
-          alreadyFullyRefunded: false,
+          allLineItemsRefunded: false,
           finalSale: false,
           itemCategories: [],
         },

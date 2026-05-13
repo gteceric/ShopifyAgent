@@ -154,7 +154,7 @@ const CHECK_REFUND_ELIGIBILITY_TOOL = {
             type: "object",
             additionalProperties: false,
             properties: {
-              financialStatus: {
+              effectiveFinancialStatus: {
                 type: "string",
                 enum: Object.values(FinancialStatus),
               },
@@ -163,7 +163,7 @@ const CHECK_REFUND_ELIGIBILITY_TOOL = {
                 enum: Object.values(FulfillmentStatus),
               },
               hasReturnableFulfillments: { type: "boolean" },
-              alreadyFullyRefunded: { type: "boolean" },
+              allLineItemsRefunded: { type: "boolean" },
               finalSale: { type: "boolean" },
               itemCategories: {
                 type: "array",
@@ -171,10 +171,10 @@ const CHECK_REFUND_ELIGIBILITY_TOOL = {
               },
             },
             required: [
-              "financialStatus",
+              "effectiveFinancialStatus",
               "fulfillmentStatus",
               "hasReturnableFulfillments",
-              "alreadyFullyRefunded",
+              "allLineItemsRefunded",
               "finalSale",
               "itemCategories",
             ],

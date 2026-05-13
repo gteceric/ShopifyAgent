@@ -1,7 +1,7 @@
 import type {
   CheckRefundEligibilityInput,
   RefundPolicyConfig,
-  RefundPolicySummaryEvidence,
+  RefundPolicyOrderEvidence,
   RefundContext,
   RefundContextLineItem,
 } from "@shopify-agent/core";
@@ -46,9 +46,9 @@ export type RefundScenarioId =
   (typeof RefundScenarioId)[keyof typeof RefundScenarioId];
 
 type RefundScenarioExpectedEvidence = {
-  order?: Partial<RefundPolicySummaryEvidence["order"]>;
-  policyContext?: Partial<RefundPolicySummaryEvidence["policyContext"]>;
-  evaluatedOrder?: Partial<RefundPolicySummaryEvidence["evaluatedOrder"]>;
+  order?: Partial<RefundPolicyOrderEvidence["order"]>;
+  policyContext?: Partial<RefundPolicyOrderEvidence["policyContext"]>;
+  evaluatedOrder?: Partial<RefundPolicyOrderEvidence["evaluatedOrder"]>;
 };
 
 // Each scenario describes one merchant-facing refund situation. The test runner
@@ -395,8 +395,8 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     expectedReasonCodes: [RefundReasonCode.AlreadyFullyRefunded],
     expectedEvidence: {
       evaluatedOrder: {
-        alreadyFullyRefunded: true,
-        financialStatus: FinancialStatus.Refunded,
+        allLineItemsRefunded: true,
+        effectiveFinancialStatus: FinancialStatus.Refunded,
       },
     },
     expectedAgentBehavior:

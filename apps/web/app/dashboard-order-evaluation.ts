@@ -242,7 +242,9 @@ function buildEvidence(
     },
     {
       label: "Financial Status",
-      value: formatStatusLabel(result.evidence.evaluatedOrder.financialStatus),
+      value: formatStatusLabel(
+        result.evidence.evaluatedOrder.effectiveFinancialStatus,
+      ),
     },
     {
       label: "Fulfillment",

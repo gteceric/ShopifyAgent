@@ -134,7 +134,8 @@ test("does not block a refundable line item only because the order was partially
   assert.equal(result.decision, RefundDecision.Eligible);
   assert.equal(result.itemEvaluations[0]?.decision, RefundDecision.Eligible);
   assert.equal(
-    result.itemEvaluations[0]?.evidence.evaluatedLineItem.financialStatus,
+    result.itemEvaluations[0]?.evidence.evaluatedLineItem
+      .effectiveFinancialStatus,
     FinancialStatus.Paid,
   );
 });
@@ -366,6 +367,42 @@ test("uses the configured fulfilled refund window for delivered orders", () => {
   assert.equal(result.evidence.policyContext.effectiveRefundWindowDays, 14);
 });
 
+test("uses line item age override without changing order evidence age", () => {
+  const result = evaluateRefundPolicy(
+    makeInput({
+      ageDays: 10,
+      lineItems: [
+        {
+          lineItemId: "gid://shopify/LineItem/1",
+          title: "Older return subject",
+          returnableQuantity: 1,
+          ageDaysOverride: 45,
+          fulfillmentStatus: FulfillmentStatus.Fulfilled,
+          hasReturnableFulfillment: true,
+          alreadyRefunded: false,
+          finalSale: false,
+        },
+      ],
+    }),
+    {
+      refundWindowDays: 30,
+      alreadyRefundedDecision: RefundDecision.Ineligible,
+    },
+  );
+
+  assert.equal(result.decision, RefundDecision.Ineligible);
+  assert.equal(result.evidence.order.ageDays, 10);
+  assert.equal(
+    result.itemEvaluations[0]?.evidence.evaluatedLineItem.ageDays,
+    45,
+  );
+  assert.ok(
+    result.reasons.some(
+      (reason) => reason.code === RefundReasonCode.OutsideRefundWindow,
+    ),
+  );
+});
+
 test("uses the configured unfulfilled cancellation window for pre-shipment orders", () => {
   const result = evaluateRefundPolicy(
     makeInput({
@@ -461,6 +498,37 @@ test("applies merchant exception rules when order tags match a blocking refund c
           decision: RefundDecision.Eligible,
           message:
             "Merchant loyalty recovery rule allows a refund outside the standard window.",
+        },
+      ],
+      alreadyRefundedDecision: RefundDecision.Ineligible,
+    },
+  );
+
+  assert.equal(result.decision, RefundDecision.Eligible);
+  assert.ok(
+    result.reasons.some(
+      (reason) =>
+        reason.code === RefundReasonCode.MerchantExceptionRuleApplied,
+    ),
+  );
+  assert.equal(result.evidence.policyContext.matchedExceptionRuleTag, "loyalty_recovery");
+});
+
+test("applies merchant exception rules after returnable fulfillment blockers are collected", () => {
+  const result = evaluateRefundPolicy(
+    makeInput({
+      hasReturnableFulfillment: false,
+      tags: ["loyalty_recovery"],
+    }),
+    {
+      refundWindowDays: 30,
+      cancelWindowDays: 30,
+      exceptionRules: [
+        {
+          tag: "loyalty_recovery",
+          decision: RefundDecision.Eligible,
+          message:
+            "Merchant loyalty recovery rule allows a refund without returnable fulfillments.",
         },
       ],
       alreadyRefundedDecision: RefundDecision.Ineligible,
@@ -700,12 +768,20 @@ test("evaluates already-refunded line items without blocking refundable siblings
 
   assert.equal(result.decision, RefundDecision.ManualReview);
   assert.equal(result.itemEvaluations?.[0]?.decision, RefundDecision.Ineligible);
-  assert.equal(result.itemEvaluations?.[0]?.evidence.evaluatedLineItem.alreadyRefunded, true);
+  assert.equal(
+    result.itemEvaluations?.[0]?.evidence.evaluatedLineItem
+      .lineItemAlreadyRefunded,
+    true,
+  );
   assert.ok(
     result.itemEvaluations?.[0]?.reasons.some(
       (reason) => reason.code === RefundReasonCode.AlreadyFullyRefunded,
     ),
   );
   assert.equal(result.itemEvaluations?.[1]?.decision, RefundDecision.Eligible);
-  assert.equal(result.itemEvaluations?.[1]?.evidence.evaluatedLineItem.alreadyRefunded, false);
+  assert.equal(
+    result.itemEvaluations?.[1]?.evidence.evaluatedLineItem
+      .lineItemAlreadyRefunded,
+    false,
+  );
 });

@@ -110,7 +110,7 @@ export interface RefundContextLineItem {
   fulfillmentLineItemId?: string;
   title?: string;
   returnableQuantity: number;
-  orderAgeDays?: number;
+  ageDaysOverride?: number;
   category?: string;
   fulfillmentStatus: FulfillmentStatus;
   hasReturnableFulfillment: boolean;
@@ -146,10 +146,10 @@ export interface RefundPolicyEvidencePolicyContext {
 }
 
 export interface EvaluatedRefundPolicyOrder {
-  financialStatus: FinancialStatus;
+  effectiveFinancialStatus: FinancialStatus;
   fulfillmentStatus: FulfillmentStatus;
   hasReturnableFulfillments: boolean;
-  alreadyFullyRefunded: boolean;
+  allLineItemsRefunded: boolean;
   finalSale: boolean;
   itemCategories: string[];
 }
@@ -160,16 +160,16 @@ export interface EvaluatedRefundPolicyLineItem {
   title?: string;
   returnableQuantity: number;
   ageDays: number;
-  financialStatus: FinancialStatus;
+  effectiveFinancialStatus: FinancialStatus;
   fulfillmentStatus: FulfillmentStatus;
   hasReturnableFulfillment: boolean;
-  alreadyRefunded: boolean;
+  lineItemAlreadyRefunded: boolean;
   finalSale: boolean;
   category?: string;
 }
 
 // order level
-export interface RefundPolicySummaryEvidence {
+export interface RefundPolicyOrderEvidence {
   order: RefundContextOrder;
   policyContext: RefundPolicyEvidencePolicyContext;
   evaluatedOrder: EvaluatedRefundPolicyOrder;
@@ -183,10 +183,6 @@ export interface RefundPolicyLineItemEvidence {
 }
 
 export interface RefundPolicyLineItemEvaluation {
-  lineItemId: string;
-  fulfillmentLineItemId?: string;
-  title?: string;
-  returnableQuantity: number;
   decision: RefundDecision;
   reasons: RefundReason[];
   evidence: RefundPolicyLineItemEvidence;
@@ -195,6 +191,6 @@ export interface RefundPolicyLineItemEvaluation {
 export interface RefundPolicyResult {
   decision: RefundDecision;
   reasons: RefundReason[];
-  evidence: RefundPolicySummaryEvidence;
+  evidence: RefundPolicyOrderEvidence;
   itemEvaluations: RefundPolicyLineItemEvaluation[];
 }

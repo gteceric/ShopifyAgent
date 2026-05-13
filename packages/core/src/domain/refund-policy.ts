@@ -13,14 +13,17 @@ import type {
   RefundPolicyLineItemEvaluation,
   RefundPolicyLineItemEvidence,
   RefundContextLineItem,
+  RefundPolicyEvidencePolicyContext,
   RefundPolicyResult,
-  RefundPolicySummaryEvidence,
+  RefundPolicyOrderEvidence,
+  EvaluatedRefundPolicyOrder,
   RefundReason,
 } from "./refund-policy.types.js";
 
 // item level data
 interface RefundPolicyItemContext {
   order: RefundContextOrder;
+  effectiveAgeDays: number; // order age adjusted by any line-item age override
   effectiveFinancialStatus: FinancialStatus; // derived from order financial status plus this item's refund state
   fulfillmentStatus: FulfillmentStatus; // Shopify-backed fulfillment status normalized by the adapter
   hasReturnableFulfillment: boolean; // from Shopify returnable fulfillments
@@ -230,7 +233,7 @@ function createRuleEvaluationContext(
   };
 }
 
-function evaluateRefundPolicyRules(
+function evaluateRefundPolicyItemContext(
   itemContext: RefundPolicyItemContext,
   config: RefundPolicyConfig = DEFAULT_POLICY,
 ): RefundPolicyEvaluationResult {
@@ -403,7 +406,7 @@ function evaluateRefundPolicyRules(
 
   if (
     isUnfulfilledRefundSubject &&
-    order.ageDays > effectiveCancelWindowDays &&
+    itemContext.effectiveAgeDays > effectiveCancelWindowDays &&
     !flags.vipOverride
   ) {
     switch (effectiveConfig.unfulfilledOutsideWindowDecision) {
@@ -450,7 +453,7 @@ function evaluateRefundPolicyRules(
 
   if (
     !isUnfulfilledRefundSubject &&
-    order.ageDays > effectiveRefundWindowDays &&
+    itemContext.effectiveAgeDays > effectiveRefundWindowDays &&
     !flags.vipOverride
   ) {
     blockingReasons.push(
@@ -461,13 +464,37 @@ function evaluateRefundPolicyRules(
     );
   } else if (
     !isUnfulfilledRefundSubject &&
-    order.ageDays > effectiveRefundWindowDays &&
+    itemContext.effectiveAgeDays > effectiveRefundWindowDays &&
     flags.vipOverride
   ) {
     overrideReasons.push(
       makeReason(
         RefundReasonCode.VipOverrideApplied,
         vipOverrideOutsideRefundWindowMessage(effectiveRefundWindowDays),
+      ),
+    );
+  }
+
+  if (
+    !isUnfulfilledRefundSubject &&
+    !itemContext.hasReturnableFulfillment &&
+    !flags.vipOverride
+  ) {
+    blockingReasons.push(
+      makeReason(
+        RefundReasonCode.ReturnableFulfillmentsUnavailable,
+        REFUND_POLICY_REASON_COPY.returnableFulfillmentsUnavailable,
+      ),
+    );
+  } else if (
+    !isUnfulfilledRefundSubject &&
+    !itemContext.hasReturnableFulfillment &&
+    flags.vipOverride
+  ) {
+    overrideReasons.push(
+      makeReason(
+        RefundReasonCode.VipOverrideApplied,
+        REFUND_POLICY_REASON_COPY.vipOverrideWithoutReturnableFulfillments,
       ),
     );
   }
@@ -496,30 +523,6 @@ function evaluateRefundPolicyRules(
         },
       };
     }
-  }
-
-  if (
-    !isUnfulfilledRefundSubject &&
-    !itemContext.hasReturnableFulfillment &&
-    !flags.vipOverride
-  ) {
-    blockingReasons.push(
-      makeReason(
-        RefundReasonCode.ReturnableFulfillmentsUnavailable,
-        REFUND_POLICY_REASON_COPY.returnableFulfillmentsUnavailable,
-      ),
-    );
-  } else if (
-    !isUnfulfilledRefundSubject &&
-    !itemContext.hasReturnableFulfillment &&
-    flags.vipOverride
-  ) {
-    overrideReasons.push(
-      makeReason(
-        RefundReasonCode.VipOverrideApplied,
-        REFUND_POLICY_REASON_COPY.vipOverrideWithoutReturnableFulfillments,
-      ),
-    );
   }
 
   if (blockingReasons.length > 0) {
@@ -584,15 +587,13 @@ function getLineItemFinancialStatus(
 
 // Convert adapter-normalized order and line item facts into the shape used by
 // the policy rules for one refund subject.
-function createLineItemRuleContext(
+function createRefundPolicyItemContext(
   order: RefundContextOrder,
   lineItem: RefundContextLineItem,
 ): RefundPolicyItemContext {
   return {
-    order: {
-      ...order,
-      ageDays: lineItem.orderAgeDays ?? order.ageDays,
-    },
+    order,
+    effectiveAgeDays: lineItem.ageDaysOverride ?? order.ageDays,
     effectiveFinancialStatus: getLineItemFinancialStatus(
       order.financialStatus,
       lineItem.alreadyRefunded,
@@ -605,7 +606,7 @@ function createLineItemRuleContext(
   };
 }
 
-function createLineItemEvaluationEvidence(
+function createLineItemEvidence(
   lineItem: RefundContextLineItem,
   result: RefundPolicyEvaluationResult,
 ): RefundPolicyLineItemEvidence {
@@ -629,11 +630,11 @@ function createLineItemEvaluationEvidence(
       fulfillmentLineItemId: lineItem.fulfillmentLineItemId,
       title: lineItem.title,
       returnableQuantity: lineItem.returnableQuantity,
-      ageDays: order.ageDays,
-      financialStatus: itemContext.effectiveFinancialStatus,
+      ageDays: itemContext.effectiveAgeDays,
+      effectiveFinancialStatus: itemContext.effectiveFinancialStatus,
       fulfillmentStatus: itemContext.fulfillmentStatus,
       hasReturnableFulfillment: itemContext.hasReturnableFulfillment,
-      alreadyRefunded: itemContext.alreadyRefunded,
+      lineItemAlreadyRefunded: itemContext.alreadyRefunded,
       finalSale: itemContext.finalSale,
       category: itemContext.itemCategories[0],
     },
@@ -645,15 +646,11 @@ function evaluateLineItemRefundPolicy(
   lineItem: RefundContextLineItem,
   config: RefundPolicyConfig,
 ): RefundPolicyLineItemEvaluation {
-  const ruleContext = createLineItemRuleContext(order, lineItem);
-  const result = evaluateRefundPolicyRules(ruleContext, config);
-  const evidence = createLineItemEvaluationEvidence(lineItem, result);
+  const itemContext = createRefundPolicyItemContext(order, lineItem);
+  const result = evaluateRefundPolicyItemContext(itemContext, config);
+  const evidence = createLineItemEvidence(lineItem, result);
 
   return {
-    lineItemId: lineItem.lineItemId,
-    fulfillmentLineItemId: lineItem.fulfillmentLineItemId,
-    title: lineItem.title,
-    returnableQuantity: lineItem.returnableQuantity,
     decision: result.decision,
     reasons: result.reasons,
     evidence,
@@ -734,6 +731,12 @@ function combineItemReasons(
   return reasons;
 }
 
+// [fulfilled, fulfilled]       -> fulfilled
+// [unfulfilled, unfulfilled]   -> unfulfilled
+// [fulfilled, unfulfilled]     -> partial
+// [fulfilled, partial]         -> partial
+// [fulfilled, unknown]         -> unknown
+// [unknown, unknown]           -> unknown
 function summarizeFulfillmentStatus(
   lineItems: RefundContextLineItem[],
 ): FulfillmentStatus {
@@ -753,15 +756,17 @@ function summarizeFulfillmentStatus(
   return FulfillmentStatus.Partial;
 }
 
-// Build the aggregate item context used for summary evidence.
-function createSummaryEvidenceItemContext(
+// build order level summary based on all line items
+function createEvaluatedOrder(
   input: RefundContext,
-): RefundPolicyItemContext {
+): EvaluatedRefundPolicyOrder {
   const lineItems = input.lineItems;
   const itemCategories = lineItems
     .map((lineItem) => lineItem.category)
     .filter((category): category is string => category !== undefined);
-  const allLineItemsAlreadyRefunded = lineItems.every(
+
+  // if the order financial status is Refunded, we treat every line item as refunded for summary purposes.
+  const allLineItemsRefunded = lineItems.every(
     (lineItem) =>
       input.order.financialStatus === FinancialStatus.Refunded ||
       lineItem.alreadyRefunded,
@@ -773,72 +778,80 @@ function createSummaryEvidenceItemContext(
   const finalSale = lineItems.every((lineItem) => lineItem.finalSale);
 
   return {
-    order: input.order,
     effectiveFinancialStatus:
-      allLineItemsAlreadyRefunded ||
+      allLineItemsRefunded ||
       input.order.financialStatus === FinancialStatus.Refunded
         ? FinancialStatus.Refunded
         : input.order.financialStatus === FinancialStatus.PartiallyRefunded
           ? FinancialStatus.Paid
           : input.order.financialStatus,
     fulfillmentStatus,
-    hasReturnableFulfillment: hasAnyReturnableFulfillment,
-    alreadyRefunded: allLineItemsAlreadyRefunded,
+    hasReturnableFulfillments: hasAnyReturnableFulfillment,
+    allLineItemsRefunded,
     finalSale,
     itemCategories,
   };
 }
 
-function createSummaryEvidence(
+// builds the order-level policy evidence from the already-computed line-item evaluations.
+function createOrderEvidencePolicyContext(
+  config: Required<RefundPolicyConfig>,
+  itemEvaluations: RefundPolicyLineItemEvaluation[],
+): RefundPolicyEvidencePolicyContext {
+  const itemPolicyContexts = itemEvaluations.map(
+    (itemEvaluation) => itemEvaluation.evidence.policyContext,
+  );
+  const matchedCategoryWindowCategories = [
+    ...new Set(
+      itemPolicyContexts.flatMap(
+        (policyContext) => policyContext.matchedCategoryWindowCategories,
+      ),
+    ),
+  ];
+  const matchedExceptionRuleTag = itemPolicyContexts.find(
+    (policyContext) => policyContext.matchedExceptionRuleTag !== undefined,
+  )?.matchedExceptionRuleTag;
+  const isHighValueOrderThresholdFinite = Number.isFinite(
+    config.highValueOrderThreshold,
+  );
+
+  return {
+    refundWindowDays: config.refundWindowDays,
+    effectiveRefundWindowDays: Math.min(
+      ...itemPolicyContexts.map(
+        (policyContext) => policyContext.effectiveRefundWindowDays,
+      ),
+    ),
+    cancelWindowDays: config.cancelWindowDays,
+    effectiveCancelWindowDays: Math.min(
+      ...itemPolicyContexts.map(
+        (policyContext) => policyContext.effectiveCancelWindowDays,
+      ),
+    ),
+    highValueOrderThreshold: isHighValueOrderThresholdFinite
+      ? config.highValueOrderThreshold
+      : undefined,
+    matchedCategoryWindowCategories,
+    matchedExceptionRuleTag,
+  };
+}
+
+function createOrderEvidence(
   input: RefundContext,
   config: RefundPolicyConfig,
   itemEvaluations: RefundPolicyLineItemEvaluation[],
-): RefundPolicySummaryEvidence {
+): RefundPolicyOrderEvidence {
   const effectiveConfig = createEffectivePolicyConfig(config);
-  const summaryItemContext = createSummaryEvidenceItemContext(input);
-  const ruleContext = createRuleEvaluationContext(
-    summaryItemContext,
-    effectiveConfig,
-  );
-  const itemContext = ruleContext.itemContext;
-  const order = itemContext.order;
-  const matchedExceptionRuleTag = itemEvaluations.find(
-    (itemEvaluation) =>
-      itemEvaluation.evidence.policyContext.matchedExceptionRuleTag !==
-      undefined,
-  )?.evidence.policyContext.matchedExceptionRuleTag;
-  const evidence: RefundPolicySummaryEvidence = {
-    order,
-    policyContext: {
-      refundWindowDays: ruleContext.refundWindowDays,
-      effectiveRefundWindowDays: ruleContext.effectiveRefundWindowDays,
-      cancelWindowDays: ruleContext.cancelWindowDays,
-      effectiveCancelWindowDays: ruleContext.effectiveCancelWindowDays,
-      highValueOrderThreshold: ruleContext.highValueOrderThreshold,
-      matchedCategoryWindowCategories:
-        ruleContext.matchedCategoryWindowCategories,
-    },
-    evaluatedOrder: {
-      financialStatus: itemContext.effectiveFinancialStatus,
-      fulfillmentStatus: itemContext.fulfillmentStatus,
-      hasReturnableFulfillments: itemContext.hasReturnableFulfillment,
-      alreadyFullyRefunded: itemContext.alreadyRefunded,
-      finalSale: itemContext.finalSale,
-      itemCategories: itemContext.itemCategories,
-    },
+  const evaluatedOrder = createEvaluatedOrder(input);
+
+  return {
+    order: input.order,
+    policyContext: createOrderEvidencePolicyContext(
+      effectiveConfig,
+      itemEvaluations,
+    ),
+    evaluatedOrder,
   };
-
-  if (matchedExceptionRuleTag) {
-    return {
-      ...evidence,
-      policyContext: {
-        ...evidence.policyContext,
-        matchedExceptionRuleTag,
-      },
-    };
-  }
-
-  return evidence;
 }
 
 function evaluateItemLevelRefundPolicy(
@@ -862,7 +875,7 @@ function evaluateItemLevelRefundPolicy(
   });
   const decision = combineItemDecisions(itemEvaluations);
   const reasons = combineItemReasons(decision, itemEvaluations);
-  const evidence = createSummaryEvidence(input, config, itemEvaluations);
+  const evidence = createOrderEvidence(input, config, itemEvaluations);
 
   return {
     decision,

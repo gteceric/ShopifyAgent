@@ -47,10 +47,10 @@ export function makeEligibleRefundAgentResponseContext() {
           matchedCategoryWindowCategories: [],
         },
         evaluatedOrder: {
-          financialStatus: FinancialStatus.Paid,
+          effectiveFinancialStatus: FinancialStatus.Paid,
           fulfillmentStatus: FulfillmentStatus.Fulfilled,
           hasReturnableFulfillments: true,
-          alreadyFullyRefunded: false,
+          allLineItemsRefunded: false,
           finalSale: false,
           itemCategories: [],
         },
