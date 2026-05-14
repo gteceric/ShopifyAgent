@@ -182,8 +182,8 @@ function createEffectivePolicyConfig(
   };
 }
 
-// figures out the policy values that apply to one line item.
-// it tightens the policy value if there is override
+// Resolve the configured policy windows that apply to one line item,
+// including category-based overrides.
 function resolveLineItemPolicyContext(
   itemContext: RefundPolicyItemContext,
   config: Required<RefundPolicyConfig>,
@@ -423,11 +423,7 @@ function evaluateRefundPolicyForItem(
     );
   }
 
-  // That case gets special handling because an unfulfilled final-sale item might be treated
-  // as a cancellation before shipment, depending on merchant config: finalSaleUnfulfilledDecision
-  //   unfulfilled
-  // + final sale
-  // + no VIP override
+  // Merchant config decides whether unfulfilled final-sale items can be canceled.
   if (isUnfulfilledFinalSaleRefundSubject) {
     switch (effectiveConfig.finalSaleUnfulfilledDecision) {
       case RefundDecision.Eligible:
@@ -475,7 +471,7 @@ function evaluateRefundPolicyForItem(
     );
   }
 
-  // this depends on effectiveConfig.unfulfilledOutsideWindowDecision setting
+  // Merchant config decides how to handle unfulfilled items outside the cancellation window.
   if (
     isUnfulfilledRefundSubject &&
     itemContext.effectiveAgeDays > effectiveCancelWindowDays &&
@@ -587,10 +583,8 @@ function evaluateRefundPolicyForItem(
     return exceptionResult;
   }
 
-  // At that point the function has already:
-  // 1.collected blocking reasons, like: already refunded / final sale / outside refund window / no returnable fulfillment
-  // 2.given merchant exception rules a chance to override:
-  // after exception handling, then nothing overrode the blockers, and the item is: RefundDecision.Ineligible
+  // Merchant exceptions have already had a chance to override these blockers.
+  // Any remaining blockers make the item ineligible.
   if (blockingReasons.length > 0) {
     return makeEvaluationResult(
       itemContext,
