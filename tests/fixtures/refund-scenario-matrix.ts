@@ -141,10 +141,7 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     toolInput: { orderId: "gid://shopify/Order/910000000001" },
     context: makeContext("gid://shopify/Order/910000000001", "#3001"),
     expectedDecision: RefundDecision.Eligible,
-    expectedReasonCodes: [
-      RefundReasonCode.WithinRefundWindow,
-      RefundReasonCode.ReturnableFulfillmentsAvailable,
-    ],
+    expectedReasonCodes: [RefundReasonCode.WithinRefundWindow],
     expectedAgentBehavior:
       "Confirm the order looks refundable and explain the next refund step clearly.",
   },
@@ -163,10 +160,7 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
       },
     ),
     expectedDecision: RefundDecision.Eligible,
-    expectedReasonCodes: [
-      RefundReasonCode.WithinCancelWindow,
-      RefundReasonCode.CancelableBeforeFulfillment,
-    ],
+    expectedReasonCodes: [RefundReasonCode.WithinCancelWindow],
     expectedAgentBehavior:
       "Approve the pre-shipment cancellation path and avoid talking about returns as if the order was already delivered.",
   },
@@ -320,10 +314,7 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
       },
     ),
     expectedDecision: RefundDecision.Eligible,
-    expectedReasonCodes: [
-      RefundReasonCode.WithinRefundWindow,
-      RefundReasonCode.ReturnableFulfillmentsAvailable,
-    ],
+    expectedReasonCodes: [RefundReasonCode.WithinRefundWindow],
     expectedAgentBehavior:
       "Approve only the refundable line item and avoid blocking it only because another item was already refunded.",
   },

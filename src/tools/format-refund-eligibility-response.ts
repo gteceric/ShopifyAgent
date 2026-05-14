@@ -94,7 +94,7 @@ export function formatRefundEligibilityResponse(
           .trim();
       }
 
-      if (hasReason(result, RefundReasonCode.CancelableBeforeFulfillment)) {
+      if (hasReason(result, RefundReasonCode.WithinCancelWindow)) {
         return `${opening} ${REFUND_RESPONSE_COPY.eligibleCancelableBeforeShipment} ${reasonSummary} ${REFUND_RESPONSE_COPY.followupPreFulfillmentCancellation}`
           .trim();
       }

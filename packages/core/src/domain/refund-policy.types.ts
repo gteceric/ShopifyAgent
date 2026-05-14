@@ -35,9 +35,7 @@ export const RefundReasonCode = {
   VipOverrideApplied: "vip_override_applied",
   OutsideRefundWindow: "outside_refund_window",
   WithinRefundWindow: "within_refund_window",
-  CancelableBeforeFulfillment: "cancelable_before_fulfillment",
   ReturnableFulfillmentsUnavailable: "returnable_fulfillments_unavailable",
-  ReturnableFulfillmentsAvailable: "returnable_fulfillments_available",
 } as const;
 
 export type RefundReasonCode =
@@ -100,11 +98,13 @@ export interface RefundPolicyFlags {
 
 export type NormalizedRefundPolicyFlags = Required<RefundPolicyFlags>;
 
+// normalized refund facts loaded from Shopify order + returnable fulfillment data
 export interface RefundContext {
   order: RefundContextOrder;
   lineItems: RefundContextLineItem[];
 }
 
+// one line item prepared for policy rules
 export interface RefundContextLineItem {
   lineItemId: string;
   fulfillmentLineItemId?: string;
@@ -135,6 +135,7 @@ export interface RefundReason {
   message: string;
 }
 
+// policy values applied to that item/order
 export interface ResolvedPolicyContext {
   refundWindowDays: number;
   effectiveRefundWindowDays: number;

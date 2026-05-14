@@ -72,12 +72,8 @@ const REFUND_POLICY_REASON_COPY = {
     "No returnable fulfillment was found for this refund subject.",
   vipOverrideWithoutReturnableFulfillments:
     "VIP override allows a refund without returnable fulfillments.",
-  cancelableBeforeFulfillment:
-    "Refund subject has not been fulfilled yet, so it can be canceled before shipment.",
   unfulfilledOutsideWindowAllowed:
     "Refund subject has not been fulfilled yet, and merchant policy allows cancellation outside the standard cancellation window.",
-  returnableFulfillmentsAvailable:
-    "Refund subject has a returnable fulfillment available.",
 } as const;
 
 function financialStatusReviewRequiredMessage(
@@ -186,6 +182,8 @@ function createEffectivePolicyConfig(
   };
 }
 
+// figures out the policy values that apply to one line item.
+// it tightens the policy value if there is override
 function resolveLineItemPolicyContext(
   itemContext: RefundPolicyItemContext,
   config: Required<RefundPolicyConfig>,
@@ -220,7 +218,157 @@ function resolveLineItemPolicyContext(
   };
 }
 
-function evaluateRefundPolicyItemContext(
+function makeEvaluationResult(
+  itemContext: RefundPolicyItemContext,
+  policyContext: ResolvedPolicyContext,
+  decision: RefundDecision,
+  reasons: RefundReason[],
+): RefundPolicyEvaluationResult {
+  return {
+    decision,
+    reasons,
+    itemContext,
+    policyContext,
+  };
+}
+
+// care about override handling
+function getImmediateManualReviewReasons(
+  itemContext: RefundPolicyItemContext,
+  config: Required<RefundPolicyConfig>,
+): RefundReason[] | undefined {
+  const order = itemContext.order;
+  const flags = order.flags;
+  const requiresHighValueReview =
+    Number.isFinite(config.highValueOrderThreshold) &&
+    order.totalAmount >= config.highValueOrderThreshold;
+  const requiresFinancialStatusReview =
+    itemContext.effectiveFinancialStatus === FinancialStatus.Pending ||
+    itemContext.effectiveFinancialStatus === FinancialStatus.PartiallyPaid ||
+    itemContext.effectiveFinancialStatus === FinancialStatus.Voided ||
+    itemContext.effectiveFinancialStatus === FinancialStatus.Unknown;
+
+  if (flags.fraudHold || flags.manualReview) {
+    return [
+      makeReason(
+        RefundReasonCode.ManualReviewRequired,
+        REFUND_POLICY_REASON_COPY.manualReviewRequired,
+      ),
+    ];
+  }
+
+  if (requiresHighValueReview) {
+    return [
+      makeReason(
+        RefundReasonCode.HighValueOrderReviewRequired,
+        highValueOrderReviewRequiredMessage(
+          order.totalAmount,
+          config.highValueOrderThreshold,
+        ),
+      ),
+    ];
+  }
+
+  if (requiresFinancialStatusReview) {
+    return [
+      makeReason(
+        RefundReasonCode.FinancialStatusReviewRequired,
+        financialStatusReviewRequiredMessage(
+          itemContext.effectiveFinancialStatus,
+        ),
+      ),
+    ];
+  }
+
+  if (itemContext.fulfillmentStatus === FulfillmentStatus.Partial) {
+    return [
+      makeReason(
+        RefundReasonCode.PartialFulfillmentReviewRequired,
+        REFUND_POLICY_REASON_COPY.partialFulfillmentReviewRequired,
+      ),
+    ];
+  }
+
+  return undefined;
+}
+
+// checks whether a merchant-configured exception rule should override a blocking reason.
+function applyMerchantExceptionRule(
+  itemContext: RefundPolicyItemContext,
+  policyContext: ResolvedPolicyContext,
+  config: Required<RefundPolicyConfig>,
+  blockingReasons: RefundReason[],
+): RefundPolicyEvaluationResult | undefined {
+  // if there are no blocking reasons
+  // no exception needed
+  if (blockingReasons.length === 0) {
+    return undefined;
+  }
+
+  // if there are blocking reasons
+  // e.g. blocker
+  // OutsideRefundWindow
+  // FinalSaleUnavailableForRefund
+  // ReturnableFulfillmentsUnavailable
+  // check whether the order has a tag matching an exception rule
+  const matchingExceptionRule = findMatchingExceptionRule(
+    itemContext.order.tags,
+    config.exceptionRules,
+  );
+
+  if (!matchingExceptionRule) {
+    return undefined;
+  }
+
+  // if matching exception rule exists
+  // return that exception decision
+  const result = makeEvaluationResult(
+    itemContext,
+    {
+      ...policyContext,
+      matchedExceptionRuleTag: matchingExceptionRule.tag,
+    },
+    matchingExceptionRule.decision,
+    [
+      makeReason(
+        RefundReasonCode.MerchantExceptionRuleApplied,
+        matchingExceptionRule.message,
+      ),
+      ...blockingReasons,
+    ],
+  );
+  return result;
+}
+
+// Called only after manual-review, blocking, exception, and window checks have
+// passed. It chooses the final explanation for an eligible item.
+function getFinalEligibleReasons(
+  itemContext: RefundPolicyItemContext,
+  policyContext: ResolvedPolicyContext,
+  overrideReasons: RefundReason[],
+): RefundReason[] {
+  if (overrideReasons.length > 0) {
+    return overrideReasons.slice(0, 1);
+  }
+
+  if (itemContext.fulfillmentStatus === FulfillmentStatus.Unfulfilled) {
+    return [
+      makeReason(
+        RefundReasonCode.WithinCancelWindow,
+        withinCancelWindowMessage(policyContext.effectiveCancelWindowDays),
+      ),
+    ];
+  }
+
+  return [
+    makeReason(
+      RefundReasonCode.WithinRefundWindow,
+      withinRefundWindowMessage(policyContext.effectiveRefundWindowDays),
+    ),
+  ];
+}
+
+function evaluateRefundPolicyForItem(
   itemContext: RefundPolicyItemContext,
   config: RefundPolicyConfig = DEFAULT_POLICY,
 ): RefundPolicyEvaluationResult {
@@ -231,116 +379,48 @@ function evaluateRefundPolicyItemContext(
     effectiveConfig,
   );
   const flags = order.flags;
-  const tags = order.tags;
   const effectiveRefundWindowDays = policyContext.effectiveRefundWindowDays;
   const effectiveCancelWindowDays = policyContext.effectiveCancelWindowDays;
   const isUnfulfilledRefundSubject =
     itemContext.fulfillmentStatus === FulfillmentStatus.Unfulfilled;
-  const isPartiallyFulfilledRefundSubject =
-    itemContext.fulfillmentStatus === FulfillmentStatus.Partial;
-  const isHighValueOrderThresholdFinite = Number.isFinite(
-    effectiveConfig.highValueOrderThreshold,
-  );
-  const requiresHighValueReview =
-    isHighValueOrderThresholdFinite &&
-    order.totalAmount >= effectiveConfig.highValueOrderThreshold;
-  const requiresFinancialStatusReview =
-    itemContext.effectiveFinancialStatus === FinancialStatus.Pending ||
-    itemContext.effectiveFinancialStatus === FinancialStatus.PartiallyPaid ||
-    itemContext.effectiveFinancialStatus === FinancialStatus.Voided ||
-    itemContext.effectiveFinancialStatus === FinancialStatus.Unknown;
   const isUnfulfilledFinalSaleRefundSubject =
     isUnfulfilledRefundSubject && itemContext.finalSale && !flags.vipOverride;
-  const reviewReasons: RefundReason[] = [];
   const blockingReasons: RefundReason[] = [];
   const overrideReasons: RefundReason[] = [];
+  const immediateManualReviewReasons = getImmediateManualReviewReasons(
+    itemContext,
+    effectiveConfig,
+  );
 
-  if (flags.fraudHold || flags.manualReview) {
-    reviewReasons.push(
-      makeReason(
-        RefundReasonCode.ManualReviewRequired,
-        REFUND_POLICY_REASON_COPY.manualReviewRequired,
-      ),
-    );
-
-    return {
-      decision: RefundDecision.ManualReview,
-      reasons: reviewReasons,
+  // care about override handling, immediate return
+  if (immediateManualReviewReasons) {
+    const result = makeEvaluationResult(
       itemContext,
       policyContext,
-    };
-  }
-
-  if (requiresHighValueReview) {
-    reviewReasons.push(
-      makeReason(
-        RefundReasonCode.HighValueOrderReviewRequired,
-        highValueOrderReviewRequiredMessage(
-          order.totalAmount,
-          effectiveConfig.highValueOrderThreshold,
-        ),
-      ),
+      RefundDecision.ManualReview,
+      immediateManualReviewReasons,
     );
-
-    return {
-      decision: RefundDecision.ManualReview,
-      reasons: reviewReasons,
-      itemContext,
-      policyContext,
-    };
-  }
-
-  if (requiresFinancialStatusReview) {
-    reviewReasons.push(
-      makeReason(
-        RefundReasonCode.FinancialStatusReviewRequired,
-        financialStatusReviewRequiredMessage(
-          itemContext.effectiveFinancialStatus,
-        ),
-      ),
-    );
-
-    return {
-      decision: RefundDecision.ManualReview,
-      reasons: reviewReasons,
-      itemContext,
-      policyContext,
-    };
-  }
-
-  if (isPartiallyFulfilledRefundSubject) {
-    reviewReasons.push(
-      makeReason(
-        RefundReasonCode.PartialFulfillmentReviewRequired,
-        REFUND_POLICY_REASON_COPY.partialFulfillmentReviewRequired,
-      ),
-    );
-
-    return {
-      decision: RefundDecision.ManualReview,
-      reasons: reviewReasons,
-      itemContext,
-      policyContext,
-    };
+    return result;
   }
 
   if (itemContext.alreadyRefunded) {
+    // if item is already refunded, it can be manual review or ineligible
+    // depending on effectiveConfig.alreadyRefundedDecision setting
     if (
       effectiveConfig.alreadyRefundedDecision === RefundDecision.ManualReview
     ) {
-      reviewReasons.push(
-        makeReason(
-          RefundReasonCode.AlreadyFullyRefunded,
-          REFUND_POLICY_REASON_COPY.alreadyRefundedReview,
-        ),
-      );
-
-      return {
-        decision: RefundDecision.ManualReview,
-        reasons: reviewReasons,
+      const result = makeEvaluationResult(
         itemContext,
         policyContext,
-      };
+        RefundDecision.ManualReview,
+        [
+          makeReason(
+            RefundReasonCode.AlreadyFullyRefunded,
+            REFUND_POLICY_REASON_COPY.alreadyRefundedReview,
+          ),
+        ],
+      );
+      return result;
     }
 
     blockingReasons.push(
@@ -351,6 +431,11 @@ function evaluateRefundPolicyItemContext(
     );
   }
 
+  // That case gets special handling because an unfulfilled final-sale item might be treated
+  // as a cancellation before shipment, depending on merchant config: finalSaleUnfulfilledDecision
+  //   unfulfilled
+  // + final sale
+  // + no VIP override
   if (isUnfulfilledFinalSaleRefundSubject) {
     switch (effectiveConfig.finalSaleUnfulfilledDecision) {
       case RefundDecision.Eligible:
@@ -362,19 +447,17 @@ function evaluateRefundPolicyItemContext(
         );
         break;
       case RefundDecision.ManualReview:
-        reviewReasons.push(
-          makeReason(
-            RefundReasonCode.PreFulfillmentFinalSaleReviewRequired,
-            REFUND_POLICY_REASON_COPY.preFulfillmentFinalSaleReviewRequired,
-          ),
-        );
-
-        return {
-          decision: RefundDecision.ManualReview,
-          reasons: reviewReasons,
+        return makeEvaluationResult(
           itemContext,
           policyContext,
-        };
+          RefundDecision.ManualReview,
+          [
+            makeReason(
+              RefundReasonCode.PreFulfillmentFinalSaleReviewRequired,
+              REFUND_POLICY_REASON_COPY.preFulfillmentFinalSaleReviewRequired,
+            ),
+          ],
+        );
       case RefundDecision.Ineligible:
         blockingReasons.push(
           makeReason(
@@ -400,6 +483,7 @@ function evaluateRefundPolicyItemContext(
     );
   }
 
+  // this depends on effectiveConfig.unfulfilledOutsideWindowDecision setting
   if (
     isUnfulfilledRefundSubject &&
     itemContext.effectiveAgeDays > effectiveCancelWindowDays &&
@@ -407,9 +491,11 @@ function evaluateRefundPolicyItemContext(
   ) {
     switch (effectiveConfig.unfulfilledOutsideWindowDecision) {
       case RefundDecision.Eligible:
-        return {
-          decision: RefundDecision.Eligible,
-          reasons: [
+        return makeEvaluationResult(
+          itemContext,
+          policyContext,
+          RefundDecision.Eligible,
+          [
             makeReason(
               RefundReasonCode.UnfulfilledOutsideWindowAllowed,
               REFUND_POLICY_REASON_COPY.unfulfilledOutsideWindowAllowed,
@@ -419,9 +505,7 @@ function evaluateRefundPolicyItemContext(
               outsideCancelWindowMessage(effectiveCancelWindowDays),
             ),
           ],
-          itemContext,
-          policyContext,
-        };
+        );
       case RefundDecision.Ineligible:
         blockingReasons.push(
           makeReason(
@@ -431,21 +515,19 @@ function evaluateRefundPolicyItemContext(
         );
         break;
       case RefundDecision.ManualReview:
-        reviewReasons.push(
-          makeReason(
-            RefundReasonCode.PreFulfillmentCancellationReviewRequired,
-            preFulfillmentCancellationReviewRequiredMessage(
-              effectiveCancelWindowDays,
-            ),
-          ),
-        );
-
-        return {
-          decision: RefundDecision.ManualReview,
-          reasons: reviewReasons,
+        return makeEvaluationResult(
           itemContext,
           policyContext,
-        };
+          RefundDecision.ManualReview,
+          [
+            makeReason(
+              RefundReasonCode.PreFulfillmentCancellationReviewRequired,
+              preFulfillmentCancellationReviewRequiredMessage(
+                effectiveCancelWindowDays,
+              ),
+            ),
+          ],
+        );
     }
   }
 
@@ -454,6 +536,7 @@ function evaluateRefundPolicyItemContext(
     itemContext.effectiveAgeDays > effectiveRefundWindowDays &&
     !flags.vipOverride
   ) {
+    // fullfill + outside refund window + no vip override
     blockingReasons.push(
       makeReason(
         RefundReasonCode.OutsideRefundWindow,
@@ -465,6 +548,7 @@ function evaluateRefundPolicyItemContext(
     itemContext.effectiveAgeDays > effectiveRefundWindowDays &&
     flags.vipOverride
   ) {
+    // fullfill + outside refund window + vip override
     overrideReasons.push(
       makeReason(
         RefundReasonCode.VipOverrideApplied,
@@ -478,6 +562,7 @@ function evaluateRefundPolicyItemContext(
     !itemContext.hasReturnableFulfillment &&
     !flags.vipOverride
   ) {
+    // fullfill + no returnable + no vip override
     blockingReasons.push(
       makeReason(
         RefundReasonCode.ReturnableFulfillmentsUnavailable,
@@ -489,6 +574,8 @@ function evaluateRefundPolicyItemContext(
     !itemContext.hasReturnableFulfillment &&
     flags.vipOverride
   ) {
+    // fullfill + no returnable + vip override
+    // e.g. damaged item but return not required / lost package
     overrideReasons.push(
       makeReason(
         RefundReasonCode.VipOverrideApplied,
@@ -497,71 +584,40 @@ function evaluateRefundPolicyItemContext(
     );
   }
 
-  if (blockingReasons.length > 0) {
-    const matchingExceptionRule = findMatchingExceptionRule(
-      tags,
-      effectiveConfig.exceptionRules,
-    );
-
-    if (matchingExceptionRule) {
-      const reasons = [
-        makeReason(
-          RefundReasonCode.MerchantExceptionRuleApplied,
-          matchingExceptionRule.message,
-        ),
-        blockingReasons[0]!,
-      ];
-
-      return {
-        decision: matchingExceptionRule.decision,
-        reasons,
-        itemContext,
-        policyContext: {
-          ...policyContext,
-          matchedExceptionRuleTag: matchingExceptionRule.tag,
-        },
-      };
-    }
-  }
-
-  if (blockingReasons.length > 0) {
-    return {
-      decision: RefundDecision.Ineligible,
-      reasons: blockingReasons,
-      itemContext,
-      policyContext,
-    };
-  }
-
-  return {
-    decision: RefundDecision.Eligible,
-    reasons:
-      overrideReasons.length > 0
-        ? overrideReasons.slice(0, 1)
-        : isUnfulfilledRefundSubject
-          ? [
-              makeReason(
-                RefundReasonCode.WithinCancelWindow,
-                withinCancelWindowMessage(effectiveCancelWindowDays),
-              ),
-              makeReason(
-                RefundReasonCode.CancelableBeforeFulfillment,
-                REFUND_POLICY_REASON_COPY.cancelableBeforeFulfillment,
-              ),
-            ]
-          : [
-              makeReason(
-                RefundReasonCode.WithinRefundWindow,
-                withinRefundWindowMessage(effectiveRefundWindowDays),
-              ),
-              makeReason(
-                RefundReasonCode.ReturnableFulfillmentsAvailable,
-                REFUND_POLICY_REASON_COPY.returnableFulfillmentsAvailable,
-              ),
-            ],
+  const exceptionResult = applyMerchantExceptionRule(
     itemContext,
     policyContext,
-  };
+    effectiveConfig,
+    blockingReasons,
+  );
+
+  if (exceptionResult) {
+    return exceptionResult;
+  }
+
+  // At that point the function has already:
+  // 1.collected blocking reasons, like:
+  // -already refunded
+  // -final sale
+  // -outside refund window
+  // -no returnable fulfillment
+  // 2.given merchant exception rules a chance to override:
+  // after exception handling, then nothing overrode the blockers, and the item is: RefundDecision.Ineligible
+  if (blockingReasons.length > 0) {
+    return makeEvaluationResult(
+      itemContext,
+      policyContext,
+      RefundDecision.Ineligible,
+      blockingReasons,
+    );
+  }
+
+  return makeEvaluationResult(
+    itemContext,
+    policyContext,
+    RefundDecision.Eligible,
+    getFinalEligibleReasons(itemContext, policyContext, overrideReasons),
+  );
 }
 
 // Item A: ineligible, already refunded
@@ -639,7 +695,7 @@ function evaluateLineItemRefundPolicy(
   config: RefundPolicyConfig,
 ): RefundPolicyLineItemEvaluation {
   const itemContext = createRefundPolicyItemContext(order, lineItem);
-  const result = evaluateRefundPolicyItemContext(itemContext, config);
+  const result = evaluateRefundPolicyForItem(itemContext, config);
   const evidence = createLineItemEvidence(lineItem, result);
 
   return {
