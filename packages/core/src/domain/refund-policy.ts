@@ -232,7 +232,8 @@ function makeEvaluationResult(
   };
 }
 
-// care about override handling
+// These manual-review checks short-circuit before blocker, override, and
+// merchant exception handling.
 function getImmediateManualReviewReasons(
   itemContext: RefundPolicyItemContext,
   config: Required<RefundPolicyConfig>,
@@ -292,25 +293,18 @@ function getImmediateManualReviewReasons(
   return undefined;
 }
 
-// checks whether a merchant-configured exception rule should override a blocking reason.
+// Apply a merchant-configured exception only after blockers have been collected,
+// so the result can show both the exception and the blockers it overrode.
 function applyMerchantExceptionRule(
   itemContext: RefundPolicyItemContext,
   policyContext: ResolvedPolicyContext,
   config: Required<RefundPolicyConfig>,
   blockingReasons: RefundReason[],
 ): RefundPolicyEvaluationResult | undefined {
-  // if there are no blocking reasons
-  // no exception needed
   if (blockingReasons.length === 0) {
     return undefined;
   }
 
-  // if there are blocking reasons
-  // e.g. blocker
-  // OutsideRefundWindow
-  // FinalSaleUnavailableForRefund
-  // ReturnableFulfillmentsUnavailable
-  // check whether the order has a tag matching an exception rule
   const matchingExceptionRule = findMatchingExceptionRule(
     itemContext.order.tags,
     config.exceptionRules,
@@ -320,8 +314,6 @@ function applyMerchantExceptionRule(
     return undefined;
   }
 
-  // if matching exception rule exists
-  // return that exception decision
   const result = makeEvaluationResult(
     itemContext,
     {
@@ -392,7 +384,7 @@ function evaluateRefundPolicyForItem(
     effectiveConfig,
   );
 
-  // care about override handling, immediate return
+  // These review reasons stop evaluation before normal eligibility rules run.
   if (immediateManualReviewReasons) {
     const result = makeEvaluationResult(
       itemContext,
@@ -536,7 +528,7 @@ function evaluateRefundPolicyForItem(
     itemContext.effectiveAgeDays > effectiveRefundWindowDays &&
     !flags.vipOverride
   ) {
-    // fullfill + outside refund window + no vip override
+    // Fulfilled item outside refund window, without VIP override.
     blockingReasons.push(
       makeReason(
         RefundReasonCode.OutsideRefundWindow,
@@ -548,7 +540,7 @@ function evaluateRefundPolicyForItem(
     itemContext.effectiveAgeDays > effectiveRefundWindowDays &&
     flags.vipOverride
   ) {
-    // fullfill + outside refund window + vip override
+    // Fulfilled item outside refund window, with VIP override.
     overrideReasons.push(
       makeReason(
         RefundReasonCode.VipOverrideApplied,
@@ -562,7 +554,7 @@ function evaluateRefundPolicyForItem(
     !itemContext.hasReturnableFulfillment &&
     !flags.vipOverride
   ) {
-    // fullfill + no returnable + no vip override
+    // Fulfilled item has no returnable fulfillment, without VIP override.
     blockingReasons.push(
       makeReason(
         RefundReasonCode.ReturnableFulfillmentsUnavailable,
@@ -574,7 +566,7 @@ function evaluateRefundPolicyForItem(
     !itemContext.hasReturnableFulfillment &&
     flags.vipOverride
   ) {
-    // fullfill + no returnable + vip override
+    // Fulfilled item has no returnable fulfillment, with VIP override.
     // e.g. damaged item but return not required / lost package
     overrideReasons.push(
       makeReason(
@@ -596,11 +588,7 @@ function evaluateRefundPolicyForItem(
   }
 
   // At that point the function has already:
-  // 1.collected blocking reasons, like:
-  // -already refunded
-  // -final sale
-  // -outside refund window
-  // -no returnable fulfillment
+  // 1.collected blocking reasons, like: already refunded / final sale / outside refund window / no returnable fulfillment
   // 2.given merchant exception rules a chance to override:
   // after exception handling, then nothing overrode the blockers, and the item is: RefundDecision.Ineligible
   if (blockingReasons.length > 0) {
@@ -823,7 +811,9 @@ function createEvaluatedOrder(
   const hasAnyReturnableFulfillment = lineItems.some(
     (lineItem) => lineItem.hasReturnableFulfillment,
   );
-  const finalSale = lineItems.every((lineItem) => lineItem.finalSale);
+  const allLineItemsFinalSale = lineItems.every(
+    (lineItem) => lineItem.finalSale,
+  );
 
   return {
     effectiveFinancialStatus:
@@ -834,9 +824,9 @@ function createEvaluatedOrder(
           ? FinancialStatus.Paid
           : input.order.financialStatus,
     fulfillmentStatus,
-    hasReturnableFulfillments: hasAnyReturnableFulfillment,
+    hasAnyReturnableFulfillment,
     allLineItemsRefunded,
-    finalSale,
+    allLineItemsFinalSale,
     itemCategories,
   };
 }

@@ -49,9 +49,9 @@ export function makeEligibleRefundAgentResponseContext() {
         evaluatedOrder: {
           effectiveFinancialStatus: FinancialStatus.Paid,
           fulfillmentStatus: FulfillmentStatus.Fulfilled,
-          hasReturnableFulfillments: true,
+          hasAnyReturnableFulfillment: true,
           allLineItemsRefunded: false,
-          finalSale: false,
+          allLineItemsFinalSale: false,
           itemCategories: [],
         },
       },

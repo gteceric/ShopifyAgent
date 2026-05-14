@@ -53,9 +53,9 @@ function makeContext(): RefundAgentResponseContext {
         evaluatedOrder: {
           effectiveFinancialStatus: "paid",
           fulfillmentStatus: "fulfilled",
-          hasReturnableFulfillments: true,
+          hasAnyReturnableFulfillment: true,
           allLineItemsRefunded: false,
-          finalSale: false,
+          allLineItemsFinalSale: false,
           itemCategories: [],
         },
       },

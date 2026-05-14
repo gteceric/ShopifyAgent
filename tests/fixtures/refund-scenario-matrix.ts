@@ -436,7 +436,7 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     ],
     expectedEvidence: {
       evaluatedOrder: {
-        hasReturnableFulfillments: false,
+        hasAnyReturnableFulfillment: false,
       },
     },
     expectedAgentBehavior:

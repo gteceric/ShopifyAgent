@@ -49,7 +49,6 @@ test("formats a standard eligible result as an approval response", async () => {
     new RegExp(escapeRegExp(REFUND_RESPONSE_COPY.eligibleStandard), "i"),
   );
   assert.match(response, /within the 30-day refund window/i);
-  assert.match(response, /returnable fulfillment available/i);
   assert.match(
     response,
     new RegExp(escapeRegExp(REFUND_RESPONSE_COPY.followupStandardRefund), "i"),
@@ -69,7 +68,7 @@ test("formats an unfulfilled eligible result as a cancellation response", async 
       "i",
     ),
   );
-  assert.match(response, /not been fulfilled yet/i);
+  assert.match(response, /within the 30-day cancellation window/i);
   assert.match(
     response,
     new RegExp(

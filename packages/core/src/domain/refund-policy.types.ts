@@ -149,9 +149,9 @@ export interface ResolvedPolicyContext {
 export interface EvaluatedRefundPolicyOrder {
   effectiveFinancialStatus: FinancialStatus;
   fulfillmentStatus: FulfillmentStatus;
-  hasReturnableFulfillments: boolean;
+  hasAnyReturnableFulfillment: boolean;
   allLineItemsRefunded: boolean;
-  finalSale: boolean;
+  allLineItemsFinalSale: boolean;
   itemCategories: string[];
 }
 
