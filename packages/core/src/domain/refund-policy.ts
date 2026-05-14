@@ -396,8 +396,8 @@ function evaluateRefundPolicyForItem(
   }
 
   if (itemContext.alreadyRefunded) {
-    // if item is already refunded, it can be manual review or ineligible
-    // depending on effectiveConfig.alreadyRefundedDecision setting
+    // Merchant config decides whether already-refunded items require review
+    // or are automatically ineligible.
     if (
       effectiveConfig.alreadyRefundedDecision === RefundDecision.ManualReview
     ) {
@@ -786,7 +786,7 @@ function summarizeFulfillmentStatus(
   return FulfillmentStatus.Partial;
 }
 
-// build order level summary based on all line items
+// Build the order-level summary from all line items.
 function createEvaluatedOrder(
   input: RefundContext,
 ): EvaluatedRefundPolicyOrder {
