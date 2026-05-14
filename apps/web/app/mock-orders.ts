@@ -1,5 +1,13 @@
 export type RefundDecision = "eligible" | "ineligible" | "manual_review";
 
+export interface DashboardItemEvaluationViewModel {
+  lineItemId: string;
+  title: string;
+  decision: RefundDecision;
+  reasonSummary: string;
+  evidence: Array<{ label: string; value: string }>;
+}
+
 export interface DashboardOrder {
   id: string;
   orderName: string;
@@ -16,6 +24,7 @@ export interface DashboardOrder {
   policyWindowLabel: string;
   reasonDetails: string[];
   evidence: Array<{ label: string; value: string }>;
+  itemEvaluations?: DashboardItemEvaluationViewModel[];
   timeline: Array<{ title: string; detail: string }>;
 }
 

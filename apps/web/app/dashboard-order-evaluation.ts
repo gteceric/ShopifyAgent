@@ -10,7 +10,10 @@ import type {
   CheckRefundEligibilityResult,
   RefundPolicyConfig,
 } from "@shopify-agent/core";
-import type { DashboardOrder } from "./mock-orders";
+import type {
+  DashboardItemEvaluationViewModel,
+  DashboardOrder,
+} from "./mock-orders";
 
 export interface DashboardOrderErrorState {
   orderId: string;
@@ -269,6 +272,67 @@ function buildEvidence(
   return items;
 }
 
+function formatBooleanLabel(value: boolean): string {
+  return value ? "Yes" : "No";
+}
+
+function buildItemEvaluationViewModels(
+  result: CheckRefundEligibilityResult,
+): DashboardItemEvaluationViewModel[] {
+  return result.itemEvaluations.map((itemEvaluation, index) => {
+    const lineItem = itemEvaluation.evidence.evaluatedLineItem;
+    const itemTitle = lineItem.title ?? `Line item ${index + 1}`;
+    const reasonSummary = itemEvaluation.reasons
+      .map((reason) => reason.message)
+      .join(" ");
+    const evidence: Array<{ label: string; value: string }> = [
+      {
+        label: "Fulfillment",
+        value: formatStatusLabel(lineItem.fulfillmentStatus),
+      },
+      {
+        label: "Financial Status",
+        value: formatStatusLabel(lineItem.effectiveFinancialStatus),
+      },
+      {
+        label: "Returnable Qty",
+        value: lineItem.returnableQuantity.toString(),
+      },
+      {
+        label: "Returnable Fulfillment",
+        value: formatBooleanLabel(lineItem.hasReturnableFulfillment),
+      },
+      {
+        label: "Already Refunded",
+        value: formatBooleanLabel(lineItem.lineItemAlreadyRefunded),
+      },
+      {
+        label: "Final Sale",
+        value: formatBooleanLabel(lineItem.finalSale),
+      },
+      {
+        label: "Age",
+        value: `${lineItem.ageDays} days`,
+      },
+    ];
+
+    if (lineItem.category) {
+      evidence.push({
+        label: "Category",
+        value: lineItem.category,
+      });
+    }
+
+    return {
+      lineItemId: lineItem.lineItemId,
+      title: itemTitle,
+      decision: itemEvaluation.decision,
+      reasonSummary,
+      evidence,
+    };
+  });
+}
+
 function buildTimeline(
   result: CheckRefundEligibilityResult,
 ): DashboardOrder["timeline"] {
@@ -297,6 +361,7 @@ export function applyRefundEvaluationToOrder(
     policyWindowLabel: formatPolicyLens(result),
     reasonDetails: result.reasons.map((reason) => reason.message),
     evidence: buildEvidence(result),
+    itemEvaluations: buildItemEvaluationViewModels(result),
     timeline: buildTimeline(result),
   };
 }
