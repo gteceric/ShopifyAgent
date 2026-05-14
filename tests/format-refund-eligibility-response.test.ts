@@ -5,7 +5,12 @@ import {
   formatRefundEligibilityResponse,
   REFUND_RESPONSE_COPY,
 } from "../src/tools/format-refund-eligibility-response.js";
-import { checkRefundEligibility } from "@shopify-agent/core";
+import {
+  checkRefundEligibility,
+  FinancialStatus,
+  FulfillmentStatus,
+  RefundDecision,
+} from "@shopify-agent/core";
 import {
   REFUND_SCENARIO_MATRIX,
   RefundScenarioId,
@@ -36,6 +41,68 @@ async function getFormattedResponse(id: RefundScenarioId): Promise<string> {
   });
 
   return formatRefundEligibilityResponse(scenario.agentQuestion, result);
+}
+
+async function getMixedItemFormattedResponse(): Promise<string> {
+  const result = await checkRefundEligibility(
+    { orderId: "gid://shopify/Order/910000000050" },
+    {
+      config: {
+        refundWindowDays: 30,
+        cancelWindowDays: 30,
+        alreadyRefundedDecision: RefundDecision.Ineligible,
+        categoryWindowOverrides: [
+          { category: "apparel", refundWindowDays: 14 },
+        ],
+      },
+      adapter: {
+        platform: "test",
+        loadRefundContext: async () => ({
+          order: {
+            id: "gid://shopify/Order/910000000050",
+            name: "#3050",
+            createdAt: "2026-03-01T00:00:00.000Z",
+            ageDays: 20,
+            totalAmount: 72,
+            financialStatus: FinancialStatus.Paid,
+            tags: [],
+            flags: {
+              fraudHold: false,
+              manualReview: false,
+              vipOverride: false,
+            },
+          },
+          lineItems: [
+            {
+              lineItemId: "gid://shopify/LineItem/1",
+              title: "Dress",
+              returnableQuantity: 1,
+              category: "apparel",
+              fulfillmentStatus: FulfillmentStatus.Fulfilled,
+              hasReturnableFulfillment: true,
+              alreadyRefunded: false,
+              finalSale: false,
+            },
+            {
+              lineItemId: "gid://shopify/LineItem/2",
+              title: "Phone Case",
+              returnableQuantity: 1,
+              category: "accessories",
+              fulfillmentStatus: FulfillmentStatus.Fulfilled,
+              hasReturnableFulfillment: true,
+              alreadyRefunded: false,
+              finalSale: false,
+            },
+          ],
+        }),
+      },
+    },
+  );
+
+  return formatRefundEligibilityResponse(
+    "Can we refund the eligible item on order #3050?",
+    result,
+  );
 }
 
 test("formats a standard eligible result as an approval response", async () => {
@@ -127,6 +194,19 @@ test("formats a manual review result without auto-approving it", async () => {
   assert.match(response, /^Not automatically\./);
   assert.match(response, /routed to manual review/i);
   assert.match(response, /flagged for manual review/i);
+  assert.match(response, /human reviewer/i);
+});
+
+test("formats mixed item eligibility with item-level decisions", async () => {
+  const response = await getMixedItemFormattedResponse();
+
+  assert.match(response, /^Not automatically\./);
+  assert.match(response, /mixed item eligibility/i);
+  assert.match(response, /Item-level decisions:/i);
+  assert.match(response, /Dress is ineligible/i);
+  assert.match(response, /outside the 14-day refund window/i);
+  assert.match(response, /Phone Case is eligible/i);
+  assert.match(response, /within the 30-day refund window/i);
   assert.match(response, /human reviewer/i);
 });
 

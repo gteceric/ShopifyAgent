@@ -33,6 +33,52 @@ function formatNextStep(result: CheckRefundEligibilityResult): string {
   }
 }
 
+function hasMixedItemDecisions(result: CheckRefundEligibilityResult): boolean {
+  const itemDecisions = result.itemEvaluations.map(
+    (itemEvaluation) => itemEvaluation.decision,
+  );
+
+  return new Set(itemDecisions).size > 1;
+}
+
+function formatDecisionLabel(decision: RefundDecision): string {
+  return decision.replace("_", " ");
+}
+
+function formatItemTitle(
+  itemEvaluation: CheckRefundEligibilityResult["itemEvaluations"][number],
+  index: number,
+): string {
+  return itemEvaluation.evidence.evaluatedLineItem.title ?? `Item ${index + 1}`;
+}
+
+function summarizeItemDecision(
+  itemEvaluation: CheckRefundEligibilityResult["itemEvaluations"][number],
+  index: number,
+): string {
+  const title = formatItemTitle(itemEvaluation, index);
+  const decision = formatDecisionLabel(itemEvaluation.decision);
+  const reasonSummary = itemEvaluation.reasons
+    .map((reason) => reason.message)
+    .join(" ");
+
+  return `${title} is ${decision}: ${reasonSummary}`;
+}
+
+function summarizeMixedItemDecisions(
+  result: CheckRefundEligibilityResult,
+): string | undefined {
+  if (!hasMixedItemDecisions(result)) {
+    return undefined;
+  }
+
+  return `Item-level decisions: ${result.itemEvaluations
+    .map((itemEvaluation, index) =>
+      summarizeItemDecision(itemEvaluation, index),
+    )
+    .join(" ")}`;
+}
+
 export function formatMerchantRefundAgentResponse(
   question: string,
   result: CheckRefundEligibilityResult,
@@ -41,8 +87,12 @@ export function formatMerchantRefundAgentResponse(
   const reasonSummary = result.reasons
     .map((reason) => reason.message)
     .join(" ");
+  const itemDecisionSummary = summarizeMixedItemDecisions(result);
   const nextStep = formatNextStep(result);
 
   //filter(Boolean) remove falsy value like "", false, undefined, null, 0
-  return [opening, reasonSummary, nextStep].filter(Boolean).join(" ").trim();
+  return [opening, reasonSummary, itemDecisionSummary, nextStep]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
 }

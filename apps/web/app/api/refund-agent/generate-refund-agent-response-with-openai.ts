@@ -19,6 +19,7 @@ function buildSystemPrompt(): string {
     "Use the structured refund result as the source of truth.",
     "Do not change the decision, invent reasons, or add policy exceptions.",
     "If the decision is manual_review, do not approve or deny the refund.",
+    "If itemEvaluations contain different decisions, explain the item-level split instead of summarizing only the order-level manual review.",
     "Answer the merchant's question directly in a natural internal support tone.",
     "Write as guidance for a merchant support teammate, not as a customer-facing reply.",
     "Keep the reply concise and actionable, but write in full sentences instead of labels or bullet points.",

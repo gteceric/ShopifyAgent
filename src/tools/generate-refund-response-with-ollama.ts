@@ -18,8 +18,9 @@ function buildSystemPrompt(): string {
     "Use the structured refund tool result as the source of truth.",
     "Do not change the decision, invent reasons, or make policy exceptions.",
     "If the decision is manual_review, do not approve or deny the refund.",
+    "If itemEvaluations contain different decisions, explain the item-level split instead of summarizing only the order-level manual review.",
     "Do not mention fraud, risk scoring, or internal review triggers unless that exact wording appears in the tool reasons.",
-    "For manual_review decisions, say only that the order requires human review before a decision can be made.",
+    "For manual_review decisions, say that human review is required; when mixed item decisions are present, include the item-level split.",
     "For override or exception cases, stay close to the fallback response and avoid adding stronger promises or internal-only policy details.",
     "Keep the reply concise, clear, and customer-safe.",
   ].join(" ");

@@ -29,6 +29,8 @@ export const REFUND_RESPONSE_COPY = {
     "This order's payment status needs human review before any refund decision is approved.",
   manualReviewHighValueOrder:
     "This high-value order needs human review before any refund decision is approved.",
+  manualReviewMixedItemEligibility:
+    "This order has mixed item eligibility, so a human should review the partial refund path.",
   manualReviewStandard:
     "This order should be routed to manual review.",
   followupNoteOverride:
@@ -56,6 +58,48 @@ function hasReason(
 
 function summarizeReasons(result: CheckRefundEligibilityResult): string {
   return result.reasons.map((reason) => reason.message).join(" ");
+}
+
+function hasMixedItemDecisions(result: CheckRefundEligibilityResult): boolean {
+  const itemDecisions = result.itemEvaluations.map(
+    (itemEvaluation) => itemEvaluation.decision,
+  );
+
+  return new Set(itemDecisions).size > 1;
+}
+
+function formatDecisionLabel(decision: RefundDecision): string {
+  return decision.replace("_", " ");
+}
+
+function formatItemTitle(
+  itemEvaluation: CheckRefundEligibilityResult["itemEvaluations"][number],
+  index: number,
+): string {
+  return itemEvaluation.evidence.evaluatedLineItem.title ?? `Item ${index + 1}`;
+}
+
+function summarizeItemDecision(
+  itemEvaluation: CheckRefundEligibilityResult["itemEvaluations"][number],
+  index: number,
+): string {
+  const title = formatItemTitle(itemEvaluation, index);
+  const decision = formatDecisionLabel(itemEvaluation.decision);
+  const reasonSummary = itemEvaluation.reasons
+    .map((reason) => reason.message)
+    .join(" ");
+
+  return `${title} is ${decision}: ${reasonSummary}`;
+}
+
+function summarizeMixedItemDecisions(
+  result: CheckRefundEligibilityResult,
+): string {
+  return `Item-level decisions: ${result.itemEvaluations
+    .map((itemEvaluation, index) =>
+      summarizeItemDecision(itemEvaluation, index),
+    )
+    .join(" ")}`;
 }
 
 function formatOpening(
@@ -120,6 +164,17 @@ export function formatRefundEligibilityResponse(
       return `${opening} ${REFUND_RESPONSE_COPY.ineligibleStandard} ${reasonSummary}`
         .trim();
     case RefundDecision.ManualReview:
+      if (
+        hasReason(
+          result,
+          RefundReasonCode.MixedItemEligibilityReviewRequired,
+        ) &&
+        hasMixedItemDecisions(result)
+      ) {
+        return `${opening} ${REFUND_RESPONSE_COPY.manualReviewMixedItemEligibility} ${summarizeMixedItemDecisions(result)} ${REFUND_RESPONSE_COPY.followupReviewStandard}`
+          .trim();
+      }
+
       if (hasReason(result, RefundReasonCode.AlreadyFullyRefunded)) {
         return `${opening} ${REFUND_RESPONSE_COPY.manualReviewAlreadyRefunded} ${reasonSummary} ${REFUND_RESPONSE_COPY.followupReviewAlreadyRefunded}`
           .trim();
