@@ -247,3 +247,118 @@ test("maps admin helper fields for final sale, statuses, and flags safely", () =
   assert.equal(result.order.flags?.manualReview, true);
   assert.equal(result.order.flags?.vipOverride, false);
 });
+
+test("maps multi-item Admin orders with item-level returnable and refund state", () => {
+  const result = mapAdminOrderToRefundContext(
+    {
+      id: "gid://shopify/Order/900000000303",
+      name: "#3003",
+      tags: [],
+      createdAt: "2026-03-25T00:00:00.000Z",
+      totalPriceSet: {
+        shopMoney: {
+          amount: "180.00",
+        },
+      },
+      displayFinancialStatus: "PARTIALLY_REFUNDED",
+      displayFulfillmentStatus: "FULFILLED",
+      lineItems: {
+        nodes: [
+          {
+            id: "gid://shopify/LineItem/700000000001",
+            title: "Returnable Jacket",
+            currentQuantity: 2,
+            product: {
+              category: {
+                fullName: "Apparel & Accessories > Clothing > Outerwear",
+              },
+            },
+            customAttributes: [],
+          },
+          {
+            id: "gid://shopify/LineItem/700000000002",
+            title: "Refunded Socks",
+            currentQuantity: 0,
+            product: {
+              category: {
+                fullName: "Apparel & Accessories > Clothing > Socks",
+              },
+            },
+            customAttributes: [],
+          },
+          {
+            id: "gid://shopify/LineItem/700000000003",
+            title: "Non-returnable Bottle",
+            currentQuantity: 1,
+            product: {
+              category: {
+                fullName: "Home & Garden > Kitchen & Dining",
+              },
+            },
+            customAttributes: [],
+          },
+        ],
+      },
+      fraudHoldFlag: { value: "false" },
+      manualReviewFlag: { value: "false" },
+      vipOverrideFlag: { value: "false" },
+    },
+    {
+      returnableFulfillments: {
+        nodes: [
+          {
+            id: "gid://shopify/ReturnableFulfillment/1",
+            returnableFulfillmentLineItems: {
+              nodes: [
+                {
+                  quantity: 2,
+                  fulfillmentLineItem: {
+                    id: "gid://shopify/FulfillmentLineItem/800000000001",
+                    lineItem: {
+                      id: "gid://shopify/LineItem/700000000001",
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    new Date("2026-03-30T00:00:00.000Z"),
+  );
+
+  assert.deepEqual(result.lineItems, [
+    {
+      lineItemId: "gid://shopify/LineItem/700000000001",
+      fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/800000000001",
+      title: "Returnable Jacket",
+      returnableQuantity: 2,
+      category: "Apparel & Accessories > Clothing > Outerwear",
+      fulfillmentStatus: FulfillmentStatus.Fulfilled,
+      hasReturnableFulfillment: true,
+      alreadyRefunded: false,
+      finalSale: false,
+    },
+    {
+      lineItemId: "gid://shopify/LineItem/700000000002",
+      title: "Refunded Socks",
+      returnableQuantity: 0,
+      category: "Apparel & Accessories > Clothing > Socks",
+      fulfillmentStatus: FulfillmentStatus.Fulfilled,
+      hasReturnableFulfillment: false,
+      alreadyRefunded: true,
+      finalSale: false,
+    },
+    {
+      lineItemId: "gid://shopify/LineItem/700000000003",
+      title: "Non-returnable Bottle",
+      returnableQuantity: 0,
+      category: "Home & Garden > Kitchen & Dining",
+      fulfillmentStatus: FulfillmentStatus.Fulfilled,
+      hasReturnableFulfillment: false,
+      alreadyRefunded: false,
+      finalSale: false,
+    },
+  ]);
+});

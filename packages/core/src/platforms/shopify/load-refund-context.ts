@@ -245,10 +245,11 @@ function mapAdminLineItemsToRefundContextLineItems(
 
     return {
       lineItemId: lineItem.id,
-      fulfillmentLineItemId: returnableLineItem?.fulfillmentLineItemId,
+      ...(returnableLineItem
+        ? { fulfillmentLineItemId: returnableLineItem.fulfillmentLineItemId }
+        : {}),
       title: lineItem.title ?? undefined,
-      returnableQuantity:
-        returnableLineItem?.returnableQuantity ?? lineItem.currentQuantity,
+      returnableQuantity: returnableLineItem?.returnableQuantity ?? 0,
       category: lineItem.product?.category?.fullName ?? undefined,
       fulfillmentStatus: orderFulfillmentStatus,
       hasReturnableFulfillment: returnableLineItem !== undefined,

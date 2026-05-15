@@ -37,6 +37,9 @@ Tests can still stay isolated while following the same architecture as productio
 
 - Prefer fake adapters over overriding higher-level business functions.
 - Prefer fake providers over bypassing the real orchestration flow.
+- Use production-shaped values in mocks and fixtures, especially external IDs,
+  enum strings, and payload structure. Mock data should be fake in content, not
+  fake in format.
 - If a test seam makes the production API look misleading, the seam is probably at the wrong level.
 
 ## Preserve Intentional Comments
