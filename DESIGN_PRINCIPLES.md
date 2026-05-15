@@ -76,6 +76,32 @@ Refund eligibility must be decided from line items, not only from an order-level
 
 Order-level fields can still exist as summary evidence, but they should not replace item-level evaluation. Using only the strictest order-level summary can hide refundable items, and using broad order-level booleans can hide blocked items such as final-sale or already-refunded items.
 
+## Refund Decisioning Before Execution
+
+The current product scope is refund decisioning and support guidance. It checks
+whether an order or item appears eligible, explains the decision, and recommends
+the next action. It does not create Shopify refunds or move money.
+
+Refund execution should be a separate milestone after item-level decisioning is
+trusted, merchant policy ownership is clear, and the UI shows item-level
+outcomes without ambiguity.
+
+When refund execution is added, it must be designed explicitly instead of being
+treated as a small extension of eligibility checks. It needs:
+
+- item and quantity selection
+- refund amount, tax, and shipping handling
+- approval and manual-review gates
+- confirmation before calling Shopify
+- Shopify refund mutation handling
+- audit logging
+- idempotency to prevent duplicate refunds
+- clear success and failure states
+
+The first execution milestone should be conservative: only allow execution for
+clearly eligible refunds, require merchant confirmation, and avoid automatic
+execution for manual-review or mixed-decision cases.
+
 ## Current Example
 
 For refund eligibility and the refund-agent flow:
