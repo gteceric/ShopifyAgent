@@ -107,10 +107,10 @@ export default async function Home({ searchParams }: HomeProps) {
     initialState.selectedOrderId,
   );
   const selectedOrderError: DashboardOrderErrorState | null =
-    activeSelectedOrder && orderEvaluationErrors.has(activeSelectedOrder.id)
+    activeSelectedOrder && orderEvaluationErrors.has(activeSelectedOrder.base.id)
       ? {
-          orderId: activeSelectedOrder.id,
-          message: orderEvaluationErrors.get(activeSelectedOrder.id)!,
+          orderId: activeSelectedOrder.base.id,
+          message: orderEvaluationErrors.get(activeSelectedOrder.base.id)!,
         }
       : null;
 

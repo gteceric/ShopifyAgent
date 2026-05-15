@@ -33,7 +33,7 @@ export function Dashboard({
   const pathname = usePathname();
   const router = useRouter();
   const urlSearchParams = useSearchParams();
-  const defaultOrderId = orders[0]?.id ?? "";
+  const defaultOrderId = orders[0]?.base.id ?? "";
   const [isPending, startTransition] = useTransition();
   const [pendingSelectedOrderId, setPendingSelectedOrderId] = useState<
     string | null
@@ -54,13 +54,13 @@ export function Dashboard({
     filteredOrders,
     dashboardState.selectedOrderId,
   );
-  const activeSelectedOrderId = selectedOrder?.id ?? "";
+  const activeSelectedOrderId = selectedOrder?.base.id ?? "";
   const displaySelectedOrderId =
     isPending && pendingSelectedOrderId
       ? pendingSelectedOrderId
       : activeSelectedOrderId;
   const displayedOrder =
-    filteredOrders.find((order) => order.id === displaySelectedOrderId) ??
+    filteredOrders.find((order) => order.base.id === displaySelectedOrderId) ??
     selectedOrder;
   const displayedOrderError =
     selectedOrderError?.orderId === activeSelectedOrderId

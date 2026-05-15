@@ -56,7 +56,7 @@ for (const scenario of REFUND_SCENARIO_MATRIX) {
     });
 
     // Outcome fields drive the operator's next step.
-    assert.equal(result.decision, scenario.expectedDecision);
+    assert.equal(result.policyResult.decision, scenario.expectedDecision);
     assert.equal(
       result.recommendedNextAction,
       getExpectedNextAction(scenario.expectedDecision),
@@ -67,7 +67,7 @@ for (const scenario of REFUND_SCENARIO_MATRIX) {
     );
     assert.equal(
       result.exceptionAvailable,
-      result.reasons.some(
+      result.policyResult.reasons.some(
         (reason) => reason.code === RefundReasonCode.VipOverrideApplied,
       ),
     );
@@ -75,7 +75,7 @@ for (const scenario of REFUND_SCENARIO_MATRIX) {
     // Reasons are the human-readable policy explanation behind the outcome.
     for (const expectedReasonCode of scenario.expectedReasonCodes) {
       assert.ok(
-        result.reasons.some((reason) => reason.code === expectedReasonCode),
+        result.policyResult.reasons.some((reason) => reason.code === expectedReasonCode),
         `Expected reason code ${expectedReasonCode} for scenario ${scenario.id}`,
       );
     }
@@ -83,17 +83,17 @@ for (const scenario of REFUND_SCENARIO_MATRIX) {
     // Evidence is the structured audit payload. Scenarios assert only the
     // evidence fields that are important to that case.
     assertPartialObject(
-      result.evidence.order,
+      result.policyResult.evidence.order,
       scenario.expectedEvidence?.order,
       `evidence.order for scenario ${scenario.id}`,
     );
     assertPartialObject(
-      result.evidence.policyContext,
+      result.policyResult.evidence.policyContext,
       scenario.expectedEvidence?.policyContext,
       `evidence.policyContext for scenario ${scenario.id}`,
     );
     assertPartialObject(
-      result.evidence.evaluatedOrder,
+      result.policyResult.evidence.evaluatedOrder,
       scenario.expectedEvidence?.evaluatedOrder,
       `evidence.evaluatedOrder for scenario ${scenario.id}`,
     );

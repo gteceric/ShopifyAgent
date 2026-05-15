@@ -1,7 +1,5 @@
 import {
   checkRefundEligibility,
-  FinancialStatus,
-  FulfillmentStatus,
   RecommendedRefundAction,
   RefundDecision,
   RefundReasonCode,
@@ -48,10 +46,6 @@ const CHECK_REFUND_ELIGIBILITY_TOOL = {
       orderId: {
         type: "string",
       },
-      decision: {
-        type: "string",
-        enum: Object.values(RefundDecision),
-      },
       exceptionAvailable: {
         type: "boolean",
         description:
@@ -67,140 +61,60 @@ const CHECK_REFUND_ELIGIBILITY_TOOL = {
         description:
           "The recommended next action for the caller: approve, deny, or route to manual review.",
       },
-      reasons: {
-        type: "array",
-        items: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            code: {
-              type: "string",
-              enum: Object.values(RefundReasonCode),
-            },
-            message: {
-              type: "string",
-            },
-          },
-          required: ["code", "message"],
-        },
-      },
-      evidence: {
+      policyResult: {
         type: "object",
         additionalProperties: false,
         properties: {
-          order: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              id: { type: "string" },
-              name: { type: "string" },
-              createdAt: { type: "string" },
-              ageDays: { type: "number" },
-              totalAmount: { type: "number" },
-              financialStatus: {
-                type: "string",
-                enum: Object.values(FinancialStatus),
-              },
-              tags: {
-                type: "array",
-                items: { type: "string" },
-              },
-              flags: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                  fraudHold: { type: "boolean" },
-                  manualReview: { type: "boolean" },
-                  vipOverride: { type: "boolean" },
+          decision: {
+            type: "string",
+            enum: Object.values(RefundDecision),
+          },
+          reasons: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                code: {
+                  type: "string",
+                  enum: Object.values(RefundReasonCode),
                 },
-                required: ["fraudHold", "manualReview", "vipOverride"],
+                message: {
+                  type: "string",
+                },
               },
+              required: ["code", "message"],
             },
-            required: [
-              "id",
-              "name",
-              "createdAt",
-              "ageDays",
-              "totalAmount",
-              "financialStatus",
-              "tags",
-              "flags",
-            ],
           },
-          policyContext: {
+          evidence: {
             type: "object",
-            additionalProperties: false,
+            additionalProperties: true,
             properties: {
-              refundWindowDays: { type: "number" },
-              effectiveRefundWindowDays: { type: "number" },
-              cancelWindowDays: { type: "number" },
-              effectiveCancelWindowDays: { type: "number" },
-              highValueOrderThreshold: { type: "number" },
-              matchedCategoryWindowCategories: {
-                type: "array",
-                items: { type: "string" },
-              },
-              matchedExceptionRuleTag: { type: "string" },
+              order: { type: "object", additionalProperties: true },
+              policyContext: { type: "object", additionalProperties: true },
+              evaluatedOrder: { type: "object", additionalProperties: true },
             },
-            required: [
-              "refundWindowDays",
-              "effectiveRefundWindowDays",
-              "cancelWindowDays",
-              "effectiveCancelWindowDays",
-              "matchedCategoryWindowCategories",
-            ],
+            required: ["order", "policyContext", "evaluatedOrder"],
           },
-          evaluatedOrder: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              effectiveFinancialStatus: {
-                type: "string",
-                enum: Object.values(FinancialStatus),
-              },
-              fulfillmentStatus: {
-                type: "string",
-                enum: Object.values(FulfillmentStatus),
-              },
-              hasAnyReturnableFulfillment: { type: "boolean" },
-              allLineItemsRefunded: { type: "boolean" },
-              allLineItemsFinalSale: { type: "boolean" },
-              itemCategories: {
-                type: "array",
-                items: { type: "string" },
-              },
+          itemEvaluations: {
+            type: "array",
+            description:
+              "Per-line-item refund decisions and evidence. This is the source of truth for item-level refund eligibility.",
+            items: {
+              type: "object",
+              additionalProperties: true,
             },
-            required: [
-              "effectiveFinancialStatus",
-              "fulfillmentStatus",
-              "hasAnyReturnableFulfillment",
-              "allLineItemsRefunded",
-              "allLineItemsFinalSale",
-              "itemCategories",
-            ],
           },
         },
-        required: ["order", "policyContext", "evaluatedOrder"],
-      },
-      itemEvaluations: {
-        type: "array",
-        description:
-          "Per-line-item refund decisions and evidence. This is the source of truth for item-level refund eligibility.",
-        items: {
-          type: "object",
-          additionalProperties: true,
-        },
+        required: ["decision", "reasons", "evidence", "itemEvaluations"],
       },
     },
     required: [
       "orderId",
-      "decision",
+      "policyResult",
       "exceptionAvailable",
       "escalationRequired",
       "recommendedNextAction",
-      "reasons",
-      "evidence",
-      "itemEvaluations",
     ],
   },
   annotations: {

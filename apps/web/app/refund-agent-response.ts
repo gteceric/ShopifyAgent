@@ -2,6 +2,7 @@ import {
   RecommendedRefundAction,
   RefundDecision,
   type CheckRefundEligibilityResult,
+  type RefundPolicyLineItemEvaluation,
 } from "@shopify-agent/core";
 
 function formatOpening(
@@ -12,7 +13,7 @@ function formatOpening(
     return "";
   }
 
-  switch (result.decision) {
+  switch (result.policyResult.decision) {
     case RefundDecision.Eligible:
       return "Yes.";
     case RefundDecision.Ineligible:
@@ -34,7 +35,7 @@ function formatNextStep(result: CheckRefundEligibilityResult): string {
 }
 
 function hasMixedItemDecisions(result: CheckRefundEligibilityResult): boolean {
-  const itemDecisions = result.itemEvaluations.map(
+  const itemDecisions = result.policyResult.itemEvaluations.map(
     (itemEvaluation) => itemEvaluation.decision,
   );
 
@@ -46,14 +47,14 @@ function formatDecisionLabel(decision: RefundDecision): string {
 }
 
 function formatItemTitle(
-  itemEvaluation: CheckRefundEligibilityResult["itemEvaluations"][number],
+  itemEvaluation: RefundPolicyLineItemEvaluation,
   index: number,
 ): string {
   return itemEvaluation.evidence.evaluatedLineItem.title ?? `Item ${index + 1}`;
 }
 
 function summarizeItemDecision(
-  itemEvaluation: CheckRefundEligibilityResult["itemEvaluations"][number],
+  itemEvaluation: RefundPolicyLineItemEvaluation,
   index: number,
 ): string {
   const title = formatItemTitle(itemEvaluation, index);
@@ -72,7 +73,7 @@ function summarizeMixedItemDecisions(
     return undefined;
   }
 
-  return `Item-level decisions: ${result.itemEvaluations
+  return `Item-level decisions: ${result.policyResult.itemEvaluations
     .map((itemEvaluation, index) =>
       summarizeItemDecision(itemEvaluation, index),
     )
@@ -84,7 +85,7 @@ export function formatMerchantRefundAgentResponse(
   result: CheckRefundEligibilityResult,
 ): string {
   const opening = formatOpening(question, result);
-  const reasonSummary = result.reasons
+  const reasonSummary = result.policyResult.reasons
     .map((reason) => reason.message)
     .join(" ");
   const itemDecisionSummary = summarizeMixedItemDecisions(result);

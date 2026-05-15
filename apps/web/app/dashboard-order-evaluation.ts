@@ -13,6 +13,8 @@ import type {
 import type {
   DashboardItemEvaluationViewModel,
   DashboardOrder,
+  DashboardRefundEvaluationViewModel,
+  RefundDecision as DashboardRefundDecision,
 } from "./mock-orders";
 
 export interface DashboardOrderErrorState {
@@ -62,7 +64,7 @@ function calculateOrderAgeDays(createdAt: string, now: Date): number {
 
 function getInitialDecision(
   order: ShopifyOrderSummary,
-): DashboardOrder["decision"] {
+): DashboardRefundDecision {
   if (order.financialStatus === FinancialStatus.Refunded) {
     return "ineligible";
   }
@@ -88,49 +90,56 @@ export function mapOrderSummaryToDashboardOrder(
   const orderAgeDays = calculateOrderAgeDays(order.createdAt, now);
 
   return {
-    id: order.id,
-    orderName: order.name,
-    customerName: order.customerName,
-    createdAtLabel: formatCreatedAtLabel(order.createdAt),
-    orderAgeDays,
-    orderTotalLabel: formatCurrency(order.totalAmount),
-    financialStatus: formatStatusLabel(order.financialStatus),
-    fulfillmentStatus: formatStatusLabel(order.fulfillmentStatus),
-    decision: getInitialDecision(order),
-    reasonSummary: "Live refund posture will be loaded from the policy engine.",
-    recommendedNextAction:
-      "Open the order to inspect the latest refund guidance.",
-    lastUpdatedLabel: "Awaiting live refund check",
-    policyWindowLabel:
-      order.fulfillmentStatus === FulfillmentStatus.Unfulfilled
-        ? "Cancellation and refund policy"
-        : "Refund policy",
-    reasonDetails: [
-      "This row was loaded from the current order feed.",
-      "The latest refund posture is layered on top of the live order context.",
-    ],
-    evidence: [
-      { label: "Order Age", value: `${orderAgeDays} days` },
-      { label: "Order Total", value: formatCurrency(order.totalAmount) },
-      {
-        label: "Financial Status",
-        value: formatStatusLabel(order.financialStatus),
-      },
-      {
-        label: "Fulfillment",
-        value: formatStatusLabel(order.fulfillmentStatus),
-      },
-    ],
-    timeline: [
-      {
-        title: "Order summary loaded",
-        detail: "This order came from the latest order feed available to the workspace.",
-      },
-      {
-        title: "Refund check pending",
-        detail: "Refund guidance will refresh during the current server evaluation cycle.",
-      },
-    ],
+    base: {
+      id: order.id,
+      orderName: order.name,
+      customerName: order.customerName,
+      createdAtLabel: formatCreatedAtLabel(order.createdAt),
+      orderAgeDays,
+      orderTotalLabel: formatCurrency(order.totalAmount),
+      financialStatus: formatStatusLabel(order.financialStatus),
+      fulfillmentStatus: formatStatusLabel(order.fulfillmentStatus),
+    },
+    refundEvaluation: {
+      decision: getInitialDecision(order),
+      reasonSummary:
+        "Live refund posture will be loaded from the policy engine.",
+      recommendedNextAction:
+        "Open the order to inspect the latest refund guidance.",
+      lastUpdatedLabel: "Awaiting live refund check",
+      policyWindowLabel:
+        order.fulfillmentStatus === FulfillmentStatus.Unfulfilled
+          ? "Cancellation and refund policy"
+          : "Refund policy",
+      reasonDetails: [
+        "This row was loaded from the current order feed.",
+        "The latest refund posture is layered on top of the live order context.",
+      ],
+      evidence: [
+        { label: "Order Age", value: `${orderAgeDays} days` },
+        { label: "Order Total", value: formatCurrency(order.totalAmount) },
+        {
+          label: "Financial Status",
+          value: formatStatusLabel(order.financialStatus),
+        },
+        {
+          label: "Fulfillment",
+          value: formatStatusLabel(order.fulfillmentStatus),
+        },
+      ],
+      timeline: [
+        {
+          title: "Order summary loaded",
+          detail:
+            "This order came from the latest order feed available to the workspace.",
+        },
+        {
+          title: "Refund check pending",
+          detail:
+            "Refund guidance will refresh during the current server evaluation cycle.",
+        },
+      ],
+    },
   };
 }
 
@@ -138,23 +147,26 @@ function hasReason(
   result: CheckRefundEligibilityResult,
   code: RefundReasonCode,
 ): boolean {
-  return result.reasons.some((reason) => reason.code === code);
+  return result.policyResult.reasons.some((reason) => reason.code === code);
 }
 
 function formatDecisionSummary(result: CheckRefundEligibilityResult): string {
-  if (result.decision === RefundDecision.Eligible) {
+  const policyResult = result.policyResult;
+  const evaluatedOrder = policyResult.evidence.evaluatedOrder;
+
+  if (policyResult.decision === RefundDecision.Eligible) {
     if (result.exceptionAvailable) {
       return "Refund allowed through an active exception path.";
     }
 
-    if (result.evidence.evaluatedOrder.fulfillmentStatus === "unfulfilled") {
+    if (evaluatedOrder.fulfillmentStatus === "unfulfilled") {
       return "Unfulfilled order can be canceled and refunded normally.";
     }
 
     return "Inside the refund window with no policy blockers.";
   }
 
-  if (result.decision === RefundDecision.Ineligible) {
+  if (policyResult.decision === RefundDecision.Ineligible) {
     if (hasReason(result, RefundReasonCode.AlreadyFullyRefunded)) {
       return "Order has already been fully refunded.";
     }
@@ -192,9 +204,12 @@ function formatDecisionSummary(result: CheckRefundEligibilityResult): string {
 }
 
 function formatRecommendedAction(result: CheckRefundEligibilityResult): string {
+  const policyResult = result.policyResult;
+  const evaluatedOrder = policyResult.evidence.evaluatedOrder;
+
   switch (result.recommendedNextAction) {
     case RecommendedRefundAction.Approve:
-      return result.evidence.evaluatedOrder.fulfillmentStatus === "unfulfilled"
+      return evaluatedOrder.fulfillmentStatus === "unfulfilled"
         ? "Approve the cancellation and refund flow."
         : "Approve the standard refund flow.";
     case RecommendedRefundAction.Deny:
@@ -205,67 +220,73 @@ function formatRecommendedAction(result: CheckRefundEligibilityResult): string {
 }
 
 function formatPolicyLens(result: CheckRefundEligibilityResult): string {
+  const policyResult = result.policyResult;
+  const policyContext = policyResult.evidence.policyContext;
+  const evaluatedOrder = policyResult.evidence.evaluatedOrder;
+
   if (hasReason(result, RefundReasonCode.HighValueOrderReviewRequired)) {
-    const threshold = result.evidence.policyContext.highValueOrderThreshold;
+    const threshold = policyContext.highValueOrderThreshold;
 
     return threshold
       ? `High-value review threshold (${threshold.toFixed(2)})`
       : "High-value review threshold";
   }
 
-  if (result.evidence.evaluatedOrder.fulfillmentStatus === "unfulfilled") {
-    return `${result.evidence.policyContext.cancelWindowDays}-day cancellation and refund window`;
+  if (evaluatedOrder.fulfillmentStatus === "unfulfilled") {
+    return `${policyContext.cancelWindowDays}-day cancellation and refund window`;
   }
 
-  return `${result.evidence.policyContext.refundWindowDays}-day refund window`;
+  return `${policyContext.refundWindowDays}-day refund window`;
 }
 
 function buildEvidence(
   result: CheckRefundEligibilityResult,
-): DashboardOrder["evidence"] {
+): DashboardRefundEvaluationViewModel["evidence"] {
+  const policyResult = result.policyResult;
+  const orderEvidence = policyResult.evidence.order;
+  const policyContext = policyResult.evidence.policyContext;
+  const evaluatedOrder = policyResult.evidence.evaluatedOrder;
   const usesHighValueReview = hasReason(
     result,
     RefundReasonCode.HighValueOrderReviewRequired,
   );
-  const items: DashboardOrder["evidence"] = [
+  const items: DashboardRefundEvaluationViewModel["evidence"] = [
     {
       label: "Order Age",
-      value: `${result.evidence.order.ageDays} days`,
+      value: `${orderEvidence.ageDays} days`,
     },
     {
       label:
-        result.evidence.evaluatedOrder.fulfillmentStatus === "unfulfilled"
+        evaluatedOrder.fulfillmentStatus === "unfulfilled"
           ? "Cancellation Window"
           : "Refund Window",
       value: `${
-        result.evidence.evaluatedOrder.fulfillmentStatus === "unfulfilled"
-          ? result.evidence.policyContext.cancelWindowDays
-          : result.evidence.policyContext.refundWindowDays
+        evaluatedOrder.fulfillmentStatus === "unfulfilled"
+          ? policyContext.cancelWindowDays
+          : policyContext.refundWindowDays
       } days`,
     },
     {
       label: "Financial Status",
-      value: formatStatusLabel(
-        result.evidence.evaluatedOrder.effectiveFinancialStatus,
-      ),
+      value: formatStatusLabel(evaluatedOrder.effectiveFinancialStatus),
     },
     {
       label: "Fulfillment",
-      value: formatStatusLabel(result.evidence.evaluatedOrder.fulfillmentStatus),
+      value: formatStatusLabel(evaluatedOrder.fulfillmentStatus),
     },
   ];
 
   if (
     usesHighValueReview &&
-    result.evidence.policyContext.highValueOrderThreshold !== undefined
+    policyContext.highValueOrderThreshold !== undefined
   ) {
     items[1] = {
       label: "Order Total",
-      value: formatCurrency(result.evidence.order.totalAmount),
+      value: formatCurrency(orderEvidence.totalAmount),
     };
     items[2] = {
       label: "Review Threshold",
-      value: formatCurrency(result.evidence.policyContext.highValueOrderThreshold),
+      value: formatCurrency(policyContext.highValueOrderThreshold),
     };
   }
 
@@ -279,7 +300,9 @@ function formatBooleanLabel(value: boolean): string {
 function buildItemEvaluationViewModels(
   result: CheckRefundEligibilityResult,
 ): DashboardItemEvaluationViewModel[] {
-  return result.itemEvaluations.map((itemEvaluation, index) => {
+  const policyResult = result.policyResult;
+
+  return policyResult.itemEvaluations.map((itemEvaluation, index) => {
     const lineItem = itemEvaluation.evidence.evaluatedLineItem;
     const itemTitle = lineItem.title ?? `Line item ${index + 1}`;
     const reasonSummary = itemEvaluation.reasons
@@ -335,11 +358,13 @@ function buildItemEvaluationViewModels(
 
 function buildTimeline(
   result: CheckRefundEligibilityResult,
-): DashboardOrder["timeline"] {
+): DashboardRefundEvaluationViewModel["timeline"] {
+  const policyResult = result.policyResult;
+
   return [
     {
       title: "Refund check completed",
-      detail: `Decision returned: ${formatStatusLabel(result.decision)}.`,
+      detail: `Decision returned: ${formatStatusLabel(policyResult.decision)}.`,
     },
     {
       title: "Recommended next step",
@@ -348,20 +373,25 @@ function buildTimeline(
   ];
 }
 
+// Convert refund eligibility result to dashboard view model
 export function applyRefundEvaluationToOrder(
   order: DashboardOrder,
   result: CheckRefundEligibilityResult,
 ): DashboardOrder {
+  const policyResult = result.policyResult;
+
   return {
     ...order,
-    decision: result.decision,
-    reasonSummary: formatDecisionSummary(result),
-    recommendedNextAction: formatRecommendedAction(result),
-    lastUpdatedLabel: "Checked just now",
-    policyWindowLabel: formatPolicyLens(result),
-    reasonDetails: result.reasons.map((reason) => reason.message),
-    evidence: buildEvidence(result),
-    itemEvaluations: buildItemEvaluationViewModels(result),
-    timeline: buildTimeline(result),
+    refundEvaluation: {
+      decision: policyResult.decision,
+      reasonSummary: formatDecisionSummary(result),
+      recommendedNextAction: formatRecommendedAction(result),
+      lastUpdatedLabel: "Checked just now",
+      policyWindowLabel: formatPolicyLens(result),
+      reasonDetails: policyResult.reasons.map((reason) => reason.message),
+      evidence: buildEvidence(result),
+      itemEvaluations: buildItemEvaluationViewModels(result),
+      timeline: buildTimeline(result),
+    },
   };
 }

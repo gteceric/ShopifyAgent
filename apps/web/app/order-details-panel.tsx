@@ -18,9 +18,12 @@ export function OrderDetailsPanel({
   emptyMessage,
   isPending = false,
 }: OrderDetailsPanelProps) {
+  const base = order?.base;
+  const refundEvaluation = order?.refundEvaluation;
+
   return (
     <aside className="grid gap-5 rounded-[28px] border border-stone-900/10 bg-stone-50/85 p-6 shadow-[0_18px_48px_rgba(66,45,23,0.12)] backdrop-blur-xl xl:sticky xl:top-6">
-      {order ? (
+      {base && refundEvaluation ? (
         <>
           {isPending ? (
             <div className="rounded-2xl border border-orange-700/15 bg-orange-100/60 px-4 py-3 text-sm text-stone-700">
@@ -36,9 +39,9 @@ export function OrderDetailsPanel({
 
           <header className="grid gap-2.5">
             <span
-              className={`inline-flex w-fit min-w-[108px] items-center justify-center rounded-full px-3 py-2 text-[11px] font-bold uppercase tracking-[0.12em] ${decisionPillClassName[order.decision]}`}
+              className={`inline-flex w-fit min-w-[108px] items-center justify-center rounded-full px-3 py-2 text-[11px] font-bold uppercase tracking-[0.12em] ${decisionPillClassName[refundEvaluation.decision]}`}
             >
-              {getDecisionLabel(order.decision)}
+              {getDecisionLabel(refundEvaluation.decision)}
             </span>
             <h2
               className="text-[2rem] leading-none text-stone-950"
@@ -47,25 +50,25 @@ export function OrderDetailsPanel({
                   '"Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif',
               }}
             >
-              {order.orderName}
+              {base.orderName}
             </h2>
             <p className="text-sm text-stone-600">
-              {order.customerName} ·{" "}
-              <span className="font-mono text-[0.95em]">{order.id}</span>
+              {base.customerName} ·{" "}
+              <span className="font-mono text-[0.95em]">{base.id}</span>
             </p>
           </header>
 
           <div className="flex flex-wrap gap-2.5">
             <span className="inline-flex items-center gap-2 rounded-full border border-stone-900/10 bg-stone-50 px-3.5 py-2 text-sm text-stone-700">
-              Suggested next step: {order.recommendedNextAction}
+              Suggested next step: {refundEvaluation.recommendedNextAction}
             </span>
             <span className="inline-flex items-center gap-2 rounded-full border border-stone-900/10 bg-stone-50 px-3.5 py-2 text-sm text-stone-700">
-              Policy lens: {order.policyWindowLabel}
+              Policy lens: {refundEvaluation.policyWindowLabel}
             </span>
           </div>
 
           <section className="grid gap-3 sm:grid-cols-2">
-            {order.evidence.map((item) => (
+            {refundEvaluation.evidence.map((item) => (
               <article
                 key={item.label}
                 className="rounded-2xl border border-stone-900/10 bg-stone-50/90 p-4"
@@ -83,13 +86,13 @@ export function OrderDetailsPanel({
               Reasoning Snapshot
             </p>
             <div className="grid gap-3">
-              {order.reasonDetails.map((detail) => (
+              {refundEvaluation.reasonDetails.map((detail) => (
                 <div
                   key={detail}
                   className="border-l-2 border-orange-700/30 pl-3.5"
                 >
                   <strong className="mb-1.5 block text-sm text-stone-950">
-                    {order.reasonSummary}
+                    {refundEvaluation.reasonSummary}
                   </strong>
                   <span className="text-sm leading-6 text-stone-600">
                     {detail}
@@ -99,13 +102,14 @@ export function OrderDetailsPanel({
             </div>
           </section>
 
-          {order.itemEvaluations && order.itemEvaluations.length > 0 ? (
+          {refundEvaluation.itemEvaluations &&
+          refundEvaluation.itemEvaluations.length > 0 ? (
             <section>
               <p className="mb-3 text-[11px] uppercase tracking-[0.18em] text-stone-500">
                 Line Item Decisions
               </p>
               <div className="grid gap-3">
-                {order.itemEvaluations.map((item) => (
+                {refundEvaluation.itemEvaluations.map((item) => (
                   <article
                     key={item.lineItemId}
                     className="rounded-2xl border border-stone-900/10 bg-stone-50/90 p-4"
@@ -156,7 +160,7 @@ export function OrderDetailsPanel({
               Workflow Timeline
             </p>
             <div className="grid gap-3">
-              {order.timeline.map((entry) => (
+              {refundEvaluation.timeline.map((entry) => (
                 <div
                   key={entry.title}
                   className="border-l-2 border-orange-700/30 pl-3.5"
@@ -173,9 +177,9 @@ export function OrderDetailsPanel({
           </section>
 
           <MerchantQuestionPanel
-            key={order.id}
-            orderId={order.id}
-            decision={order.decision}
+            key={base.id}
+            orderId={base.id}
+            decision={refundEvaluation.decision}
           />
         </>
       ) : (

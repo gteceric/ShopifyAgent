@@ -247,7 +247,6 @@ test("tools/call returns structured refund eligibility output", async () => {
   >;
 
   assert.equal(structuredContent.orderId, "gid://shopify/Order/900000000201");
-  assert.equal(structuredContent.decision, RefundDecision.ManualReview);
   assert.equal(structuredContent.exceptionAvailable, false);
   assert.equal(structuredContent.escalationRequired, true);
   assert.equal(
@@ -255,7 +254,13 @@ test("tools/call returns structured refund eligibility output", async () => {
     RecommendedRefundAction.ManualReview,
   );
 
-  const reasons = structuredContent.reasons as Array<Record<string, unknown>>;
+  const policyResult = structuredContent.policyResult as Record<
+    string,
+    unknown
+  >;
+  assert.equal(policyResult.decision, RefundDecision.ManualReview);
+
+  const reasons = policyResult.reasons as Array<Record<string, unknown>>;
   assert.ok(
     reasons.some(
       (reason) => reason.code === RefundReasonCode.HighValueOrderReviewRequired,

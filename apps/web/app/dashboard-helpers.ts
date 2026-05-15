@@ -104,10 +104,10 @@ export function parseDashboardUrlState(
     decisionFilter: parsedSearchParams.decision,
     ageFilter: parsedSearchParams.age,
     selectedOrderId: orders.some(
-      (order) => order.id === parsedSearchParams.orderId,
+      (order) => order.base.id === parsedSearchParams.orderId,
     )
       ? parsedSearchParams.orderId
-      : orders[0]?.id ?? "",
+      : orders[0]?.base.id ?? "",
   };
 }
 
@@ -168,14 +168,14 @@ export function matchesAgeFilter(
   }
 
   if (ageFilter === "recent") {
-    return order.orderAgeDays <= 30;
+    return order.base.orderAgeDays <= 30;
   }
 
   if (ageFilter === "aging") {
-    return order.orderAgeDays > 30 && order.orderAgeDays <= 90;
+    return order.base.orderAgeDays > 30 && order.base.orderAgeDays <= 90;
   }
 
-  return order.orderAgeDays > 90;
+  return order.base.orderAgeDays > 90;
 }
 
 export function filterOrders(
@@ -189,12 +189,13 @@ export function filterOrders(
   return orders.filter((order) => {
     const matchesSearch =
       normalizedSearch.length === 0 ||
-      order.orderName.toLowerCase().includes(normalizedSearch) ||
-      order.customerName.toLowerCase().includes(normalizedSearch) ||
-      order.id.toLowerCase().includes(normalizedSearch);
+      order.base.orderName.toLowerCase().includes(normalizedSearch) ||
+      order.base.customerName.toLowerCase().includes(normalizedSearch) ||
+      order.base.id.toLowerCase().includes(normalizedSearch);
 
     const matchesDecision =
-      decisionFilter === "all" || order.decision === decisionFilter;
+      decisionFilter === "all" ||
+      order.refundEvaluation.decision === decisionFilter;
 
     return matchesSearch && matchesDecision && matchesAgeFilter(order, ageFilter);
   });
@@ -204,18 +205,24 @@ export function selectActiveOrder(
   orders: DashboardOrder[],
   selectedOrderId: string,
 ): DashboardOrder | null {
-  return orders.find((order) => order.id === selectedOrderId) ?? orders[0] ?? null;
+  return (
+    orders.find((order) => order.base.id === selectedOrderId) ??
+    orders[0] ??
+    null
+  );
 }
 
 export function getSummary(orders: DashboardOrder[]) {
   return {
     total: orders.length,
-    eligibleCount: orders.filter((order) => order.decision === "eligible")
-      .length,
-    manualReviewCount: orders.filter(
-      (order) => order.decision === "manual_review",
+    eligibleCount: orders.filter(
+      (order) => order.refundEvaluation.decision === "eligible",
     ).length,
-    blockedCount: orders.filter((order) => order.decision === "ineligible")
-      .length,
+    manualReviewCount: orders.filter(
+      (order) => order.refundEvaluation.decision === "manual_review",
+    ).length,
+    blockedCount: orders.filter(
+      (order) => order.refundEvaluation.decision === "ineligible",
+    ).length,
   };
 }

@@ -34,7 +34,7 @@ test("uses the deterministic fallback when no responder is provided", async () =
 
   assert.equal(response.usedFallback, true);
   assert.equal(response.response, response.fallbackResponse);
-  assert.equal(response.result.decision, RefundDecision.Eligible);
+  assert.equal(response.result.policyResult.decision, RefundDecision.Eligible);
   assert.match(response.response, /standard refund flow/i);
 });
 
@@ -51,14 +51,14 @@ test("uses the injected responder output when it succeeds", async () => {
       },
       responder: {
         generateResponse: async ({ result, fallbackResponse }) =>
-          `Model reply: ${result.decision}. ${fallbackResponse}`,
+          `Model reply: ${result.policyResult.decision}. ${fallbackResponse}`,
       },
     },
   );
 
   assert.equal(response.usedFallback, false);
   assert.match(response.response, /^Model reply: manual_review\./);
-  assert.equal(response.result.decision, RefundDecision.ManualReview);
+  assert.equal(response.result.policyResult.decision, RefundDecision.ManualReview);
 });
 
 test("falls back when the injected responder throws", async () => {

@@ -39,9 +39,9 @@ function buildUserPrompt(context: RefundAgentResponseContext): string {
     "Prefer natural phrasing that sounds like a teammate giving guidance, not a template.",
     "Keep the perspective internal and operational.",
     `Merchant question: ${context.question}`,
-    `Decision: ${context.result.decision}`,
+    `Decision: ${context.result.policyResult.decision}`,
     `Recommended next action: ${context.result.recommendedNextAction}`,
-    `Reasons: ${context.result.reasons.map((reason) => reason.message).join(" ")}`,
+    `Reasons: ${context.result.policyResult.reasons.map((reason) => reason.message).join(" ")}`,
     `Fallback response: ${context.fallbackResponse}`,
     `Structured result: ${JSON.stringify(context.result, null, 2)}`,
   ].join("\n\n");

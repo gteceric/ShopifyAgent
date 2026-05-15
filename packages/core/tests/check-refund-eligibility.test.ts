@@ -90,12 +90,12 @@ test("uses an injected adapter and returns structured eligibility result", async
   );
 
   assert.equal(result.orderId, "gid://shopify/Order/900000000101");
-  assert.equal(result.decision, RefundDecision.Eligible);
+  assert.equal(result.policyResult.decision, RefundDecision.Eligible);
   assert.equal(result.exceptionAvailable, false);
   assert.equal(result.escalationRequired, false);
   assert.equal(result.recommendedNextAction, RecommendedRefundAction.Approve);
   assert.ok(
-    result.reasons.some(
+    result.policyResult.reasons.some(
       (reason) => reason.code === RefundReasonCode.WithinRefundWindow,
     ),
   );
@@ -120,7 +120,7 @@ test("uses injected merchant config when evaluating refunded line items", async 
     },
   );
 
-  assert.equal(result.decision, RefundDecision.ManualReview);
+  assert.equal(result.policyResult.decision, RefundDecision.ManualReview);
   assert.equal(result.exceptionAvailable, false);
   assert.equal(result.escalationRequired, true);
   assert.equal(
@@ -128,7 +128,7 @@ test("uses injected merchant config when evaluating refunded line items", async 
     RecommendedRefundAction.ManualReview,
   );
   assert.ok(
-    result.reasons.some(
+    result.policyResult.reasons.some(
       (reason) => reason.code === RefundReasonCode.AlreadyFullyRefunded,
     ),
   );
@@ -150,12 +150,12 @@ test("supports platform adapters as the order-context boundary", async () => {
   );
 
   assert.equal(result.orderId, "gid://shopify/Order/900000000104");
-  assert.equal(result.decision, RefundDecision.Ineligible);
+  assert.equal(result.policyResult.decision, RefundDecision.Ineligible);
   assert.equal(result.exceptionAvailable, false);
   assert.equal(result.escalationRequired, false);
   assert.equal(result.recommendedNextAction, RecommendedRefundAction.Deny);
   assert.ok(
-    result.reasons.some(
+    result.policyResult.reasons.some(
       (reason) => reason.code === RefundReasonCode.OutsideRefundWindow,
     ),
   );
@@ -183,12 +183,12 @@ test("marks VIP overrides as an active exception without requiring escalation", 
     },
   );
 
-  assert.equal(result.decision, RefundDecision.Eligible);
+  assert.equal(result.policyResult.decision, RefundDecision.Eligible);
   assert.equal(result.exceptionAvailable, true);
   assert.equal(result.escalationRequired, false);
   assert.equal(result.recommendedNextAction, RecommendedRefundAction.Approve);
   assert.ok(
-    result.reasons.some(
+    result.policyResult.reasons.some(
       (reason) => reason.code === RefundReasonCode.VipOverrideApplied,
     ),
   );
@@ -217,12 +217,12 @@ test("applies merchant exception rules through the Shopify adapter when mock ord
     },
   );
 
-  assert.equal(result.decision, RefundDecision.Eligible);
+  assert.equal(result.policyResult.decision, RefundDecision.Eligible);
   assert.ok(
-    result.reasons.some(
+    result.policyResult.reasons.some(
       (reason) =>
         reason.code === RefundReasonCode.MerchantExceptionRuleApplied,
     ),
   );
-  assert.equal(result.evidence.policyContext.matchedExceptionRuleTag, "loyalty_recovery");
+  assert.equal(result.policyResult.evidence.policyContext.matchedExceptionRuleTag, "loyalty_recovery");
 });

@@ -27,8 +27,9 @@ export const RecommendedRefundAction = {
 export type RecommendedRefundAction =
   (typeof RecommendedRefundAction)[keyof typeof RecommendedRefundAction];
 
-export interface CheckRefundEligibilityResult extends RefundPolicyResult {
+export interface CheckRefundEligibilityResult {
   orderId: string;
+  policyResult: RefundPolicyResult;
   // These are derived helper fields for AI and UI consumers. They do not change
   // the core refund-policy decision; they make common interpretations explicit.
   exceptionAvailable: boolean;
@@ -65,15 +66,19 @@ export async function checkRefundEligibility(
   deps: CheckRefundEligibilityDeps,
 ): Promise<CheckRefundEligibilityResult> {
   const context = await deps.adapter.loadRefundContext(input);
-  const result = evaluateRefundPolicy(context, deps.config ?? DEFAULT_POLICY);
+  const policyResult = evaluateRefundPolicy(
+    context,
+    deps.config ?? DEFAULT_POLICY,
+  );
 
   return {
     orderId: input.orderId,
-    ...result,
+    policyResult,
     // Keep AI-facing guidance explicit so clients do less inference from the
     // raw decision, reasons, and evidence payload.
-    exceptionAvailable: hasVipOverrideApplied(result),
-    escalationRequired: result.decision === RefundDecision.ManualReview,
-    recommendedNextAction: getRecommendedNextAction(result.decision),
+    exceptionAvailable: hasVipOverrideApplied(policyResult),
+    escalationRequired:
+      policyResult.decision === RefundDecision.ManualReview,
+    recommendedNextAction: getRecommendedNextAction(policyResult.decision),
   };
 }

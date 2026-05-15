@@ -18,48 +18,50 @@ function makeContext(): RefundAgentResponseContext {
       "Yes. This order looks eligible for a refund. Order is within the 30-day refund window.",
     result: {
       orderId: "gid://shopify/Order/1",
-      decision: RefundDecision.Eligible,
       exceptionAvailable: false,
       escalationRequired: false,
       recommendedNextAction: RecommendedRefundAction.Approve,
-      reasons: [
-        {
-          code: RefundReasonCode.WithinRefundWindow,
-          message: "Order is within the 30-day refund window.",
-        },
-      ],
-      evidence: {
-        order: {
-          id: "gid://shopify/Order/1",
-          name: "#1001",
-          createdAt: "2026-03-01T00:00:00.000Z",
-          ageDays: 7,
-          totalAmount: 48,
-          financialStatus: "paid",
-          tags: [],
-          flags: {
-            fraudHold: false,
-            manualReview: false,
-            vipOverride: false,
+      policyResult: {
+        decision: RefundDecision.Eligible,
+        reasons: [
+          {
+            code: RefundReasonCode.WithinRefundWindow,
+            message: "Order is within the 30-day refund window.",
+          },
+        ],
+        evidence: {
+          order: {
+            id: "gid://shopify/Order/1",
+            name: "#1001",
+            createdAt: "2026-03-01T00:00:00.000Z",
+            ageDays: 7,
+            totalAmount: 48,
+            financialStatus: "paid",
+            tags: [],
+            flags: {
+              fraudHold: false,
+              manualReview: false,
+              vipOverride: false,
+            },
+          },
+          policyContext: {
+            refundWindowDays: 30,
+            effectiveRefundWindowDays: 30,
+            cancelWindowDays: 30,
+            effectiveCancelWindowDays: 30,
+            matchedCategoryWindowCategories: [],
+          },
+          evaluatedOrder: {
+            effectiveFinancialStatus: "paid",
+            fulfillmentStatus: "fulfilled",
+            hasAnyReturnableFulfillment: true,
+            allLineItemsRefunded: false,
+            allLineItemsFinalSale: false,
+            itemCategories: [],
           },
         },
-        policyContext: {
-          refundWindowDays: 30,
-          effectiveRefundWindowDays: 30,
-          cancelWindowDays: 30,
-          effectiveCancelWindowDays: 30,
-          matchedCategoryWindowCategories: [],
-        },
-        evaluatedOrder: {
-          effectiveFinancialStatus: "paid",
-          fulfillmentStatus: "fulfilled",
-          hasAnyReturnableFulfillment: true,
-          allLineItemsRefunded: false,
-          allLineItemsFinalSale: false,
-          itemCategories: [],
-        },
+        itemEvaluations: [],
       },
-      itemEvaluations: [],
     },
   };
 }

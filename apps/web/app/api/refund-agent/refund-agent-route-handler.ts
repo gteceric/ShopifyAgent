@@ -87,9 +87,9 @@ export async function handleRefundAgentRequest(
     status: 200,
     body: {
       response,
-      decision: result.decision,
+      decision: result.policyResult.decision,
       recommendedNextAction: result.recommendedNextAction,
-      reasons: result.reasons.map((reason) => reason.message),
+      reasons: result.policyResult.reasons.map((reason) => reason.message),
       usedFallback,
       provider,
     },

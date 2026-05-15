@@ -1,6 +1,7 @@
 import {
   RefundDecision,
   RefundReasonCode,
+  type RefundPolicyLineItemEvaluation,
 } from "@shopify-agent/core";
 import type { CheckRefundEligibilityResult } from "@shopify-agent/core";
 
@@ -53,15 +54,15 @@ function hasReason(
   result: CheckRefundEligibilityResult,
   code: RefundReasonCode,
 ): boolean {
-  return result.reasons.some((reason) => reason.code === code);
+  return result.policyResult.reasons.some((reason) => reason.code === code);
 }
 
 function summarizeReasons(result: CheckRefundEligibilityResult): string {
-  return result.reasons.map((reason) => reason.message).join(" ");
+  return result.policyResult.reasons.map((reason) => reason.message).join(" ");
 }
 
 function hasMixedItemDecisions(result: CheckRefundEligibilityResult): boolean {
-  const itemDecisions = result.itemEvaluations.map(
+  const itemDecisions = result.policyResult.itemEvaluations.map(
     (itemEvaluation) => itemEvaluation.decision,
   );
 
@@ -73,14 +74,14 @@ function formatDecisionLabel(decision: RefundDecision): string {
 }
 
 function formatItemTitle(
-  itemEvaluation: CheckRefundEligibilityResult["itemEvaluations"][number],
+  itemEvaluation: RefundPolicyLineItemEvaluation,
   index: number,
 ): string {
   return itemEvaluation.evidence.evaluatedLineItem.title ?? `Item ${index + 1}`;
 }
 
 function summarizeItemDecision(
-  itemEvaluation: CheckRefundEligibilityResult["itemEvaluations"][number],
+  itemEvaluation: RefundPolicyLineItemEvaluation,
   index: number,
 ): string {
   const title = formatItemTitle(itemEvaluation, index);
@@ -95,7 +96,7 @@ function summarizeItemDecision(
 function summarizeMixedItemDecisions(
   result: CheckRefundEligibilityResult,
 ): string {
-  return `Item-level decisions: ${result.itemEvaluations
+  return `Item-level decisions: ${result.policyResult.itemEvaluations
     .map((itemEvaluation, index) =>
       summarizeItemDecision(itemEvaluation, index),
     )
@@ -112,7 +113,7 @@ function formatOpening(
     return "";
   }
 
-  switch (result.decision) {
+  switch (result.policyResult.decision) {
     case RefundDecision.Eligible:
       return hasReason(result, RefundReasonCode.VipOverrideApplied)
         ? "Yes, as an exception."
@@ -131,7 +132,7 @@ export function formatRefundEligibilityResponse(
   const opening = formatOpening(agentQuestion, result);
   const reasonSummary = summarizeReasons(result);
 
-  switch (result.decision) {
+  switch (result.policyResult.decision) {
     case RefundDecision.Eligible:
       if (hasReason(result, RefundReasonCode.VipOverrideApplied)) {
         return `${opening} ${REFUND_RESPONSE_COPY.eligibleException} ${reasonSummary} ${REFUND_RESPONSE_COPY.followupNoteOverride}`

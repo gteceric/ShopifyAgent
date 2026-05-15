@@ -32,8 +32,8 @@ function buildUserPrompt(context: RefundAgentResponseContext): string {
     "Write a short support reply for the following refund question.",
     "Use the fallback response as the safest baseline. You may improve fluency, but do not add new policy details.",
     `Question: ${context.agentQuestion}`,
-    `Tool decision: ${context.result.decision}`,
-    `Tool reasons: ${context.result.reasons.map((reason) => reason.message).join(" ")}`,
+    `Tool decision: ${context.result.policyResult.decision}`,
+    `Tool reasons: ${context.result.policyResult.reasons.map((reason) => reason.message).join(" ")}`,
     `Fallback response: ${context.fallbackResponse}`,
     `Structured tool result: ${JSON.stringify(context.result, null, 2)}`,
   ].join("\n\n");
