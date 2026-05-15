@@ -1,4 +1,9 @@
-import type { DashboardOrder } from "./mock-orders";
+import type {
+  DashboardItemEvaluationViewModel,
+  DashboardOrder,
+  DashboardRefundEvaluationViewModel,
+  RefundDecision,
+} from "./mock-orders";
 import {
   decisionPillClassName,
   getDecisionLabel,
@@ -8,6 +13,72 @@ interface OrdersTableBodyProps {
   orders: DashboardOrder[];
   selectedOrderId: string;
   onSelectOrder(orderId: string): void;
+}
+
+const decisionCountOrder: RefundDecision[] = [
+  "eligible",
+  "ineligible",
+  "manual_review",
+];
+
+function formatDecisionCount(
+  decision: RefundDecision,
+  count: number,
+): string {
+  const label = getDecisionLabel(decision).toLowerCase();
+
+  return `${count} ${label}`;
+}
+
+function getItemDecisionCounts(
+  itemEvaluations: DashboardItemEvaluationViewModel[] | undefined,
+): Map<RefundDecision, number> {
+  const counts = new Map<RefundDecision, number>();
+
+  for (const itemEvaluation of itemEvaluations ?? []) {
+    counts.set(
+      itemEvaluation.decision,
+      (counts.get(itemEvaluation.decision) ?? 0) + 1,
+    );
+  }
+
+  return counts;
+}
+
+export function hasMixedItemDecisions(
+  refundEvaluation: DashboardRefundEvaluationViewModel,
+): boolean {
+  return getItemDecisionCounts(refundEvaluation.itemEvaluations).size > 1;
+}
+
+export function getOrdersTableDecisionLabel(
+  refundEvaluation: DashboardRefundEvaluationViewModel,
+): string {
+  const decisionLabel = getDecisionLabel(refundEvaluation.decision);
+
+  if (!hasMixedItemDecisions(refundEvaluation)) {
+    return decisionLabel;
+  }
+
+  return `${decisionLabel} · Mixed items`;
+}
+
+export function getOrdersTableItemDecisionSummary(
+  refundEvaluation: DashboardRefundEvaluationViewModel,
+): string | undefined {
+  const counts = getItemDecisionCounts(refundEvaluation.itemEvaluations);
+
+  if (counts.size <= 1) {
+    return undefined;
+  }
+
+  return decisionCountOrder
+    .flatMap((decision) => {
+      const count = counts.get(decision);
+
+      return count ? [formatDecisionCount(decision, count)] : [];
+    })
+    .join(", ");
 }
 
 export function OrdersTableBody({
@@ -20,6 +91,8 @@ export function OrdersTableBody({
       {orders.map((order) => {
         const base = order.base;
         const refundEvaluation = order.refundEvaluation;
+        const itemDecisionSummary =
+          getOrdersTableItemDecisionSummary(refundEvaluation);
         const isSelected = selectedOrderId === base.id;
 
         return (
@@ -52,13 +125,18 @@ export function OrdersTableBody({
               <span
                 className={`inline-flex min-w-[108px] items-center justify-center rounded-full px-3 py-2 text-[11px] font-bold uppercase tracking-[0.12em] ${decisionPillClassName[refundEvaluation.decision]}`}
               >
-                {getDecisionLabel(refundEvaluation.decision)}
+                {getOrdersTableDecisionLabel(refundEvaluation)}
               </span>
             </td>
             <td className="hidden px-4 py-4 align-top md:table-cell">
               <p className="mb-1.5 font-semibold text-stone-950">
                 {refundEvaluation.reasonSummary}
               </p>
+              {itemDecisionSummary ? (
+                <p className="mb-1 text-sm font-medium text-stone-700">
+                  {itemDecisionSummary}
+                </p>
+              ) : null}
               <p className="text-sm text-stone-600">
                 {base.financialStatus} · {base.fulfillmentStatus}
               </p>
