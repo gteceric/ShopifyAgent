@@ -43,6 +43,19 @@ function assertPartialObject(
   }
 }
 
+function assertReasonCodes(
+  actualReasons: { code: RefundReasonCode }[],
+  expectedReasonCodes: RefundReasonCode[],
+  label: string,
+): void {
+  for (const expectedReasonCode of expectedReasonCodes) {
+    assert.ok(
+      actualReasons.some((reason) => reason.code === expectedReasonCode),
+      `Expected reason code ${expectedReasonCode} for ${label}`,
+    );
+  }
+}
+
 for (const scenario of REFUND_SCENARIO_MATRIX) {
   test(`scenario matrix: ${scenario.id}`, async () => {
     // Use the same application boundary as MCP/web callers, but inject a mock
@@ -73,12 +86,11 @@ for (const scenario of REFUND_SCENARIO_MATRIX) {
     );
 
     // Reasons are the human-readable policy explanation behind the outcome.
-    for (const expectedReasonCode of scenario.expectedReasonCodes) {
-      assert.ok(
-        result.policyResult.reasons.some((reason) => reason.code === expectedReasonCode),
-        `Expected reason code ${expectedReasonCode} for scenario ${scenario.id}`,
-      );
-    }
+    assertReasonCodes(
+      result.policyResult.reasons,
+      scenario.expectedReasonCodes,
+      `scenario ${scenario.id}`,
+    );
 
     // Evidence is the structured audit payload. Scenarios assert only the
     // evidence fields that are important to that case.
@@ -97,5 +109,35 @@ for (const scenario of REFUND_SCENARIO_MATRIX) {
       scenario.expectedEvidence?.evaluatedOrder,
       `evidence.evaluatedOrder for scenario ${scenario.id}`,
     );
+
+    for (const expectedItemEvaluation of
+      scenario.expectedItemEvaluations ?? []) {
+      const actualItemEvaluation = result.policyResult.itemEvaluations.find(
+        (itemEvaluation) =>
+          itemEvaluation.evidence.evaluatedLineItem.lineItemId ===
+          expectedItemEvaluation.lineItemId,
+      );
+
+      assert.ok(
+        actualItemEvaluation,
+        `Expected item evaluation ${expectedItemEvaluation.lineItemId} for scenario ${scenario.id}`,
+      );
+      assert.equal(
+        actualItemEvaluation.decision,
+        expectedItemEvaluation.decision,
+        `Expected item decision for ${expectedItemEvaluation.lineItemId}`,
+      );
+
+      assertReasonCodes(
+        actualItemEvaluation.reasons,
+        expectedItemEvaluation.reasonCodes ?? [],
+        `item ${expectedItemEvaluation.lineItemId} in scenario ${scenario.id}`,
+      );
+      assertPartialObject(
+        actualItemEvaluation.evidence.policyContext,
+        expectedItemEvaluation.policyContext,
+        `item policyContext for ${expectedItemEvaluation.lineItemId}`,
+      );
+    }
   });
 }

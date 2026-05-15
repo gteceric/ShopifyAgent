@@ -39,6 +39,7 @@ export const RefundScenarioId = {
   ManualReviewManualReviewFlag: "manual_review_manual_review_flag",
   IneligibleCategoryWindowOverride:
     "ineligible_category_window_override",
+  ManualReviewMixedItemDecisions: "manual_review_mixed_item_decisions",
   EligibleVipOverride: "eligible_vip_override",
 } as const;
 
@@ -49,6 +50,13 @@ type RefundScenarioExpectedEvidence = {
   order?: Partial<RefundPolicyOrderEvidence["order"]>;
   policyContext?: Partial<RefundPolicyOrderEvidence["policyContext"]>;
   evaluatedOrder?: Partial<RefundPolicyOrderEvidence["evaluatedOrder"]>;
+};
+
+type RefundScenarioExpectedItemEvaluation = {
+  lineItemId: string;
+  decision: RefundDecision;
+  reasonCodes?: RefundReasonCode[];
+  policyContext?: Partial<RefundPolicyOrderEvidence["policyContext"]>;
 };
 
 // Each scenario describes one merchant-facing refund situation. The test runner
@@ -64,6 +72,7 @@ export interface RefundScenario {
   expectedDecision: RefundDecision;
   expectedReasonCodes: RefundReasonCode[];
   expectedEvidence?: RefundScenarioExpectedEvidence;
+  expectedItemEvaluations?: RefundScenarioExpectedItemEvaluation[];
   expectedAgentBehavior: string;
 }
 
@@ -504,6 +513,92 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
     },
     expectedAgentBehavior:
       "Deny based on the stricter category-specific refund window, not the default policy window.",
+  },
+  {
+    id: RefundScenarioId.ManualReviewMixedItemDecisions,
+    description:
+      "Mixed item eligibility should route the order to manual review while preserving each line item's decision.",
+    agentQuestion:
+      "This order has one apparel item and one accessory. Can we approve the refund automatically?",
+    toolInput: { orderId: "gid://shopify/Order/910000000019" },
+    context: makeContext(
+      "gid://shopify/Order/910000000019",
+      "#3019",
+      {
+        ageDays: 20,
+        lineItems: [
+          {
+            lineItemId: "gid://shopify/LineItem/7000000000191",
+            fulfillmentLineItemId:
+              "gid://shopify/FulfillmentLineItem/8000000000191",
+            title: "Apparel item",
+            returnableQuantity: 1,
+            category: "apparel",
+            fulfillmentStatus: FulfillmentStatus.Fulfilled,
+            hasReturnableFulfillment: true,
+            alreadyRefunded: false,
+            finalSale: false,
+          },
+          {
+            lineItemId: "gid://shopify/LineItem/7000000000192",
+            fulfillmentLineItemId:
+              "gid://shopify/FulfillmentLineItem/8000000000192",
+            title: "Accessory item",
+            returnableQuantity: 1,
+            category: "accessories",
+            fulfillmentStatus: FulfillmentStatus.Fulfilled,
+            hasReturnableFulfillment: true,
+            alreadyRefunded: false,
+            finalSale: false,
+          },
+        ],
+      },
+    ),
+    config: {
+      refundWindowDays: 30,
+      cancelWindowDays: 30,
+      categoryWindowOverrides: [
+        { category: "apparel", refundWindowDays: 14 },
+      ],
+      alreadyRefundedDecision: RefundDecision.Ineligible,
+    },
+    expectedDecision: RefundDecision.ManualReview,
+    expectedReasonCodes: [
+      RefundReasonCode.MixedItemEligibilityReviewRequired,
+      RefundReasonCode.OutsideRefundWindow,
+      RefundReasonCode.WithinRefundWindow,
+    ],
+    expectedEvidence: {
+      policyContext: {
+        effectiveRefundWindowDays: 14,
+        matchedCategoryWindowCategories: ["apparel"],
+      },
+      evaluatedOrder: {
+        itemCategories: ["apparel", "accessories"],
+      },
+    },
+    expectedItemEvaluations: [
+      {
+        lineItemId: "gid://shopify/LineItem/7000000000191",
+        decision: RefundDecision.Ineligible,
+        reasonCodes: [RefundReasonCode.OutsideRefundWindow],
+        policyContext: {
+          effectiveRefundWindowDays: 14,
+          matchedCategoryWindowCategories: ["apparel"],
+        },
+      },
+      {
+        lineItemId: "gid://shopify/LineItem/7000000000192",
+        decision: RefundDecision.Eligible,
+        reasonCodes: [RefundReasonCode.WithinRefundWindow],
+        policyContext: {
+          effectiveRefundWindowDays: 30,
+          matchedCategoryWindowCategories: [],
+        },
+      },
+    ],
+    expectedAgentBehavior:
+      "Do not auto-approve the whole order; explain that one item is ineligible while the other item remains refundable.",
   },
   {
     id: RefundScenarioId.EligibleVipOverride,
