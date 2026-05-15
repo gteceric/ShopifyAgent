@@ -22,7 +22,7 @@ export interface DashboardOrderErrorState {
   message: string;
 }
 
-export const DASHBOARD_POLICY_CONFIG: RefundPolicyConfig = {
+const DEMO_MERCHANT_POLICY_CONFIG: RefundPolicyConfig = {
   refundWindowDays: 30,
   cancelWindowDays: 30,
   highValueOrderThreshold: 500,
@@ -30,6 +30,13 @@ export const DASHBOARD_POLICY_CONFIG: RefundPolicyConfig = {
   finalSaleUnfulfilledDecision: RefundDecision.Ineligible,
   unfulfilledOutsideWindowDecision: RefundDecision.ManualReview,
 };
+
+// Merchant refund policy should eventually be loaded from merchant-owned
+// settings storage. For now, the dashboard uses this demo merchant policy so
+// all refund checks still go through the same policy-loading boundary.
+export async function loadMerchantRefundPolicyConfig(): Promise<RefundPolicyConfig> {
+  return DEMO_MERCHANT_POLICY_CONFIG;
+}
 
 function formatStatusLabel(value: string): string {
   return value

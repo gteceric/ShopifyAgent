@@ -2,7 +2,7 @@ import {
   checkRefundEligibility,
   type RefundContextPlatformAdapter,
 } from "@shopify-agent/core";
-import { DASHBOARD_POLICY_CONFIG } from "../../dashboard-order-evaluation";
+import { loadMerchantRefundPolicyConfig } from "../../dashboard-order-evaluation";
 import { logger } from "../../logger";
 import type {
   RefundAgentErrorResponse,
@@ -39,11 +39,12 @@ export async function handleRefundAgentRequest(
   }
 
   const { orderId, question } = parsedRequest.data;
+  const merchantPolicyConfig = await loadMerchantRefundPolicyConfig();
   const result = await checkRefundEligibility(
     { orderId },
     {
       adapter: deps.adapter,
-      config: DASHBOARD_POLICY_CONFIG,
+      config: merchantPolicyConfig,
     },
   );
   const fallbackResponse = formatMerchantRefundAgentResponse(question, result);

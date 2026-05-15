@@ -6,7 +6,7 @@ import {
 import { Dashboard } from "./dashboard";
 import {
   applyRefundEvaluationToOrder,
-  DASHBOARD_POLICY_CONFIG,
+  loadMerchantRefundPolicyConfig,
   mapOrderSummaryToDashboardOrder,
   type DashboardOrderErrorState,
 } from "./dashboard-order-evaluation";
@@ -30,6 +30,7 @@ export default async function Home({ searchParams }: HomeProps) {
   const now = new Date();
   const allowMockOrdersFallback = shouldAllowMockOrdersFallback();
   const refundContextAdapter = createRefundContextAdapter();
+  const merchantPolicyConfig = await loadMerchantRefundPolicyConfig();
   let orders: DashboardOrder[] = [];
   let ordersLoadError: string | null = null;
   // Keep row-level refund-check failures separate from top-level order-feed
@@ -48,7 +49,7 @@ export default async function Home({ searchParams }: HomeProps) {
         orderSummaries.map((order) => {
           const refundEligibilityInput = { orderId: order.id };
           const refundEligibilityDeps = {
-            config: DASHBOARD_POLICY_CONFIG,
+            config: merchantPolicyConfig,
             adapter: refundContextAdapter,
           };
 
