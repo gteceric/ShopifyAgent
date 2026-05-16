@@ -362,3 +362,117 @@ test("maps multi-item Admin orders with item-level returnable and refund state",
     },
   ]);
 });
+
+test("maps Admin edge cases for unknown statuses, missing categories, and final-sale attributes", () => {
+  const result = mapAdminOrderToRefundContext(
+    {
+      id: "gid://shopify/Order/900000000304",
+      name: "#3004",
+      tags: ["  ", "edge-case"],
+      createdAt: "2026-03-28T00:00:00.000Z",
+      totalPriceSet: {
+        shopMoney: {
+          amount: undefined,
+        },
+      },
+      displayFinancialStatus: "AUTHORIZED_BUT_NOT_CAPTURED",
+      displayFulfillmentStatus: "WAITING_ON_SUPPLIER",
+      lineItems: {
+        nodes: [
+          {
+            id: "gid://shopify/LineItem/700000000004",
+            title: "Final Sale Gift Card",
+            currentQuantity: 1,
+            product: null,
+            customAttributes: [{ key: " finalsale ", value: " YES " }],
+          },
+          {
+            id: "gid://shopify/LineItem/700000000005",
+            title: "Uncategorized Mystery Item",
+            currentQuantity: 1,
+            product: {
+              category: {
+                fullName: null,
+              },
+            },
+            customAttributes: [{ key: "final_sale", value: "false" }],
+          },
+        ],
+      },
+      fraudHoldFlag: null,
+      manualReviewFlag: { value: "no" },
+      vipOverrideFlag: { value: "TRUE" },
+    },
+    {
+      returnableFulfillments: {
+        nodes: [
+          {
+            id: "gid://shopify/ReturnableFulfillment/2",
+            returnableFulfillmentLineItems: {
+              nodes: [
+                {
+                  quantity: 1,
+                  fulfillmentLineItem: {
+                    id: "gid://shopify/FulfillmentLineItem/800000000004",
+                    lineItem: {
+                      id: "gid://shopify/LineItem/700000000004",
+                    },
+                  },
+                },
+                {
+                  quantity: 0,
+                  fulfillmentLineItem: {
+                    id: "gid://shopify/FulfillmentLineItem/800000000005",
+                    lineItem: {
+                      id: "gid://shopify/LineItem/700000000005",
+                    },
+                  },
+                },
+                {
+                  quantity: 1,
+                  fulfillmentLineItem: null,
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    new Date("2026-03-30T00:00:00.000Z"),
+  );
+
+  assert.equal(result.order.financialStatus, FinancialStatus.Unknown);
+  assert.equal(result.order.totalAmount, 0);
+  assert.deepEqual(result.order.tags, ["edge-case"]);
+  assert.equal(result.order.flags?.fraudHold, false);
+  assert.equal(result.order.flags?.manualReview, false);
+  assert.equal(result.order.flags?.vipOverride, true);
+  assert.equal(result.lineItems.length, 2);
+
+  assert.equal(
+    result.lineItems[0]?.lineItemId,
+    "gid://shopify/LineItem/700000000004",
+  );
+  assert.equal(
+    result.lineItems[0]?.fulfillmentLineItemId,
+    "gid://shopify/FulfillmentLineItem/800000000004",
+  );
+  assert.equal(result.lineItems[0]?.returnableQuantity, 1);
+  assert.equal(result.lineItems[0]?.category, undefined);
+  assert.equal(result.lineItems[0]?.fulfillmentStatus, FulfillmentStatus.Unknown);
+  assert.equal(result.lineItems[0]?.hasReturnableFulfillment, true);
+  assert.equal(result.lineItems[0]?.alreadyRefunded, false);
+  assert.equal(result.lineItems[0]?.finalSale, true);
+
+  assert.equal(
+    result.lineItems[1]?.lineItemId,
+    "gid://shopify/LineItem/700000000005",
+  );
+  assert.equal(result.lineItems[1]?.fulfillmentLineItemId, undefined);
+  assert.equal(result.lineItems[1]?.returnableQuantity, 0);
+  assert.equal(result.lineItems[1]?.category, undefined);
+  assert.equal(result.lineItems[1]?.fulfillmentStatus, FulfillmentStatus.Unknown);
+  assert.equal(result.lineItems[1]?.hasReturnableFulfillment, false);
+  assert.equal(result.lineItems[1]?.alreadyRefunded, false);
+  assert.equal(result.lineItems[1]?.finalSale, false);
+});
