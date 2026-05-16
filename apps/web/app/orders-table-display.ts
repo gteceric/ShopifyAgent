@@ -16,8 +16,9 @@ function formatDecisionCount(
   count: number,
 ): string {
   const label = getDecisionLabel(decision).toLowerCase();
+  const itemLabel = count === 1 ? "item" : "items";
 
-  return `${count} ${label}`;
+  return `${count} ${label} ${itemLabel}`;
 }
 
 function getItemDecisionCounts(

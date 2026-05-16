@@ -45,7 +45,7 @@ test("adds mixed item context to orders table decision labels", () => {
   );
   assert.equal(
     getOrdersTableItemDecisionSummary(refundEvaluation),
-    "1 eligible, 1 ineligible",
+    "1 eligible item, 1 ineligible item",
   );
 });
 
