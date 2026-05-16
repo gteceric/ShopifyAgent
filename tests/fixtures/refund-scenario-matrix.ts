@@ -2,6 +2,7 @@ import type {
   CheckRefundEligibilityInput,
   RefundPolicyConfig,
   RefundPolicyOrderEvidence,
+  ResolvedPolicyContext,
   RefundContext,
   RefundContextLineItem,
 } from "@shopify-agent/core";
@@ -56,7 +57,7 @@ type RefundScenarioExpectedItemEvaluation = {
   lineItemId: string;
   decision: RefundDecision;
   reasonCodes?: RefundReasonCode[];
-  policyContext?: Partial<RefundPolicyOrderEvidence["policyContext"]>;
+  policyContext?: Partial<ResolvedPolicyContext>;
 };
 
 // Each scenario describes one merchant-facing refund situation. The test runner
