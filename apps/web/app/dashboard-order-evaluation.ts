@@ -207,6 +207,10 @@ function formatDecisionSummary(result: CheckRefundEligibilityResult): string {
     return "Payment status needs human review before refunding.";
   }
 
+  if (hasReason(result, RefundReasonCode.MixedItemEligibilityReviewRequired)) {
+    return "Mixed item eligibility requires human review.";
+  }
+
   return "A human reviewer needs to decide this refund.";
 }
 
@@ -222,6 +226,12 @@ function formatRecommendedAction(result: CheckRefundEligibilityResult): string {
     case RecommendedRefundAction.Deny:
       return "Decline the refund request with policy wording.";
     case RecommendedRefundAction.ManualReview:
+      if (
+        hasReason(result, RefundReasonCode.MixedItemEligibilityReviewRequired)
+      ) {
+        return "Review item-level eligibility before promising an outcome.";
+      }
+
       return "Escalate to a human reviewer before promising an outcome.";
   }
 }

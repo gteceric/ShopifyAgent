@@ -161,6 +161,14 @@ test("maps item evaluations into dashboard item view models", () => {
     makeRefundResult(),
   );
 
+  assert.equal(
+    dashboardOrder.refundEvaluation.reasonSummary,
+    "Mixed item eligibility requires human review.",
+  );
+  assert.equal(
+    dashboardOrder.refundEvaluation.recommendedNextAction,
+    "Review item-level eligibility before promising an outcome.",
+  );
   assert.deepEqual(dashboardOrder.refundEvaluation.itemEvaluations, [
     {
       lineItemId: "gid://shopify/LineItem/1",
