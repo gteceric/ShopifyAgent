@@ -7,7 +7,7 @@ import {
   getOrdersTableDecisionLabel,
   getOrdersTableItemDecisionSummary,
   hasMixedItemDecisions,
-} from "../app/orders-table-body.js";
+} from "../app/orders-table-display.js";
 
 function makeRefundEvaluation(
   itemDecisions: RefundDecision[],
