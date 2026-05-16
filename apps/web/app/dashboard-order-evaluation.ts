@@ -189,26 +189,35 @@ function formatDecisionSummary(result: CheckRefundEligibilityResult): string {
     return "Merchant policy blocks an automatic refund.";
   }
 
-  if (hasReason(result, RefundReasonCode.HighValueOrderReviewRequired)) {
-    return "High-value order crosses the merchant review threshold.";
-  }
+  // Priority list for the one-line manual-review summary shown in the dashboard.
+  const manualReviewSummaries = [
+    {
+      reasonCode: RefundReasonCode.MixedItemEligibilityReviewRequired,
+      summary: "Mixed item eligibility requires human review.",
+    },
+    {
+      reasonCode: RefundReasonCode.HighValueOrderReviewRequired,
+      summary: "High-value order crosses the merchant review threshold.",
+    },
+    {
+      reasonCode: RefundReasonCode.PreFulfillmentCancellationReviewRequired,
+      summary: "Late unfulfilled order needs a human decision.",
+    },
+    {
+      reasonCode: RefundReasonCode.PartialFulfillmentReviewRequired,
+      summary: "Partially fulfilled order needs manual review.",
+    },
+    {
+      reasonCode: RefundReasonCode.FinancialStatusReviewRequired,
+      summary: "Payment status needs human review before refunding.",
+    },
+  ];
+  const matchedSummary = manualReviewSummaries.find((item) =>
+    hasReason(result, item.reasonCode),
+  );
 
-  if (
-    hasReason(result, RefundReasonCode.PreFulfillmentCancellationReviewRequired)
-  ) {
-    return "Late unfulfilled order needs a human decision.";
-  }
-
-  if (hasReason(result, RefundReasonCode.PartialFulfillmentReviewRequired)) {
-    return "Partially fulfilled order needs manual review.";
-  }
-
-  if (hasReason(result, RefundReasonCode.FinancialStatusReviewRequired)) {
-    return "Payment status needs human review before refunding.";
-  }
-
-  if (hasReason(result, RefundReasonCode.MixedItemEligibilityReviewRequired)) {
-    return "Mixed item eligibility requires human review.";
+  if (matchedSummary) {
+    return matchedSummary.summary;
   }
 
   return "A human reviewer needs to decide this refund.";
