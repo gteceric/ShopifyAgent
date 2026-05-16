@@ -169,6 +169,14 @@ test("maps item evaluations into dashboard item view models", () => {
     dashboardOrder.refundEvaluation.recommendedNextAction,
     "Review item-level eligibility before promising an outcome.",
   );
+  assert.equal(
+    dashboardOrder.refundEvaluation.policyWindowLabel,
+    "14-day refund window",
+  );
+  assert.deepEqual(dashboardOrder.refundEvaluation.evidence.slice(0, 2), [
+    { label: "Order Age", value: "20 days" },
+    { label: "Refund Window", value: "14 days" },
+  ]);
   assert.deepEqual(dashboardOrder.refundEvaluation.itemEvaluations, [
     {
       lineItemId: "gid://shopify/LineItem/1",

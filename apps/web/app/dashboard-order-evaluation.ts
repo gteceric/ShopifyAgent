@@ -250,10 +250,10 @@ function formatPolicyLens(result: CheckRefundEligibilityResult): string {
   }
 
   if (evaluatedOrder.fulfillmentStatus === "unfulfilled") {
-    return `${policyContext.cancelWindowDays}-day cancellation and refund window`;
+    return `${policyContext.effectiveCancelWindowDays}-day cancellation and refund window`;
   }
 
-  return `${policyContext.refundWindowDays}-day refund window`;
+  return `${policyContext.effectiveRefundWindowDays}-day refund window`;
 }
 
 function buildEvidence(
@@ -279,8 +279,8 @@ function buildEvidence(
           : "Refund Window",
       value: `${
         evaluatedOrder.fulfillmentStatus === "unfulfilled"
-          ? policyContext.cancelWindowDays
-          : policyContext.refundWindowDays
+          ? policyContext.effectiveCancelWindowDays
+          : policyContext.effectiveRefundWindowDays
       } days`,
     },
     {
