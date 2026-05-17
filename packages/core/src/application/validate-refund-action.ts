@@ -47,7 +47,7 @@ export interface RefundActionBlocker {
   returnableQuantity?: number;
 }
 
-export interface RefundActionValidatedLineItem {
+export interface RefundActionMatchedLineItem {
   lineItemId: string;
   fulfillmentLineItemId?: string;
   title?: string;
@@ -59,7 +59,7 @@ export interface RefundActionValidatedLineItem {
 export interface RefundActionValidation {
   orderId: string;
   status: RefundActionValidationStatus;
-  validatedLineItems: RefundActionValidatedLineItem[];
+  matchedLineItems: RefundActionMatchedLineItem[];
   blockers: RefundActionBlocker[];
 }
 
@@ -121,7 +121,7 @@ export function validateRefundAction(
   eligibilityResult: CheckRefundEligibilityResult,
 ): RefundActionValidation {
   const blockers: RefundActionBlocker[] = [];
-  const validatedLineItems: RefundActionValidatedLineItem[] = [];
+  const matchedLineItems: RefundActionMatchedLineItem[] = [];
   const itemEvaluationsById = getLineItemEvaluationById(eligibilityResult);
   const requestedLineItemIds = new Set<string>();
 
@@ -207,7 +207,7 @@ export function validateRefundAction(
 
     const evaluatedLineItem = itemEvaluation.evidence.evaluatedLineItem;
 
-    validatedLineItems.push({
+    matchedLineItems.push({
       lineItemId: evaluatedLineItem.lineItemId,
       fulfillmentLineItemId: evaluatedLineItem.fulfillmentLineItemId,
       title: evaluatedLineItem.title,
@@ -257,7 +257,7 @@ export function validateRefundAction(
   return {
     orderId: request.orderId,
     status: resolveRefundActionValidationStatus(blockers),
-    validatedLineItems,
+    matchedLineItems,
     blockers,
   };
 }

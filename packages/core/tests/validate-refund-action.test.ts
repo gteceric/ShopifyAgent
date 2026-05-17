@@ -122,7 +122,7 @@ test("validates eligible returnable line items as ready for refund execution", (
 
   assert.equal(validation.status, RefundActionValidationStatus.Ready);
   assert.deepEqual(validation.blockers, []);
-  assert.deepEqual(validation.validatedLineItems, [
+  assert.deepEqual(validation.matchedLineItems, [
     {
       lineItemId: "gid://shopify/LineItem/700000000070",
       fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/800000000070",
@@ -312,7 +312,7 @@ test("blocks refund execution when requested line item is not in the eligibility
   );
 
   assert.equal(validation.status, RefundActionValidationStatus.Blocked);
-  assert.deepEqual(validation.validatedLineItems, []);
+  assert.deepEqual(validation.matchedLineItems, []);
   assert.deepEqual(validation.blockers, [
     {
       code: RefundActionBlockerCode.LineItemNotFound,
