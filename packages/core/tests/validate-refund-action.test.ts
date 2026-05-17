@@ -125,8 +125,7 @@ test("validates eligible returnable line items as ready for refund execution", (
   assert.deepEqual(validation.validatedLineItems, [
     {
       lineItemId: "gid://shopify/LineItem/700000000070",
-      fulfillmentLineItemId:
-        "gid://shopify/FulfillmentLineItem/800000000070",
+      fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/800000000070",
       title: "Returnable Shirt",
       requestedQuantity: 1,
       returnableQuantity: 2,
@@ -238,6 +237,31 @@ test("blocks refund execution for fractional and negative quantities", () => {
     validation.blockers.map((blocker) => blocker.requestedQuantity),
     [1.5, -1, undefined],
   );
+});
+
+test("blocks refund execution when requested line item is not in the eligibility result", () => {
+  const validation = validateRefundAction(
+    {
+      orderId: order.id,
+      lineItems: [
+        {
+          lineItemId: "gid://shopify/LineItem/700000000999", // request one is not found in makeEligibilityResult
+          quantity: 1,
+        },
+      ],
+    },
+    makeEligibilityResult(),
+  );
+
+  assert.equal(validation.status, RefundActionValidationStatus.Blocked);
+  assert.deepEqual(validation.validatedLineItems, []);
+  assert.deepEqual(validation.blockers, [
+    {
+      code: RefundActionBlockerCode.LineItemNotFound,
+      message: "Requested line item was not found in the eligibility result.",
+      lineItemId: "gid://shopify/LineItem/700000000999",
+    },
+  ]);
 });
 
 test("blocks refund execution when returnable fulfillment is unavailable", () => {
