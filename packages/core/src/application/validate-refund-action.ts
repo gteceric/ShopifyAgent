@@ -75,7 +75,7 @@ function makeBlocker(
   };
 }
 
-function getLineItemEvaluationById(
+function getLineItemEvaluationsById(
   eligibilityResult: CheckRefundEligibilityResult,
 ): Map<string, RefundPolicyLineItemEvaluation> {
   const itemEvaluationsById =
@@ -122,7 +122,7 @@ export function validateRefundAction(
 ): RefundActionValidation {
   const blockers: RefundActionBlocker[] = [];
   const matchedLineItems: RefundActionMatchedLineItem[] = [];
-  const itemEvaluationsById = getLineItemEvaluationById(eligibilityResult);
+  const itemEvaluationsById = getLineItemEvaluationsById(eligibilityResult);
   const requestedLineItemIds = new Set<string>();
 
   if (request.orderId !== eligibilityResult.orderId) {
