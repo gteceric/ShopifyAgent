@@ -162,6 +162,33 @@ test("requires review before refund execution for manual-review eligibility resu
   );
 });
 
+test("blocks refund execution for order-level ineligible eligibility results", () => {
+  const validation = validateRefundAction(
+    {
+      orderId: order.id,
+      lineItems: [
+        {
+          lineItemId: "gid://shopify/LineItem/700000000070",
+          quantity: 1,
+        },
+      ],
+    },
+    makeEligibilityResult({
+      recommendedNextAction: RecommendedRefundAction.Deny,
+      policyResult: {
+        ...makeEligibilityResult().policyResult,
+        decision: RefundDecision.Ineligible,
+      },
+    }),
+  );
+
+  assert.equal(validation.status, RefundActionValidationStatus.Blocked);
+  assert.equal(
+    validation.blockers[0]?.code,
+    RefundActionBlockerCode.OrderIneligible,
+  );
+});
+
 test("blocks refund execution when manual review also has invalid quantities", () => {
   const validation = validateRefundAction(
     {
