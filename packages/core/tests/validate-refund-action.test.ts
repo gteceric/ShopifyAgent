@@ -207,6 +207,39 @@ test("blocks refund execution for ineligible line items and invalid quantities",
   );
 });
 
+test("blocks refund execution for fractional and negative quantities", () => {
+  const validation = validateRefundAction(
+    {
+      orderId: order.id,
+      lineItems: [
+        {
+          lineItemId: "gid://shopify/LineItem/700000000070",
+          quantity: 1.5,
+        },
+        {
+          lineItemId: "gid://shopify/LineItem/700000000071",
+          quantity: -1,
+        },
+      ],
+    },
+    makeEligibilityResult(),
+  );
+
+  assert.equal(validation.status, RefundActionValidationStatus.Blocked);
+  assert.deepEqual(
+    validation.blockers.map((blocker) => blocker.code),
+    [
+      RefundActionBlockerCode.QuantityMustBePositiveInteger,
+      RefundActionBlockerCode.QuantityMustBePositiveInteger,
+      RefundActionBlockerCode.LineItemNotFound,
+    ],
+  );
+  assert.deepEqual(
+    validation.blockers.map((blocker) => blocker.requestedQuantity),
+    [1.5, -1, undefined],
+  );
+});
+
 test("blocks refund execution when returnable fulfillment is unavailable", () => {
   const eligibilityResult = makeEligibilityResult();
   const itemEvaluation = eligibilityResult.policyResult.itemEvaluations[0]!;
