@@ -1,4 +1,5 @@
 export * from "./application/check-refund-eligibility.js";
+export * from "./application/validate-refund-action.js";
 export * from "./application/refund-context-adapter.js";
 export * from "./domain/refund-policy.js";
 export * from "./domain/refund-policy.types.js";
