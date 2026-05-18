@@ -64,6 +64,19 @@ When an object literal represents meaningful domain data, assign it to a named v
 - Use the type annotation when it helps explain the role of the object.
 - Inline tiny objects only when the meaning is obvious and there is no domain concept worth naming.
 
+## Type Meaningful Objects Explicitly
+
+Use TypeScript inference for simple local values, but add explicit types for
+meaningful object shapes.
+
+- Let simple scalar or obvious derived values infer their type.
+- Add type annotations for request inputs, dependency objects, configs,
+  fixtures, view models, and domain objects.
+- Prefer explicit object types when building the object benefits from
+  autocomplete or when several objects have similar fields.
+- Avoid noisy annotations for values where the type is already obvious, such as
+  `const quantity = 1` or `const hasErrors = result.userErrors.length > 0`.
+
 ## Refund Decisions Are Item-Level
 
 Refund eligibility must be decided from line items, not only from an order-level summary.

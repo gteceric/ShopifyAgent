@@ -16,7 +16,7 @@ interface ShopifyRefundCreateInput {
   note?: string;
 }
 
-interface ShopifyRefundCreateMutationVariables {
+interface ShopifyRefundCreateMutationVariables extends Record<string, unknown> {
   input: ShopifyRefundCreateInput;
   idempotencyKey: string;
 }
