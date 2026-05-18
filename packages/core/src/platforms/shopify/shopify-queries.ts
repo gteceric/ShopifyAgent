@@ -68,6 +68,29 @@ export const REFUND_RETURNABLE_FULFILLMENTS_QUERY = /* GraphQL */ `
   }
 `;
 
+export const SHOPIFY_REFUND_CREATE_MUTATION = /* GraphQL */ `
+  mutation ShopifyRefundCreate($input: RefundInput!, $idempotencyKey: String!) {
+    refundCreate(input: $input) @idempotent(key: $idempotencyKey) {
+      refund {
+        id
+        totalRefundedSet {
+          presentmentMoney {
+            amount
+            currencyCode
+          }
+        }
+      }
+      order {
+        id
+      }
+      userErrors {
+        field
+        message
+      }
+    }
+  }
+`;
+
 export const SHOPIFY_ORDERS_LIST_QUERY = /* GraphQL */ `
   query ShopifyOrdersList($first: Int!) {
     orders(first: $first, sortKey: CREATED_AT, reverse: true) {
