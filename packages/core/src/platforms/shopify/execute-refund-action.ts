@@ -71,6 +71,12 @@ function shouldUseRealShopify(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.USE_REAL_SHOPIFY === "true";
 }
 
+function isRealRefundExecutionEnabled(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return env.ENABLE_REAL_REFUND_EXECUTION === "true";
+}
+
 function mapExecutedLineItems(
   validation: RefundActionValidation,
 ): ShopifyRefundActionExecutedLineItem[] {
@@ -184,6 +190,12 @@ export async function executeShopifyRefundAction(
     if (!hasShopifyAdminConfig(deps.env)) {
       throw new Error(
         "USE_REAL_SHOPIFY=true requires SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_TOKEN.",
+      );
+    }
+
+    if (!isRealRefundExecutionEnabled(deps.env)) {
+      throw new Error(
+        "Real Shopify refund execution requires ENABLE_REAL_REFUND_EXECUTION=true.",
       );
     }
 

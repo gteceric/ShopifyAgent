@@ -98,6 +98,7 @@ test("executes Shopify refundCreate through Admin GraphQL when real Shopify is e
   const deps: ExecuteShopifyRefundActionDeps = {
     env: {
       USE_REAL_SHOPIFY: "true",
+      ENABLE_REAL_REFUND_EXECUTION: "true",
       SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
       SHOPIFY_ADMIN_TOKEN: "shpat_test",
     },
@@ -166,6 +167,7 @@ test("returns failed result when Shopify refundCreate returns user errors", asyn
   const deps: ExecuteShopifyRefundActionDeps = {
     env: {
       USE_REAL_SHOPIFY: "true",
+      ENABLE_REAL_REFUND_EXECUTION: "true",
       SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
       SHOPIFY_ADMIN_TOKEN: "shpat_test",
     },
@@ -198,5 +200,28 @@ test("throws when real Shopify refund execution is requested without admin confi
   await assert.rejects(
     () => executeShopifyRefundAction(input, deps),
     /USE_REAL_SHOPIFY=true requires SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_TOKEN\./,
+  );
+});
+
+test("throws when real Shopify refund execution is not explicitly enabled", async () => {
+  const fetchImpl: typeof fetch = async () => {
+    throw new Error("Disabled real refund execution should not call fetch.");
+  };
+  const input: ExecuteShopifyRefundActionInput = {
+    validation: readyValidation,
+    idempotencyKey: "refund-action-910000000070-700000000070",
+  };
+  const deps: ExecuteShopifyRefundActionDeps = {
+    env: {
+      USE_REAL_SHOPIFY: "true",
+      SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
+      SHOPIFY_ADMIN_TOKEN: "shpat_test",
+    },
+    fetchImpl,
+  };
+
+  await assert.rejects(
+    () => executeShopifyRefundAction(input, deps),
+    /ENABLE_REAL_REFUND_EXECUTION=true/,
   );
 });
