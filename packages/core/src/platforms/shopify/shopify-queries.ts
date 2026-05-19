@@ -91,6 +91,103 @@ export const SHOPIFY_REFUND_CREATE_MUTATION = /* GraphQL */ `
   }
 `;
 
+export const SHOPIFY_SUGGESTED_REFUND_QUERY = /* GraphQL */ `
+  query ShopifySuggestedRefund(
+    $orderId: ID!
+    $refundLineItems: [RefundLineItemInput!]
+  ) {
+    order(id: $orderId) {
+      id
+      suggestedRefund(refundLineItems: $refundLineItems) {
+        amountSet {
+          shopMoney {
+            amount
+            currencyCode
+          }
+          presentmentMoney {
+            amount
+            currencyCode
+          }
+        }
+        maximumRefundableSet {
+          shopMoney {
+            amount
+            currencyCode
+          }
+          presentmentMoney {
+            amount
+            currencyCode
+          }
+        }
+        subtotalSet {
+          shopMoney {
+            amount
+            currencyCode
+          }
+          presentmentMoney {
+            amount
+            currencyCode
+          }
+        }
+        totalTaxSet {
+          shopMoney {
+            amount
+            currencyCode
+          }
+          presentmentMoney {
+            amount
+            currencyCode
+          }
+        }
+        refundLineItems {
+          lineItem {
+            id
+            title
+          }
+          quantity
+          priceSet {
+            shopMoney {
+              amount
+              currencyCode
+            }
+            presentmentMoney {
+              amount
+              currencyCode
+            }
+          }
+        }
+        suggestedTransactions {
+          kind
+          gateway
+          amountSet {
+            shopMoney {
+              amount
+              currencyCode
+            }
+            presentmentMoney {
+              amount
+              currencyCode
+            }
+          }
+          maximumRefundableSet {
+            shopMoney {
+              amount
+              currencyCode
+            }
+            presentmentMoney {
+              amount
+              currencyCode
+            }
+          }
+          parentTransaction {
+            id
+          }
+        }
+      }
+    }
+  }
+`;
+
 export const SHOPIFY_ORDERS_LIST_QUERY = /* GraphQL */ `
   query ShopifyOrdersList($first: Int!) {
     orders(first: $first, sortKey: CREATED_AT, reverse: true) {
