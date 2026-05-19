@@ -91,38 +91,6 @@ export const SHOPIFY_REFUND_CREATE_MUTATION = /* GraphQL */ `
   }
 `;
 
-export const SHOPIFY_ORDER_TRANSACTIONS_QUERY = /* GraphQL */ `
-  query ShopifyOrderTransactions($orderId: ID!, $first: Int!) {
-    order(id: $orderId) {
-      id
-      transactions(first: $first) {
-        id
-        kind
-        status
-        gateway
-        test
-        parentTransaction {
-          id
-        }
-        amountSet {
-          shopMoney {
-            amount
-            currencyCode
-          }
-          presentmentMoney {
-            amount
-            currencyCode
-          }
-        }
-        maximumRefundableV2 {
-          amount
-          currencyCode
-        }
-      }
-    }
-  }
-`;
-
 export const SHOPIFY_ORDERS_LIST_QUERY = /* GraphQL */ `
   query ShopifyOrdersList($first: Int!) {
     orders(first: $first, sortKey: CREATED_AT, reverse: true) {
