@@ -9,10 +9,18 @@ interface ShopifyRefundCreateLineItemInput {
   quantity: number;
 }
 
+interface ShopifyRefundTransactionInput {
+  orderId: string;
+  parentId: string;
+  gateway: string;
+  kind: "REFUND";
+  amount: string;
+}
+
 interface ShopifyRefundCreateInput {
   orderId: string;
   refundLineItems: ShopifyRefundCreateLineItemInput[];
-  transactions: [];
+  transactions: ShopifyRefundTransactionInput[];
   note?: string;
 }
 
@@ -53,13 +61,14 @@ export function buildShopifyRefundCreateGraphqlRequest(
     );
   }
 
+  const refundTransactionInputs: ShopifyRefundTransactionInput[] = [];
   const input: ShopifyRefundCreateInput = {
     orderId: validation.orderId,
     refundLineItems: validation.matchedLineItems.map((lineItem) => ({
       lineItemId: lineItem.lineItemId,
       quantity: lineItem.requestedQuantity,
     })),
-    transactions: [],
+    transactions: refundTransactionInputs,
     ...(options.note ? { note: options.note } : {}),
   };
 
