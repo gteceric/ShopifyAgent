@@ -4,6 +4,7 @@ import {
   hasShopifyAdminConfig,
   shopifyAdminFetch,
 } from "./shopify-admin.js";
+import type { ShopifyAdminFetchOptions } from "./shopify-admin.js";
 
 export const ShopifyRefundActionExecutionStatus = {
   Succeeded: "succeeded",
@@ -165,7 +166,7 @@ async function executeRealShopifyRefundAction(
   input: ExecuteShopifyRefundActionInput,
   deps: ExecuteShopifyRefundActionDeps,
 ): Promise<ShopifyRefundActionResult> {
-  const shopifyAdminOptions = {
+  const shopifyAdminOptions: ShopifyAdminFetchOptions = {
     env: deps.env,
     fetchImpl: deps.fetchImpl,
   };
