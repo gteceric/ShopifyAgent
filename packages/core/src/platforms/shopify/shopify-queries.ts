@@ -107,8 +107,8 @@ export const SHOPIFY_REFUND_CREATE_MUTATION = /* GraphQL */ `
   }
 `;
 
-export const SHOPIFY_SUGGESTED_REFUND_QUERY = /* GraphQL */ `
-  query ShopifySuggestedRefund(
+export const SHOPIFY_REFUND_PREVIEW_QUERY = /* GraphQL */ `
+  query ShopifyRefundPreview(
     $orderId: ID!
     $refundLineItems: [RefundLineItemInput!]
   ) {

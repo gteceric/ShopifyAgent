@@ -2,12 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  loadShopifySuggestedRefund,
-  type LoadShopifySuggestedRefundDeps,
-  type LoadShopifySuggestedRefundInput,
+  previewShopifyRefund,
+  type PreviewShopifyRefundDeps,
+  type PreviewShopifyRefundInput,
 } from "../src/index.js";
 
-test("loads Shopify suggested refund for selected line items", async () => {
+test("loads Shopify refund preview for selected line items", async () => {
   let capturedRequestBody: unknown;
   const fetchImpl: typeof fetch = async (_url, init) => {
     capturedRequestBody = JSON.parse(String(init?.body));
@@ -133,7 +133,7 @@ test("loads Shopify suggested refund for selected line items", async () => {
       },
     );
   };
-  const input: LoadShopifySuggestedRefundInput = {
+  const input: PreviewShopifyRefundInput = {
     orderId: "gid://shopify/Order/910000000080",
     refundLineItems: [
       {
@@ -146,7 +146,7 @@ test("loads Shopify suggested refund for selected line items", async () => {
       },
     ],
   };
-  const deps: LoadShopifySuggestedRefundDeps = {
+  const deps: PreviewShopifyRefundDeps = {
     env: {
       SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
       SHOPIFY_ADMIN_TOKEN: "shpat_test",
@@ -154,7 +154,7 @@ test("loads Shopify suggested refund for selected line items", async () => {
     fetchImpl,
   };
 
-  const suggestedRefund = await loadShopifySuggestedRefund(input, deps);
+  const refundPreview = await previewShopifyRefund(input, deps);
 
   const requestBody = capturedRequestBody as {
     query: string;
@@ -174,7 +174,7 @@ test("loads Shopify suggested refund for selected line items", async () => {
       },
     ],
   });
-  assert.deepEqual(suggestedRefund, {
+  assert.deepEqual(refundPreview, {
     orderId: "gid://shopify/Order/910000000080",
     amount: {
       shopMoney: {
@@ -278,7 +278,7 @@ test("loads Shopify suggested refund for selected line items", async () => {
   });
 });
 
-test("throws when Shopify suggested refund response has no order", async () => {
+test("throws when Shopify refund preview response has no order", async () => {
   const fetchImpl: typeof fetch = async () =>
     new Response(
       JSON.stringify({
@@ -291,7 +291,7 @@ test("throws when Shopify suggested refund response has no order", async () => {
         headers: { "Content-Type": "application/json" },
       },
     );
-  const input: LoadShopifySuggestedRefundInput = {
+  const input: PreviewShopifyRefundInput = {
     orderId: "gid://shopify/Order/910000000081",
     refundLineItems: [
       {
@@ -300,7 +300,7 @@ test("throws when Shopify suggested refund response has no order", async () => {
       },
     ],
   };
-  const deps: LoadShopifySuggestedRefundDeps = {
+  const deps: PreviewShopifyRefundDeps = {
     env: {
       SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
       SHOPIFY_ADMIN_TOKEN: "shpat_test",
@@ -309,12 +309,12 @@ test("throws when Shopify suggested refund response has no order", async () => {
   };
 
   await assert.rejects(
-    () => loadShopifySuggestedRefund(input, deps),
+    () => previewShopifyRefund(input, deps),
     /was not found/,
   );
 });
 
-test("throws when Shopify order does not return a suggested refund", async () => {
+test("throws when Shopify order does not return a refund preview", async () => {
   const fetchImpl: typeof fetch = async () =>
     new Response(
       JSON.stringify({
@@ -330,7 +330,7 @@ test("throws when Shopify order does not return a suggested refund", async () =>
         headers: { "Content-Type": "application/json" },
       },
     );
-  const input: LoadShopifySuggestedRefundInput = {
+  const input: PreviewShopifyRefundInput = {
     orderId: "gid://shopify/Order/910000000082",
     refundLineItems: [
       {
@@ -339,7 +339,7 @@ test("throws when Shopify order does not return a suggested refund", async () =>
       },
     ],
   };
-  const deps: LoadShopifySuggestedRefundDeps = {
+  const deps: PreviewShopifyRefundDeps = {
     env: {
       SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
       SHOPIFY_ADMIN_TOKEN: "shpat_test",
@@ -348,7 +348,7 @@ test("throws when Shopify order does not return a suggested refund", async () =>
   };
 
   await assert.rejects(
-    () => loadShopifySuggestedRefund(input, deps),
-    /did not return a suggested refund/,
+    () => previewShopifyRefund(input, deps),
+    /did not return a refund preview/,
   );
 });

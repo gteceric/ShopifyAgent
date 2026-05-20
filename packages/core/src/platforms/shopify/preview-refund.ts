@@ -1,60 +1,60 @@
 import { shopifyAdminFetch } from "./shopify-admin.js";
 import type { ShopifyAdminFetchOptions } from "./shopify-admin.js";
-import { SHOPIFY_SUGGESTED_REFUND_QUERY } from "./shopify-queries.js";
+import { SHOPIFY_REFUND_PREVIEW_QUERY } from "./shopify-queries.js";
 
-export interface SuggestedRefundLineItemInput {
+export interface RefundPreviewLineItemInput {
   lineItemId: string;
   quantity: number;
 }
 
-export interface LoadShopifySuggestedRefundInput {
+export interface PreviewShopifyRefundInput {
   orderId: string;
-  refundLineItems: SuggestedRefundLineItemInput[];
+  refundLineItems: RefundPreviewLineItemInput[];
 }
 
-export interface LoadShopifySuggestedRefundDeps {
+export interface PreviewShopifyRefundDeps {
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
 }
 
-export interface SuggestedRefundMoney {
+export interface RefundPreviewMoney {
   amount: string;
   currencyCode: string;
 }
 
-export interface SuggestedRefundMoneyBag {
-  shopMoney: SuggestedRefundMoney;
-  presentmentMoney: SuggestedRefundMoney;
+export interface RefundPreviewMoneyBag {
+  shopMoney: RefundPreviewMoney;
+  presentmentMoney: RefundPreviewMoney;
 }
 
-export interface ShopifySuggestedRefundLineItem {
+export interface ShopifyRefundPreviewLineItem {
   lineItemId: string;
   title?: string;
   quantity: number;
-  price: SuggestedRefundMoneyBag;
+  price: RefundPreviewMoneyBag;
 }
 
-export interface ShopifySuggestedRefundTransaction {
+export interface ShopifyRefundPreviewTransaction {
   kind: string;
   gateway: string;
-  amount: SuggestedRefundMoneyBag;
+  amount: RefundPreviewMoneyBag;
   parentTransactionId?: string;
-  maximumRefundable?: SuggestedRefundMoneyBag;
+  maximumRefundable?: RefundPreviewMoneyBag;
 }
 
-export interface ShopifySuggestedRefund {
+export interface ShopifyRefundPreview {
   orderId: string;
-  amount: SuggestedRefundMoneyBag;
-  maximumRefundable: SuggestedRefundMoneyBag;
-  subtotal: SuggestedRefundMoneyBag;
-  totalTax: SuggestedRefundMoneyBag;
-  refundLineItems: ShopifySuggestedRefundLineItem[];
-  suggestedTransactions: ShopifySuggestedRefundTransaction[];
+  amount: RefundPreviewMoneyBag;
+  maximumRefundable: RefundPreviewMoneyBag;
+  subtotal: RefundPreviewMoneyBag;
+  totalTax: RefundPreviewMoneyBag;
+  refundLineItems: ShopifyRefundPreviewLineItem[];
+  suggestedTransactions: ShopifyRefundPreviewTransaction[];
 }
 
-interface ShopifySuggestedRefundVariables extends Record<string, unknown> {
+interface ShopifyRefundPreviewVariables extends Record<string, unknown> {
   orderId: string;
-  refundLineItems: SuggestedRefundLineItemInput[];
+  refundLineItems: RefundPreviewLineItemInput[];
 }
 
 interface ShopifyAdminMoney {
@@ -95,55 +95,55 @@ interface ShopifyAdminSuggestedRefund {
   suggestedTransactions: ShopifyAdminSuggestedRefundTransaction[];
 }
 
-interface ShopifySuggestedRefundResponse {
+interface ShopifyRefundPreviewResponse {
   order?: {
     id: string;
     suggestedRefund?: ShopifyAdminSuggestedRefund | null;
   } | null;
 }
 
-function mapSuggestedRefundMoney(
+function mapRefundPreviewMoney(
   money: ShopifyAdminMoney,
-): SuggestedRefundMoney {
+): RefundPreviewMoney {
   return {
     amount: money.amount,
     currencyCode: money.currencyCode,
   };
 }
 
-function mapSuggestedRefundMoneyBag(
+function mapRefundPreviewMoneyBag(
   moneyBag: ShopifyAdminMoneyBag,
-): SuggestedRefundMoneyBag {
+): RefundPreviewMoneyBag {
   return {
-    shopMoney: mapSuggestedRefundMoney(moneyBag.shopMoney),
-    presentmentMoney: mapSuggestedRefundMoney(moneyBag.presentmentMoney),
+    shopMoney: mapRefundPreviewMoney(moneyBag.shopMoney),
+    presentmentMoney: mapRefundPreviewMoney(moneyBag.presentmentMoney),
   };
 }
 
-function mapSuggestedRefundLineItem(
+function mapRefundPreviewLineItem(
   lineItem: ShopifyAdminSuggestedRefundLineItem,
-): ShopifySuggestedRefundLineItem {
+): ShopifyRefundPreviewLineItem {
   return {
     lineItemId: lineItem.lineItem.id,
     ...(lineItem.lineItem.title ? { title: lineItem.lineItem.title } : {}),
     quantity: lineItem.quantity,
-    price: mapSuggestedRefundMoneyBag(lineItem.priceSet),
+    price: mapRefundPreviewMoneyBag(lineItem.priceSet),
   };
 }
 
-function mapSuggestedRefundTransaction(
+function mapRefundPreviewTransaction(
   transaction: ShopifyAdminSuggestedRefundTransaction,
-): ShopifySuggestedRefundTransaction {
+): ShopifyRefundPreviewTransaction {
   return {
     kind: transaction.kind,
     gateway: transaction.gateway,
-    amount: mapSuggestedRefundMoneyBag(transaction.amountSet),
+    amount: mapRefundPreviewMoneyBag(transaction.amountSet),
     ...(transaction.parentTransaction?.id
       ? { parentTransactionId: transaction.parentTransaction.id }
       : {}),
     ...(transaction.maximumRefundableSet
       ? {
-          maximumRefundable: mapSuggestedRefundMoneyBag(
+          maximumRefundable: mapRefundPreviewMoneyBag(
             transaction.maximumRefundableSet,
           ),
         }
@@ -151,32 +151,32 @@ function mapSuggestedRefundTransaction(
   };
 }
 
-function mapSuggestedRefund(
+function mapRefundPreview(
   orderId: string,
   suggestedRefund: ShopifyAdminSuggestedRefund,
-): ShopifySuggestedRefund {
+): ShopifyRefundPreview {
   return {
     orderId,
-    amount: mapSuggestedRefundMoneyBag(suggestedRefund.amountSet),
-    maximumRefundable: mapSuggestedRefundMoneyBag(
+    amount: mapRefundPreviewMoneyBag(suggestedRefund.amountSet),
+    maximumRefundable: mapRefundPreviewMoneyBag(
       suggestedRefund.maximumRefundableSet,
     ),
-    subtotal: mapSuggestedRefundMoneyBag(suggestedRefund.subtotalSet),
-    totalTax: mapSuggestedRefundMoneyBag(suggestedRefund.totalTaxSet),
+    subtotal: mapRefundPreviewMoneyBag(suggestedRefund.subtotalSet),
+    totalTax: mapRefundPreviewMoneyBag(suggestedRefund.totalTaxSet),
     refundLineItems: suggestedRefund.refundLineItems.map(
-      mapSuggestedRefundLineItem,
+      mapRefundPreviewLineItem,
     ),
     suggestedTransactions: suggestedRefund.suggestedTransactions.map(
-      mapSuggestedRefundTransaction,
+      mapRefundPreviewTransaction,
     ),
   };
 }
 
-export async function loadShopifySuggestedRefund(
-  input: LoadShopifySuggestedRefundInput,
-  deps: LoadShopifySuggestedRefundDeps = {},
-): Promise<ShopifySuggestedRefund> {
-  const variables: ShopifySuggestedRefundVariables = {
+export async function previewShopifyRefund(
+  input: PreviewShopifyRefundInput,
+  deps: PreviewShopifyRefundDeps = {},
+): Promise<ShopifyRefundPreview> {
+  const variables: ShopifyRefundPreviewVariables = {
     orderId: input.orderId,
     refundLineItems: input.refundLineItems,
   };
@@ -184,8 +184,8 @@ export async function loadShopifySuggestedRefund(
     env: deps.env,
     fetchImpl: deps.fetchImpl,
   };
-  const response = await shopifyAdminFetch<ShopifySuggestedRefundResponse>(
-    SHOPIFY_SUGGESTED_REFUND_QUERY,
+  const response = await shopifyAdminFetch<ShopifyRefundPreviewResponse>(
+    SHOPIFY_REFUND_PREVIEW_QUERY,
     variables,
     shopifyAdminOptions,
   );
@@ -196,9 +196,9 @@ export async function loadShopifySuggestedRefund(
 
   if (!response.order.suggestedRefund) {
     throw new Error(
-      `Shopify order ${input.orderId} did not return a suggested refund.`,
+      `Shopify order ${input.orderId} did not return a refund preview.`,
     );
   }
 
-  return mapSuggestedRefund(response.order.id, response.order.suggestedRefund);
+  return mapRefundPreview(response.order.id, response.order.suggestedRefund);
 }

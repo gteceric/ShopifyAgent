@@ -8,7 +8,7 @@ import {
 } from "../src/index.js";
 import type {
   ResolveRefundTransactionInputsInput,
-  ShopifySuggestedRefund,
+  ShopifyRefundPreview,
 } from "../src/index.js";
 import { RefundDecision } from "../src/domain/refund-policy.types.js";
 
@@ -97,8 +97,8 @@ test("builds Shopify refundCreate GraphQL request for multiple line items", () =
   ]);
 });
 
-test("builds refund transaction inputs from Shopify suggested refund", () => {
-  const suggestedRefund: ShopifySuggestedRefund = {
+test("builds refund transaction inputs from Shopify refund preview", () => {
+  const refundPreview: ShopifyRefundPreview = {
     orderId: "gid://shopify/Order/910000000070",
     amount: {
       shopMoney: {
@@ -161,7 +161,7 @@ test("builds refund transaction inputs from Shopify suggested refund", () => {
   };
   const input: ResolveRefundTransactionInputsInput = {
     orderId: "gid://shopify/Order/910000000070",
-    suggestedRefund,
+    refundPreview,
   };
 
   const refundTransactionInputs = resolveRefundTransactionInputs(input);
@@ -178,7 +178,7 @@ test("builds refund transaction inputs from Shopify suggested refund", () => {
 });
 
 test("does not build refund transaction inputs without suggested transactions", () => {
-  const suggestedRefund: ShopifySuggestedRefund = {
+  const refundPreview: ShopifyRefundPreview = {
     orderId: "gid://shopify/Order/910000000070",
     amount: {
       shopMoney: {
@@ -225,7 +225,7 @@ test("does not build refund transaction inputs without suggested transactions", 
   };
   const input: ResolveRefundTransactionInputsInput = {
     orderId: "gid://shopify/Order/910000000070",
-    suggestedRefund,
+    refundPreview,
   };
 
   assert.throws(
@@ -235,7 +235,7 @@ test("does not build refund transaction inputs without suggested transactions", 
 });
 
 test("does not build refund transaction inputs without a parent transaction", () => {
-  const suggestedRefund: ShopifySuggestedRefund = {
+  const refundPreview: ShopifyRefundPreview = {
     orderId: "gid://shopify/Order/910000000070",
     amount: {
       shopMoney: {
@@ -297,7 +297,7 @@ test("does not build refund transaction inputs without a parent transaction", ()
   };
   const input: ResolveRefundTransactionInputsInput = {
     orderId: "gid://shopify/Order/910000000070",
-    suggestedRefund,
+    refundPreview,
   };
 
   assert.throws(

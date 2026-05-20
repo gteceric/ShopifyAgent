@@ -5,10 +5,10 @@ import {
   type ResolveRefundTransactionInputsInput,
 } from "./build-refund-create-request.js";
 import {
-  loadShopifySuggestedRefund,
-  type LoadShopifySuggestedRefundDeps,
-  type LoadShopifySuggestedRefundInput,
-} from "./load-suggested-refund.js";
+  previewShopifyRefund,
+  type PreviewShopifyRefundDeps,
+  type PreviewShopifyRefundInput,
+} from "./preview-refund.js";
 import {
   hasShopifyAdminConfig,
   shopifyAdminFetch,
@@ -248,24 +248,24 @@ async function executeRealShopifyRefundAction(
   input: ExecuteShopifyRefundActionInput,
   deps: ExecuteShopifyRefundActionDeps,
 ): Promise<ShopifyRefundActionResult> {
-  const suggestedRefundInput: LoadShopifySuggestedRefundInput = {
+  const refundPreviewInput: PreviewShopifyRefundInput = {
     orderId: input.validation.orderId,
     refundLineItems: input.validation.matchedLineItems.map((lineItem) => ({
       lineItemId: lineItem.lineItemId,
       quantity: lineItem.requestedQuantity,
     })),
   };
-  const suggestedRefundDeps: LoadShopifySuggestedRefundDeps = {
+  const refundPreviewDeps: PreviewShopifyRefundDeps = {
     env: deps.env,
     fetchImpl: deps.fetchImpl,
   };
-  const suggestedRefund = await loadShopifySuggestedRefund(
-    suggestedRefundInput,
-    suggestedRefundDeps,
+  const refundPreview = await previewShopifyRefund(
+    refundPreviewInput,
+    refundPreviewDeps,
   );
   const refundTransactionInput: ResolveRefundTransactionInputsInput = {
     orderId: input.validation.orderId,
-    suggestedRefund,
+    refundPreview,
   };
   const refundTransactionInputs =
     resolveRefundTransactionInputs(refundTransactionInput);

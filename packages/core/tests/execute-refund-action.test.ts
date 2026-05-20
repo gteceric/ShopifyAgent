@@ -104,7 +104,7 @@ test("uses mock Shopify refund execution for multiple line items", async () => {
   ]);
 });
 
-test("executes Shopify refundCreate from Shopify suggested refund", async () => {
+test("executes Shopify refundCreate from Shopify refund preview", async () => {
   const capturedRequestBodies: Array<{
     query: string;
     variables: unknown;
@@ -116,7 +116,7 @@ test("executes Shopify refundCreate from Shopify suggested refund", async () => 
     };
     capturedRequestBodies.push(requestBody);
 
-    if (requestBody.query.includes("ShopifySuggestedRefund")) {
+    if (requestBody.query.includes("ShopifyRefundPreview")) {
       return new Response(
         JSON.stringify({
           data: {
@@ -344,7 +344,7 @@ test("returns pending when Shopify refund transaction is pending", async () => {
       query: string;
     };
 
-    if (requestBody.query.includes("ShopifySuggestedRefund")) {
+    if (requestBody.query.includes("ShopifyRefundPreview")) {
       return new Response(
         JSON.stringify({
           data: {

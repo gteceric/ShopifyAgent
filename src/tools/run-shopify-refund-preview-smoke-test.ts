@@ -2,14 +2,14 @@ import {
   checkRefundEligibility,
   createPolicyConfig,
   createShopifyAdminRefundContextAdapter,
-  loadShopifySuggestedRefund,
+  previewShopifyRefund,
   RefundDecision,
 } from "@shopify-agent/core";
 import type {
   CheckRefundEligibilityDeps,
   CheckRefundEligibilityInput,
-  LoadShopifySuggestedRefundDeps,
-  LoadShopifySuggestedRefundInput,
+  PreviewShopifyRefundDeps,
+  PreviewShopifyRefundInput,
   RefundPolicyLineItemEvaluation,
 } from "@shopify-agent/core";
 
@@ -17,7 +17,7 @@ function readRequiredEnv(name: string): string {
   const value = process.env[name]?.trim();
 
   if (!value) {
-    throw new Error(`${name} is required for the suggested refund smoke test.`);
+    throw new Error(`${name} is required for the refund preview smoke test.`);
   }
 
   return value;
@@ -123,7 +123,7 @@ function readSmokeRefundQuantities(itemCount: number): number[] {
 function requireRealShopifySmokeTestFlag(): void {
   if (process.env.USE_REAL_SHOPIFY !== "true") {
     throw new Error(
-      "Suggested refund smoke test requires USE_REAL_SHOPIFY=true.",
+      "Refund preview smoke test requires USE_REAL_SHOPIFY=true.",
     );
   }
 }
@@ -166,7 +166,7 @@ function selectSmokeRefundLineItem(
   const selectedItem = eligibleItems[selectedIndex];
 
   if (!selectedItem) {
-    console.log("Suggested refund smoke test item evaluations");
+    console.log("Refund preview smoke test item evaluations");
     console.log(
       JSON.stringify(formatSmokeRefundItemEvaluations(itemEvaluations), null, 2),
     );
@@ -194,7 +194,7 @@ function selectSmokeRefundLineItems(
 
     if (selectedLineItemIds.has(lineItemId)) {
       throw new Error(
-        `Suggested refund smoke selected the same line item more than once: ${lineItemId}.`,
+        `Refund preview smoke selected the same line item more than once: ${lineItemId}.`,
       );
     }
 
@@ -225,20 +225,20 @@ async function main(): Promise<void> {
     selectedItemIndexes,
     quantities,
   );
-  const suggestedRefundInput: LoadShopifySuggestedRefundInput = {
+  const refundPreviewInput: PreviewShopifyRefundInput = {
     orderId,
     refundLineItems: selectedItemEvaluations.map((itemEvaluation, index) => ({
       lineItemId: itemEvaluation.evidence.evaluatedLineItem.lineItemId,
       quantity: quantities[index]!,
     })),
   };
-  const suggestedRefundDeps: LoadShopifySuggestedRefundDeps = {};
-  const suggestedRefund = await loadShopifySuggestedRefund(
-    suggestedRefundInput,
-    suggestedRefundDeps,
+  const refundPreviewDeps: PreviewShopifyRefundDeps = {};
+  const refundPreview = await previewShopifyRefund(
+    refundPreviewInput,
+    refundPreviewDeps,
   );
 
-  console.log("Suggested refund smoke test input");
+  console.log("Refund preview smoke test input");
   console.log(
     JSON.stringify(
       {
@@ -265,12 +265,12 @@ async function main(): Promise<void> {
     ),
   );
 
-  console.log("Suggested refund smoke test result");
-  console.log(JSON.stringify(suggestedRefund, null, 2));
+  console.log("Refund preview smoke test result");
+  console.log(JSON.stringify(refundPreview, null, 2));
 }
 
 main().catch((error: unknown) => {
-  console.error("Failed to run Shopify suggested refund smoke test.");
+  console.error("Failed to run Shopify refund preview smoke test.");
   console.error(error);
   process.exitCode = 1;
 });
