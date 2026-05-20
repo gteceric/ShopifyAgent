@@ -79,6 +79,22 @@ export const SHOPIFY_REFUND_CREATE_MUTATION = /* GraphQL */ `
             currencyCode
           }
         }
+        transactions(first: 10) {
+          edges {
+            node {
+              id
+              kind
+              gateway
+              status
+              amountSet {
+                presentmentMoney {
+                  amount
+                  currencyCode
+                }
+              }
+            }
+          }
+        }
       }
       order {
         id

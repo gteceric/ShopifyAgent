@@ -2,6 +2,10 @@ import {
   RefundActionValidationStatus,
   type RefundActionValidation,
 } from "../../application/validate-refund-action.js";
+import type {
+  ShopifySuggestedRefund,
+  ShopifySuggestedRefundTransaction,
+} from "./load-suggested-refund.js";
 import { SHOPIFY_REFUND_CREATE_MUTATION } from "./shopify-queries.js";
 
 interface ShopifyRefundCreateLineItemInput {
@@ -32,6 +36,11 @@ interface ShopifyRefundCreateMutationVariables extends Record<string, unknown> {
 export interface ShopifyRefundCreateGraphqlRequest {
   query: string;
   variables: ShopifyRefundCreateMutationVariables;
+}
+
+export interface BuildRefundTransactionInputsFromSuggestedRefundInput {
+  orderId: string;
+  suggestedRefund: ShopifySuggestedRefund;
 }
 
 export function buildShopifyRefundCreateGraphqlRequest(
@@ -80,4 +89,37 @@ export function buildShopifyRefundCreateGraphqlRequest(
       idempotencyKey,
     },
   };
+}
+
+function mapSuggestedTransactionToRefundTransactionInput(
+  orderId: string,
+  transaction: ShopifySuggestedRefundTransaction,
+): ShopifyRefundTransactionInput {
+  if (!transaction.parentTransactionId) {
+    throw new Error(
+      "Cannot build refund transaction input because Shopify did not return a parent transaction.",
+    );
+  }
+
+  return {
+    orderId,
+    parentId: transaction.parentTransactionId,
+    gateway: transaction.gateway,
+    kind: "REFUND",
+    amount: transaction.amount.shopMoney.amount,
+  };
+}
+
+export function buildRefundTransactionInputsFromSuggestedRefund(
+  input: BuildRefundTransactionInputsFromSuggestedRefundInput,
+): ShopifyRefundTransactionInput[] {
+  if (input.suggestedRefund.suggestedTransactions.length === 0) {
+    throw new Error(
+      "Cannot build refund transaction inputs because Shopify did not return suggested transactions.",
+    );
+  }
+
+  return input.suggestedRefund.suggestedTransactions.map((transaction) =>
+    mapSuggestedTransactionToRefundTransactionInput(input.orderId, transaction),
+  );
 }

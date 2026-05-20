@@ -1,9 +1,23 @@
 import type { RefundActionValidation } from "../../application/validate-refund-action.js";
-import { buildShopifyRefundCreateGraphqlRequest } from "./build-refund-create-request.js";
-import { hasShopifyAdminConfig } from "./shopify-admin.js";
+import {
+  buildRefundTransactionInputsFromSuggestedRefund,
+  buildShopifyRefundCreateGraphqlRequest,
+  type BuildRefundTransactionInputsFromSuggestedRefundInput,
+} from "./build-refund-create-request.js";
+import {
+  loadShopifySuggestedRefund,
+  type LoadShopifySuggestedRefundDeps,
+  type LoadShopifySuggestedRefundInput,
+} from "./load-suggested-refund.js";
+import {
+  hasShopifyAdminConfig,
+  shopifyAdminFetch,
+} from "./shopify-admin.js";
+import type { ShopifyAdminFetchOptions } from "./shopify-admin.js";
 
 export const ShopifyRefundActionExecutionStatus = {
   Succeeded: "succeeded",
+  Pending: "pending",
   Failed: "failed",
 } as const;
 
@@ -32,6 +46,17 @@ export interface ShopifyRefundActionUserError {
   message: string;
 }
 
+export interface ShopifyRefundActionTransaction {
+  id: string;
+  kind: string;
+  gateway: string;
+  status: string;
+  amount: {
+    amount: string;
+    currencyCode: string;
+  };
+}
+
 export interface ShopifyRefundActionResult {
   orderId: string;
   status: ShopifyRefundActionExecutionStatus;
@@ -43,7 +68,42 @@ export interface ShopifyRefundActionResult {
     currencyCode: string;
   };
   lineItems: ShopifyRefundActionExecutedLineItem[];
+  refundTransactions?: ShopifyRefundActionTransaction[];
   userErrors: ShopifyRefundActionUserError[];
+}
+
+interface ShopifyRefundCreateResponse {
+  refundCreate: {
+    refund?: {
+      id: string;
+      totalRefundedSet?: {
+        presentmentMoney?: {
+          amount?: string | null;
+          currencyCode?: string | null;
+        } | null;
+      } | null;
+      transactions?: {
+        edges: Array<{
+          node: {
+            id: string;
+            kind: string;
+            gateway: string;
+            status: string;
+            amountSet: {
+              presentmentMoney: {
+                amount: string;
+                currencyCode: string;
+              };
+            };
+          };
+        }>;
+      } | null;
+    } | null;
+    order?: {
+      id: string;
+    } | null;
+    userErrors: ShopifyRefundActionUserError[];
+  };
 }
 
 function shouldUseRealShopify(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -87,10 +147,145 @@ function executeMockShopifyRefundAction(
   };
 }
 
-async function executeRealShopifyRefundAction(): Promise<ShopifyRefundActionResult> {
-  throw new Error(
-    "Real Shopify refund execution requires suggestedRefund wiring before refundCreate.",
+function mapShopifyRefundTransactions(
+  refund: NonNullable<ShopifyRefundCreateResponse["refundCreate"]["refund"]>,
+): ShopifyRefundActionTransaction[] {
+  return (
+    refund.transactions?.edges.map(({ node }) => ({
+      id: node.id,
+      kind: node.kind,
+      gateway: node.gateway,
+      status: node.status,
+      amount: {
+        amount: node.amountSet.presentmentMoney.amount,
+        currencyCode: node.amountSet.presentmentMoney.currencyCode,
+      },
+    })) ?? []
   );
+}
+
+function deriveRefundActionExecutionStatus(
+  refundTransactions: ShopifyRefundActionTransaction[],
+): ShopifyRefundActionExecutionStatus {
+  if (refundTransactions.length === 0) {
+    return ShopifyRefundActionExecutionStatus.Succeeded;
+  }
+
+  if (
+    refundTransactions.some((transaction) =>
+      ["FAILURE", "ERROR"].includes(transaction.status),
+    )
+  ) {
+    return ShopifyRefundActionExecutionStatus.Failed;
+  }
+
+  if (
+    refundTransactions.some((transaction) => transaction.status === "PENDING")
+  ) {
+    return ShopifyRefundActionExecutionStatus.Pending;
+  }
+
+  return ShopifyRefundActionExecutionStatus.Succeeded;
+}
+
+function mapShopifyRefundActionResult(
+  input: ExecuteShopifyRefundActionInput,
+  response: ShopifyRefundCreateResponse,
+): ShopifyRefundActionResult {
+  const payload = response.refundCreate;
+  const refund = payload.refund ?? undefined;
+  const refundedMoney = refund?.totalRefundedSet?.presentmentMoney;
+  const refundTransactions = refund ? mapShopifyRefundTransactions(refund) : [];
+  const executionStatus = deriveRefundActionExecutionStatus(refundTransactions);
+
+  if (payload.userErrors.length > 0) {
+    return {
+      orderId: input.validation.orderId,
+      status: ShopifyRefundActionExecutionStatus.Failed,
+      idempotencyKey: input.idempotencyKey,
+      source: "shopify",
+      lineItems: mapExecutedLineItems(input.validation),
+      userErrors: payload.userErrors,
+    };
+  }
+
+  if (!refund) {
+    return {
+      orderId: input.validation.orderId,
+      status: ShopifyRefundActionExecutionStatus.Failed,
+      idempotencyKey: input.idempotencyKey,
+      source: "shopify",
+      lineItems: mapExecutedLineItems(input.validation),
+      userErrors: [
+        {
+          message: "Shopify refundCreate did not return a refund.",
+        },
+      ],
+    };
+  }
+
+  return {
+    orderId: payload.order?.id ?? input.validation.orderId,
+    status: executionStatus,
+    idempotencyKey: input.idempotencyKey,
+    source: "shopify",
+    refundId: refund.id,
+    ...(refundedMoney?.amount && refundedMoney.currencyCode
+      ? {
+          totalRefunded: {
+            amount: refundedMoney.amount,
+            currencyCode: refundedMoney.currencyCode,
+          },
+        }
+      : {}),
+    lineItems: mapExecutedLineItems(input.validation),
+    ...(refundTransactions.length > 0 ? { refundTransactions } : {}),
+    userErrors: [],
+  };
+}
+
+async function executeRealShopifyRefundAction(
+  input: ExecuteShopifyRefundActionInput,
+  deps: ExecuteShopifyRefundActionDeps,
+): Promise<ShopifyRefundActionResult> {
+  const suggestedRefundInput: LoadShopifySuggestedRefundInput = {
+    orderId: input.validation.orderId,
+    refundLineItems: input.validation.matchedLineItems.map((lineItem) => ({
+      lineItemId: lineItem.lineItemId,
+      quantity: lineItem.requestedQuantity,
+    })),
+  };
+  const suggestedRefundDeps: LoadShopifySuggestedRefundDeps = {
+    env: deps.env,
+    fetchImpl: deps.fetchImpl,
+  };
+  const suggestedRefund = await loadShopifySuggestedRefund(
+    suggestedRefundInput,
+    suggestedRefundDeps,
+  );
+  const refundTransactionInput: BuildRefundTransactionInputsFromSuggestedRefundInput =
+    {
+      orderId: input.validation.orderId,
+      suggestedRefund,
+    };
+  const refundTransactionInputs =
+    buildRefundTransactionInputsFromSuggestedRefund(refundTransactionInput);
+  const request = buildShopifyRefundCreateGraphqlRequest(input.validation, {
+    idempotencyKey: input.idempotencyKey,
+    refundTransactionInputs,
+    note: input.note,
+  });
+  const shopifyAdminOptions: ShopifyAdminFetchOptions = {
+    env: deps.env,
+    fetchImpl: deps.fetchImpl,
+  };
+  const response = await shopifyAdminFetch<ShopifyRefundCreateResponse>(
+    request.query,
+    request.variables,
+    shopifyAdminOptions,
+  );
+
+  return mapShopifyRefundActionResult(input, response);
 }
 
 export async function executeShopifyRefundAction(
@@ -110,7 +305,7 @@ export async function executeShopifyRefundAction(
       );
     }
 
-    return executeRealShopifyRefundAction();
+    return executeRealShopifyRefundAction(input, deps);
   }
 
   return executeMockShopifyRefundAction(input);

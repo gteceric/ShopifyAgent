@@ -2,8 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildRefundTransactionInputsFromSuggestedRefund,
   buildShopifyRefundCreateGraphqlRequest,
   RefundActionValidationStatus,
+} from "../src/index.js";
+import type {
+  BuildRefundTransactionInputsFromSuggestedRefundInput,
+  ShopifySuggestedRefund,
 } from "../src/index.js";
 import { RefundDecision } from "../src/domain/refund-policy.types.js";
 
@@ -55,6 +60,216 @@ test("builds Shopify refundCreate GraphQL request from ready refund action valid
       note: "Customer requested a refund.",
     },
   });
+});
+
+test("builds refund transaction inputs from Shopify suggested refund", () => {
+  const suggestedRefund: ShopifySuggestedRefund = {
+    orderId: "gid://shopify/Order/910000000070",
+    amount: {
+      shopMoney: {
+        amount: "54.99",
+        currencyCode: "HKD",
+      },
+      presentmentMoney: {
+        amount: "54.99",
+        currencyCode: "HKD",
+      },
+    },
+    maximumRefundable: {
+      shopMoney: {
+        amount: "54.99",
+        currencyCode: "HKD",
+      },
+      presentmentMoney: {
+        amount: "54.99",
+        currencyCode: "HKD",
+      },
+    },
+    subtotal: {
+      shopMoney: {
+        amount: "54.99",
+        currencyCode: "HKD",
+      },
+      presentmentMoney: {
+        amount: "54.99",
+        currencyCode: "HKD",
+      },
+    },
+    totalTax: {
+      shopMoney: {
+        amount: "0.0",
+        currencyCode: "HKD",
+      },
+      presentmentMoney: {
+        amount: "0.0",
+        currencyCode: "HKD",
+      },
+    },
+    refundLineItems: [],
+    suggestedTransactions: [
+      {
+        kind: "SUGGESTED_REFUND",
+        gateway: "shopify_payments",
+        amount: {
+          shopMoney: {
+            amount: "54.99",
+            currencyCode: "HKD",
+          },
+          presentmentMoney: {
+            amount: "54.99",
+            currencyCode: "HKD",
+          },
+        },
+        parentTransactionId: "gid://shopify/OrderTransaction/700000000001",
+      },
+    ],
+  };
+  const input: BuildRefundTransactionInputsFromSuggestedRefundInput = {
+    orderId: "gid://shopify/Order/910000000070",
+    suggestedRefund,
+  };
+
+  const refundTransactionInputs =
+    buildRefundTransactionInputsFromSuggestedRefund(input);
+
+  assert.deepEqual(refundTransactionInputs, [
+    {
+      orderId: "gid://shopify/Order/910000000070",
+      parentId: "gid://shopify/OrderTransaction/700000000001",
+      gateway: "shopify_payments",
+      kind: "REFUND",
+      amount: "54.99",
+    },
+  ]);
+});
+
+test("does not build refund transaction inputs without suggested transactions", () => {
+  const suggestedRefund: ShopifySuggestedRefund = {
+    orderId: "gid://shopify/Order/910000000070",
+    amount: {
+      shopMoney: {
+        amount: "0.0",
+        currencyCode: "HKD",
+      },
+      presentmentMoney: {
+        amount: "0.0",
+        currencyCode: "HKD",
+      },
+    },
+    maximumRefundable: {
+      shopMoney: {
+        amount: "0.0",
+        currencyCode: "HKD",
+      },
+      presentmentMoney: {
+        amount: "0.0",
+        currencyCode: "HKD",
+      },
+    },
+    subtotal: {
+      shopMoney: {
+        amount: "0.0",
+        currencyCode: "HKD",
+      },
+      presentmentMoney: {
+        amount: "0.0",
+        currencyCode: "HKD",
+      },
+    },
+    totalTax: {
+      shopMoney: {
+        amount: "0.0",
+        currencyCode: "HKD",
+      },
+      presentmentMoney: {
+        amount: "0.0",
+        currencyCode: "HKD",
+      },
+    },
+    refundLineItems: [],
+    suggestedTransactions: [],
+  };
+  const input: BuildRefundTransactionInputsFromSuggestedRefundInput = {
+    orderId: "gid://shopify/Order/910000000070",
+    suggestedRefund,
+  };
+
+  assert.throws(
+    () => buildRefundTransactionInputsFromSuggestedRefund(input),
+    /did not return suggested transactions/,
+  );
+});
+
+test("does not build refund transaction inputs without a parent transaction", () => {
+  const suggestedRefund: ShopifySuggestedRefund = {
+    orderId: "gid://shopify/Order/910000000070",
+    amount: {
+      shopMoney: {
+        amount: "54.99",
+        currencyCode: "HKD",
+      },
+      presentmentMoney: {
+        amount: "54.99",
+        currencyCode: "HKD",
+      },
+    },
+    maximumRefundable: {
+      shopMoney: {
+        amount: "54.99",
+        currencyCode: "HKD",
+      },
+      presentmentMoney: {
+        amount: "54.99",
+        currencyCode: "HKD",
+      },
+    },
+    subtotal: {
+      shopMoney: {
+        amount: "54.99",
+        currencyCode: "HKD",
+      },
+      presentmentMoney: {
+        amount: "54.99",
+        currencyCode: "HKD",
+      },
+    },
+    totalTax: {
+      shopMoney: {
+        amount: "0.0",
+        currencyCode: "HKD",
+      },
+      presentmentMoney: {
+        amount: "0.0",
+        currencyCode: "HKD",
+      },
+    },
+    refundLineItems: [],
+    suggestedTransactions: [
+      {
+        kind: "SUGGESTED_REFUND",
+        gateway: "shopify_payments",
+        amount: {
+          shopMoney: {
+            amount: "54.99",
+            currencyCode: "HKD",
+          },
+          presentmentMoney: {
+            amount: "54.99",
+            currencyCode: "HKD",
+          },
+        },
+      },
+    ],
+  };
+  const input: BuildRefundTransactionInputsFromSuggestedRefundInput = {
+    orderId: "gid://shopify/Order/910000000070",
+    suggestedRefund,
+  };
+
+  assert.throws(
+    () => buildRefundTransactionInputsFromSuggestedRefund(input),
+    /parent transaction/,
+  );
 });
 
 test("does not build Shopify refundCreate request when validation is blocked", () => {
