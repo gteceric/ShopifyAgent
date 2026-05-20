@@ -2,12 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  buildRefundTransactionInputsFromSuggestedRefund,
   buildShopifyRefundCreateGraphqlRequest,
   RefundActionValidationStatus,
+  resolveRefundTransactionInputs,
 } from "../src/index.js";
 import type {
-  BuildRefundTransactionInputsFromSuggestedRefundInput,
+  ResolveRefundTransactionInputsInput,
   ShopifySuggestedRefund,
 } from "../src/index.js";
 import { RefundDecision } from "../src/domain/refund-policy.types.js";
@@ -124,13 +124,12 @@ test("builds refund transaction inputs from Shopify suggested refund", () => {
       },
     ],
   };
-  const input: BuildRefundTransactionInputsFromSuggestedRefundInput = {
+  const input: ResolveRefundTransactionInputsInput = {
     orderId: "gid://shopify/Order/910000000070",
     suggestedRefund,
   };
 
-  const refundTransactionInputs =
-    buildRefundTransactionInputsFromSuggestedRefund(input);
+  const refundTransactionInputs = resolveRefundTransactionInputs(input);
 
   assert.deepEqual(refundTransactionInputs, [
     {
@@ -189,13 +188,13 @@ test("does not build refund transaction inputs without suggested transactions", 
     refundLineItems: [],
     suggestedTransactions: [],
   };
-  const input: BuildRefundTransactionInputsFromSuggestedRefundInput = {
+  const input: ResolveRefundTransactionInputsInput = {
     orderId: "gid://shopify/Order/910000000070",
     suggestedRefund,
   };
 
   assert.throws(
-    () => buildRefundTransactionInputsFromSuggestedRefund(input),
+    () => resolveRefundTransactionInputs(input),
     /did not return suggested transactions/,
   );
 });
@@ -261,13 +260,13 @@ test("does not build refund transaction inputs without a parent transaction", ()
       },
     ],
   };
-  const input: BuildRefundTransactionInputsFromSuggestedRefundInput = {
+  const input: ResolveRefundTransactionInputsInput = {
     orderId: "gid://shopify/Order/910000000070",
     suggestedRefund,
   };
 
   assert.throws(
-    () => buildRefundTransactionInputsFromSuggestedRefund(input),
+    () => resolveRefundTransactionInputs(input),
     /parent transaction/,
   );
 });

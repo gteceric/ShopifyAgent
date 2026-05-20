@@ -1,8 +1,8 @@
 import type { RefundActionValidation } from "../../application/validate-refund-action.js";
 import {
-  buildRefundTransactionInputsFromSuggestedRefund,
   buildShopifyRefundCreateGraphqlRequest,
-  type BuildRefundTransactionInputsFromSuggestedRefundInput,
+  resolveRefundTransactionInputs,
+  type ResolveRefundTransactionInputsInput,
 } from "./build-refund-create-request.js";
 import {
   loadShopifySuggestedRefund,
@@ -263,13 +263,12 @@ async function executeRealShopifyRefundAction(
     suggestedRefundInput,
     suggestedRefundDeps,
   );
-  const refundTransactionInput: BuildRefundTransactionInputsFromSuggestedRefundInput =
-    {
-      orderId: input.validation.orderId,
-      suggestedRefund,
-    };
+  const refundTransactionInput: ResolveRefundTransactionInputsInput = {
+    orderId: input.validation.orderId,
+    suggestedRefund,
+  };
   const refundTransactionInputs =
-    buildRefundTransactionInputsFromSuggestedRefund(refundTransactionInput);
+    resolveRefundTransactionInputs(refundTransactionInput);
   const request = buildShopifyRefundCreateGraphqlRequest(input.validation, {
     idempotencyKey: input.idempotencyKey,
     refundTransactionInputs,

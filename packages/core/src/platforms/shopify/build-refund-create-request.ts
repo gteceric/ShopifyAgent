@@ -38,7 +38,7 @@ export interface ShopifyRefundCreateGraphqlRequest {
   variables: ShopifyRefundCreateMutationVariables;
 }
 
-export interface BuildRefundTransactionInputsFromSuggestedRefundInput {
+export interface ResolveRefundTransactionInputsInput {
   orderId: string;
   suggestedRefund: ShopifySuggestedRefund;
 }
@@ -110,8 +110,8 @@ function mapSuggestedTransactionToRefundTransactionInput(
   };
 }
 
-export function buildRefundTransactionInputsFromSuggestedRefund(
-  input: BuildRefundTransactionInputsFromSuggestedRefundInput,
+export function resolveRefundTransactionInputs(
+  input: ResolveRefundTransactionInputsInput,
 ): ShopifyRefundTransactionInput[] {
   if (input.suggestedRefund.suggestedTransactions.length === 0) {
     throw new Error(
