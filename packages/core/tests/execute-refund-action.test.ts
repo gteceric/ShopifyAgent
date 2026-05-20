@@ -26,6 +26,21 @@ const readyValidation = {
   ],
 };
 
+const multiItemReadyValidation = {
+  ...readyValidation,
+  matchedLineItems: [
+    ...readyValidation.matchedLineItems,
+    {
+      lineItemId: "gid://shopify/LineItem/700000000071",
+      fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/800000000071",
+      title: "Returnable Pants",
+      requestedQuantity: 2,
+      returnableQuantity: 3,
+      decision: RefundDecision.Eligible,
+    },
+  ],
+};
+
 test("uses mock Shopify refund execution when real Shopify is disabled", async () => {
   const fetchImpl: typeof fetch = async () => {
     throw new Error("Mock refund execution should not call fetch.");
@@ -57,6 +72,36 @@ test("uses mock Shopify refund execution when real Shopify is disabled", async (
     },
   ]);
   assert.deepEqual(result.userErrors, []);
+});
+
+test("uses mock Shopify refund execution for multiple line items", async () => {
+  const fetchImpl: typeof fetch = async () => {
+    throw new Error("Mock refund execution should not call fetch.");
+  };
+  const input: ExecuteShopifyRefundActionInput = {
+    validation: multiItemReadyValidation,
+    idempotencyKey: "refund-action-910000000070-multi-item",
+  };
+  const deps: ExecuteShopifyRefundActionDeps = {
+    env: {},
+    fetchImpl,
+  };
+
+  const result = await executeShopifyRefundAction(input, deps);
+
+  assert.equal(result.status, ShopifyRefundActionExecutionStatus.Succeeded);
+  assert.deepEqual(result.lineItems, [
+    {
+      lineItemId: "gid://shopify/LineItem/700000000070",
+      quantity: 1,
+      title: "Returnable Shirt",
+    },
+    {
+      lineItemId: "gid://shopify/LineItem/700000000071",
+      quantity: 2,
+      title: "Returnable Pants",
+    },
+  ]);
 });
 
 test("executes Shopify refundCreate from Shopify suggested refund", async () => {

@@ -134,6 +134,70 @@ test("validates eligible returnable line items as ready for refund execution", (
   ]);
 });
 
+test("validates multiple eligible returnable line items as ready for refund execution", () => {
+  const eligibilityResult = makeEligibilityResult();
+  const firstItemEvaluation = eligibilityResult.policyResult.itemEvaluations[0]!;
+  const validation = validateRefundAction(
+    {
+      orderId: order.id,
+      lineItems: [
+        {
+          lineItemId: "gid://shopify/LineItem/700000000070",
+          quantity: 1,
+        },
+        {
+          lineItemId: "gid://shopify/LineItem/700000000071",
+          quantity: 2,
+        },
+      ],
+    },
+    {
+      ...eligibilityResult,
+      policyResult: {
+        ...eligibilityResult.policyResult,
+        itemEvaluations: [
+          firstItemEvaluation,
+          {
+            ...firstItemEvaluation,
+            evidence: {
+              ...firstItemEvaluation.evidence,
+              evaluatedLineItem: {
+                ...firstItemEvaluation.evidence.evaluatedLineItem,
+                lineItemId: "gid://shopify/LineItem/700000000071",
+                fulfillmentLineItemId:
+                  "gid://shopify/FulfillmentLineItem/800000000071",
+                title: "Returnable Pants",
+                returnableQuantity: 3,
+              },
+            },
+          },
+        ],
+      },
+    },
+  );
+
+  assert.equal(validation.status, RefundActionValidationStatus.Ready);
+  assert.deepEqual(validation.blockers, []);
+  assert.deepEqual(validation.matchedLineItems, [
+    {
+      lineItemId: "gid://shopify/LineItem/700000000070",
+      fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/800000000070",
+      title: "Returnable Shirt",
+      requestedQuantity: 1,
+      returnableQuantity: 2,
+      decision: RefundDecision.Eligible,
+    },
+    {
+      lineItemId: "gid://shopify/LineItem/700000000071",
+      fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/800000000071",
+      title: "Returnable Pants",
+      requestedQuantity: 2,
+      returnableQuantity: 3,
+      decision: RefundDecision.Eligible,
+    },
+  ]);
+});
+
 test("requires review before refund execution for manual-review eligibility results", () => {
   const validation = validateRefundAction(
     {

@@ -28,6 +28,21 @@ const readyValidation = {
   ],
 };
 
+const multiItemReadyValidation = {
+  ...readyValidation,
+  matchedLineItems: [
+    ...readyValidation.matchedLineItems,
+    {
+      lineItemId: "gid://shopify/LineItem/700000000071",
+      fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/800000000071",
+      title: "Returnable Pants",
+      requestedQuantity: 2,
+      returnableQuantity: 3,
+      decision: RefundDecision.Eligible,
+    },
+  ],
+};
+
 test("builds Shopify refundCreate GraphQL request from ready refund action validation", () => {
   const refundTransactionInputs = [
     {
@@ -60,6 +75,26 @@ test("builds Shopify refundCreate GraphQL request from ready refund action valid
       note: "Customer requested a refund.",
     },
   });
+});
+
+test("builds Shopify refundCreate GraphQL request for multiple line items", () => {
+  const request = buildShopifyRefundCreateGraphqlRequest(
+    multiItemReadyValidation,
+    {
+      idempotencyKey: "refund-action-910000000070-multi-item",
+    },
+  );
+
+  assert.deepEqual(request.variables.input.refundLineItems, [
+    {
+      lineItemId: "gid://shopify/LineItem/700000000070",
+      quantity: 1,
+    },
+    {
+      lineItemId: "gid://shopify/LineItem/700000000071",
+      quantity: 2,
+    },
+  ]);
 });
 
 test("builds refund transaction inputs from Shopify suggested refund", () => {
