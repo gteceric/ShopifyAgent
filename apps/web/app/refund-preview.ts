@@ -1,24 +1,21 @@
 import {
-  checkRefundEligibility,
   createRefundContextAdapter,
   previewShopifyRefund,
   RefundActionValidationStatus,
-  validateRefundAction,
-  type CheckRefundEligibilityResult,
   type PreviewShopifyRefundDeps,
   type RefundActionBlocker,
-  type RefundActionLineItemRequest,
   type RefundActionMatchedLineItem,
   type RefundContextPlatformAdapter,
   type RefundPolicyConfig,
   type ShopifyRefundPreview,
 } from "@shopify-agent/core";
 import { loadMerchantRefundPolicyConfig } from "./dashboard-order-evaluation";
+import {
+  validateDashboardRefundAction,
+  type DashboardRefundActionRequest,
+} from "./refund-action-validation";
 
-export interface RefundPreviewRequest {
-  orderId: string;
-  lineItems: RefundActionLineItemRequest[];
-}
+export type RefundPreviewRequest = DashboardRefundActionRequest;
 
 type RefundPreviewBlockedStatus =
   | typeof RefundActionValidationStatus.Blocked
@@ -48,46 +45,15 @@ export interface PreviewRefundDependencies {
   shopifyPreviewDeps?: PreviewShopifyRefundDeps;
 }
 
-function parseRefundPreviewRequest(
-  input: RefundPreviewRequest,
-): RefundPreviewRequest {
-  const orderId = input.orderId.trim();
-  const lineItems = input.lineItems.map((lineItem) => ({
-    lineItemId: lineItem.lineItemId.trim(),
-    quantity: lineItem.quantity,
-  }));
-
-  if (!orderId) {
-    throw new Error("Missing orderId.");
-  }
-
-  if (lineItems.length === 0) {
-    throw new Error("Select at least one line item to preview.");
-  }
-
-  for (const lineItem of lineItems) {
-    if (!lineItem.lineItemId) {
-      throw new Error("Every selected line item needs a lineItemId.");
-    }
-  }
-
-  return { orderId, lineItems };
-}
-
 export async function previewRefund(
   input: RefundPreviewRequest,
   dependencies: PreviewRefundDependencies,
 ): Promise<RefundPreviewResult> {
   try {
-    const request = parseRefundPreviewRequest(input);
-    const eligibilityInput = { orderId: request.orderId };
-    const eligibilityDependencies = {
-      adapter: dependencies.adapter,
-      config: dependencies.config,
-    };
-    const eligibilityResult: CheckRefundEligibilityResult =
-      await checkRefundEligibility(eligibilityInput, eligibilityDependencies);
-    const validation = validateRefundAction(request, eligibilityResult);
+    const { request, validation } = await validateDashboardRefundAction(
+      input,
+      dependencies,
+    );
 
     if (validation.status !== RefundActionValidationStatus.Ready) {
       return {

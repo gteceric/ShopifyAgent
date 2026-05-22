@@ -1,10 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { DashboardItemEvaluationViewModel } from "./mock-orders";
+import { confirmRefundAction } from "./refund-confirm-action";
+import type { RefundConfirmResult } from "./refund-confirm";
 import { RefundPreviewLineItemRow } from "./refund-preview-line-item-row";
 import { previewRefundAction } from "./refund-preview-action";
-import type { RefundPreviewResult } from "./refund-preview";
+import type {
+  RefundPreviewRequest,
+  RefundPreviewResult,
+} from "./refund-preview";
 
 interface RefundPreviewPanelProps {
   orderId: string;
@@ -48,10 +54,56 @@ function getBlockerMessages(result: RefundPreviewResult): string[] {
   return result.blockers?.map((blocker) => blocker.message) ?? [];
 }
 
+function getConfirmMessages(result: RefundConfirmResult): string[] {
+  if (result.ok) {
+    return [];
+  }
+
+  if (result.error) {
+    return [result.error];
+  }
+
+  return result.blockers?.map((blocker) => blocker.message) ?? [];
+}
+
+function getRefundTotalLabel(result: RefundConfirmResult): string | null {
+  if (!result.ok) {
+    return null;
+  }
+
+  const transactionAmount = result.refund.refundTransactions?.find(
+    (transaction) => Number(transaction.amount.amount) > 0,
+  )?.amount;
+  const displayAmount = transactionAmount ?? result.refund.totalRefunded;
+
+  if (!displayAmount) {
+    return null;
+  }
+
+  return formatMoney(
+    displayAmount.amount,
+    displayAmount.currencyCode,
+  );
+}
+
+function getOrderIdSuffix(orderId: string): string {
+  return orderId.split("/").at(-1) ?? orderId;
+}
+
+function createRefundConfirmIdempotencyKey(orderId: string): string {
+  const randomValue =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  return `dashboard-refund-${getOrderIdSuffix(orderId)}-${randomValue}`;
+}
+
 export function RefundPreviewPanel({
   orderId,
   itemEvaluations,
 }: RefundPreviewPanelProps) {
+  const router = useRouter();
   const eligibleItems = useMemo(
     () =>
       itemEvaluations.filter(
@@ -70,17 +122,34 @@ export function RefundPreviewPanel({
   );
   const [previewResult, setPreviewResult] =
     useState<RefundPreviewResult | null>(null);
+  const [confirmResult, setConfirmResult] =
+    useState<RefundConfirmResult | null>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const confirmIdempotencyKeyRef = useRef<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const selectedItems = eligibleItems.filter((item) =>
     selectedLineItemIds.has(item.lineItemId),
   );
-  const canPreview = selectedItems.length > 0 && !isPending;
+  const hasConfirmedRefund = confirmResult?.ok === true;
+  const canPreview =
+    selectedItems.length > 0 && !isPending && !isConfirming;
+  const canConfirm =
+    previewResult?.ok === true &&
+    !hasConfirmedRefund &&
+    !isPending &&
+    !isConfirming;
   const previewAmountLabel = previewResult
     ? getPreviewAmountLabel(previewResult)
     : null;
   const blockerMessages = previewResult
     ? getBlockerMessages(previewResult)
     : [];
+  const confirmMessages = confirmResult
+    ? getConfirmMessages(confirmResult)
+    : [];
+  const refundTotalLabel = confirmResult
+    ? getRefundTotalLabel(confirmResult)
+    : null;
 
   useEffect(() => {
     setSelectedLineItemIds(
@@ -92,10 +161,25 @@ export function RefundPreviewPanel({
       ),
     );
     setPreviewResult(null);
+    setConfirmResult(null);
+    confirmIdempotencyKeyRef.current = null;
   }, [eligibleItems, orderId]);
 
-  function toggleLineItem(lineItemId: string): void {
+  function clearRefundResults(): void {
     setPreviewResult(null);
+    setConfirmResult(null);
+    confirmIdempotencyKeyRef.current = null;
+  }
+
+  function getSelectedLineItemRequests(): RefundPreviewRequest["lineItems"] {
+    return selectedItems.map((item) => ({
+      lineItemId: item.lineItemId,
+      quantity: quantities[item.lineItemId] ?? 1,
+    }));
+  }
+
+  function toggleLineItem(lineItemId: string): void {
+    clearRefundResults();
     setSelectedLineItemIds((currentValue) => {
       const nextValue = new Set(currentValue);
 
@@ -120,7 +204,7 @@ export function RefundPreviewPanel({
         ? Math.min(parsedValue, maxQuantity)
         : 1;
 
-    setPreviewResult(null);
+    clearRefundResults();
     setQuantities((currentValue) => ({
       ...currentValue,
       [lineItemId]: nextQuantity,
@@ -129,16 +213,43 @@ export function RefundPreviewPanel({
 
   function previewSelectedRefund(): void {
     startTransition(async () => {
+      setConfirmResult(null);
       const result = await previewRefundAction({
         orderId,
-        lineItems: selectedItems.map((item) => ({
-          lineItemId: item.lineItemId,
-          quantity: quantities[item.lineItemId] ?? 1,
-        })),
+        lineItems: getSelectedLineItemRequests(),
       });
 
       setPreviewResult(result);
+      confirmIdempotencyKeyRef.current = result.ok
+        ? createRefundConfirmIdempotencyKey(orderId)
+        : null;
     });
+  }
+
+  async function confirmSelectedRefund(): Promise<void> {
+    if (!canConfirm) {
+      return;
+    }
+
+    setIsConfirming(true);
+    setConfirmResult(null);
+
+    try {
+      const idempotencyKey =
+        confirmIdempotencyKeyRef.current ??
+        createRefundConfirmIdempotencyKey(orderId);
+      confirmIdempotencyKeyRef.current = idempotencyKey;
+      const result = await confirmRefundAction({
+        orderId,
+        lineItems: getSelectedLineItemRequests(),
+        idempotencyKey,
+        note: "Refund confirmed from dashboard preview.",
+      });
+
+      setConfirmResult(result);
+    } finally {
+      setIsConfirming(false);
+    }
   }
 
   if (itemEvaluations.length === 0) {
@@ -236,17 +347,84 @@ export function RefundPreviewPanel({
                       </div>
                       <span className="mt-1 block text-xs text-emerald-900/75">
                         Selected qty: {item.requestedQuantity} · Shopify
-                        preview qty: {previewLineItem?.quantity ?? "not returned"}
+                        preview qty:{" "}
+                        {previewLineItem?.quantity ?? "not returned"}
                       </span>
                     </div>
                   );
                 })}
+              </div>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={confirmSelectedRefund}
+                  disabled={!canConfirm}
+                  className="rounded-xl bg-emerald-950 px-4 py-2 text-sm font-semibold text-emerald-50 transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-emerald-200 disabled:text-emerald-700"
+                >
+                  {isConfirming ? "Confirming..." : "Confirm refund"}
+                </button>
               </div>
             </div>
           ) : (
             <div className="grid gap-1">
               <strong>Preview unavailable</strong>
               {blockerMessages.map((message) => (
+                <span key={message}>{message}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {confirmResult ? (
+        <div
+          className={`mt-3 rounded-2xl border px-4 py-3 text-sm leading-6 ${
+            confirmResult.ok
+              ? "border-emerald-900/10 bg-emerald-50 text-emerald-950"
+              : "border-red-900/10 bg-red-50 text-red-900"
+          }`}
+        >
+          {confirmResult.ok ? (
+            <div className="grid gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <strong>
+                  Refund{" "}
+                  {confirmResult.refund.status === "pending"
+                    ? "pending"
+                    : "confirmed"}
+                </strong>
+                {refundTotalLabel ? (
+                  <span className="text-base font-bold">
+                    {refundTotalLabel}
+                  </span>
+                ) : null}
+              </div>
+              {confirmResult.refund.refundId ? (
+                <span className="font-mono text-[11px] text-emerald-900/70">
+                  {confirmResult.refund.refundId}
+                </span>
+              ) : null}
+              <span>
+                {confirmResult.refund.lineItems.length}{" "}
+                {confirmResult.refund.lineItems.length === 1
+                  ? "item"
+                  : "items"}{" "}
+                submitted to Shopify.
+              </span>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => router.refresh()}
+                  className="rounded-xl bg-emerald-950 px-4 py-2 text-sm font-semibold text-emerald-50 transition hover:bg-emerald-800"
+                >
+                  Refresh order status
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid gap-1">
+              <strong>Refund not confirmed</strong>
+              {confirmMessages.map((message) => (
                 <span key={message}>{message}</span>
               ))}
             </div>
