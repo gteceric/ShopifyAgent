@@ -193,20 +193,55 @@ export function RefundPreviewPanel({
           }`}
         >
           {previewResult.ok ? (
-            <div className="grid gap-2">
+            <div className="grid gap-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <strong>Preview total</strong>
                 <span className="text-base font-bold">
                   {previewAmountLabel}
                 </span>
               </div>
-              <span>
-                {previewResult.preview.refundLineItems.length}{" "}
-                {previewResult.preview.refundLineItems.length === 1
-                  ? "item"
-                  : "items"}{" "}
-                selected.
-              </span>
+              <div className="grid gap-2">
+                {previewResult.matchedLineItems.map((item) => {
+                  const previewLineItem =
+                    previewResult.preview.refundLineItems.find(
+                      (lineItem) => lineItem.lineItemId === item.lineItemId,
+                    );
+                  const previewLineItemAmountLabel =
+                    previewLineItem
+                      ? formatMoney(
+                          previewLineItem.price.presentmentMoney.amount,
+                          previewLineItem.price.presentmentMoney.currencyCode,
+                        )
+                      : null;
+
+                  return (
+                    <div
+                      key={item.lineItemId}
+                      className="rounded-xl border border-emerald-900/10 bg-white/70 px-3 py-2"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <strong className="block truncate text-sm">
+                            {item.title ?? "Selected line item"}
+                          </strong>
+                          <span className="font-mono text-[11px] text-emerald-900/70">
+                            {item.lineItemId}
+                          </span>
+                        </div>
+                        {previewLineItemAmountLabel ? (
+                          <span className="font-bold">
+                            {previewLineItemAmountLabel}
+                          </span>
+                        ) : null}
+                      </div>
+                      <span className="mt-1 block text-xs text-emerald-900/75">
+                        Selected qty: {item.requestedQuantity} · Shopify
+                        preview qty: {previewLineItem?.quantity ?? "not returned"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ) : (
             <div className="grid gap-1">
