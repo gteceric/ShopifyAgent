@@ -5,6 +5,8 @@ import {
 import type {
   RefundContext,
   RefundContextLineItem,
+  RefundLineItemOption,
+  RefundMoney,
 } from "../../domain/refund-policy.types.js";
 import type {
   RefundContextInput,
@@ -35,16 +37,47 @@ interface ShopifyMetafieldValue {
 interface ShopifyAdminLineItem {
   id: string;
   title?: string | null;
+  sku?: string | null;
   currentQuantity: number;
+  originalUnitPriceSet?: ShopifyMoneySet | null;
+  variant?: {
+    title?: string | null;
+    sku?: string | null;
+    selectedOptions?: Array<{
+      name?: string | null;
+      value?: string | null;
+    }> | null;
+    image?: ShopifyImage | null;
+  } | null;
   product?: {
     category?: {
       fullName?: string | null;
+    } | null;
+    featuredMedia?: {
+      preview?: {
+        image?: ShopifyImage | null;
+      } | null;
     } | null;
   } | null;
   customAttributes: Array<{
     key: string;
     value: string;
   }>;
+}
+
+interface ShopifyImage {
+  url?: string | null;
+  altText?: string | null;
+}
+
+interface ShopifyMoney {
+  amount?: string | null;
+  currencyCode?: string | null;
+}
+
+interface ShopifyMoneySet {
+  shopMoney?: ShopifyMoney | null;
+  presentmentMoney?: ShopifyMoney | null;
 }
 
 interface ShopifyRefundOrderContextResponse {
@@ -60,6 +93,10 @@ interface ShopifyRefundOrderContextResponse {
     } | null;
     displayFinancialStatus?: string | null;
     displayFulfillmentStatus?: string | null;
+    transactions?: Array<{
+      kind?: string | null;
+      status?: string | null;
+    }> | null;
     lineItems: {
       nodes: ShopifyAdminLineItem[];
     };
@@ -108,12 +145,33 @@ function mapFinancialStatus(status?: string | null) {
     case "REFUNDED":
       return FinancialStatus.Refunded;
     case "PENDING":
-      return FinancialStatus.Pending;
+      return FinancialStatus.PaymentPending;
     case "VOIDED":
       return FinancialStatus.Voided;
     default:
       return FinancialStatus.Unknown;
   }
+}
+
+function hasPendingRefundTransaction(
+  transactions?: Array<{ kind?: string | null; status?: string | null }> | null,
+): boolean {
+  return (
+    transactions?.some(
+      (transaction) =>
+        transaction.kind === "REFUND" && transaction.status === "PENDING",
+    ) ?? false
+  );
+}
+
+function normalizeFinancialStatus(
+  order: NonNullable<ShopifyRefundOrderContextResponse["order"]>,
+): FinancialStatus {
+  if (hasPendingRefundTransaction(order.transactions)) {
+    return FinancialStatus.RefundPending;
+  }
+
+  return mapFinancialStatus(order.displayFinancialStatus);
 }
 
 function mapFulfillmentStatus(status?: string | null) {
@@ -162,6 +220,57 @@ function normalizeStringArray(
         .filter((value): value is string => Boolean(value)),
     ),
   ];
+}
+
+function normalizeOptionalString(value?: string | null): string | undefined {
+  const normalizedValue = value?.trim();
+
+  return normalizedValue ? normalizedValue : undefined;
+}
+
+function normalizeVariantOptions(
+  selectedOptions?: Array<{
+    name?: string | null;
+    value?: string | null;
+  }> | null,
+): RefundLineItemOption[] | undefined {
+  const options =
+    selectedOptions
+      ?.map((option) => ({
+        name: normalizeOptionalString(option.name),
+        value: normalizeOptionalString(option.value),
+      }))
+      .filter(
+        (
+          option,
+        ): option is RefundLineItemOption =>
+          option.name !== undefined && option.value !== undefined,
+      ) ?? [];
+
+  return options.length > 0 ? options : undefined;
+}
+
+function mapMoney(money?: ShopifyMoney | null): RefundMoney | undefined {
+  const amount = normalizeOptionalString(money?.amount);
+  const currencyCode = normalizeOptionalString(money?.currencyCode);
+
+  return amount && currencyCode ? { amount, currencyCode } : undefined;
+}
+
+function mapUnitPrice(
+  moneySet?: ShopifyMoneySet | null,
+): RefundMoney | undefined {
+  return (
+    mapMoney(moneySet?.presentmentMoney) ?? mapMoney(moneySet?.shopMoney)
+  );
+}
+
+function pickLineItemImage(lineItem: ShopifyAdminLineItem): ShopifyImage | null {
+  return (
+    lineItem.variant?.image ??
+    lineItem.product?.featuredMedia?.preview?.image ??
+    null
+  );
 }
 
 function mapMockLineItemsToRefundContextLineItems(
@@ -242,20 +351,36 @@ function mapAdminLineItemsToRefundContextLineItems(
 
   return order.lineItems.nodes.map((lineItem) => {
     const returnableLineItem = returnableLineItems.get(lineItem.id);
+    const image = pickLineItemImage(lineItem);
+    const sku = normalizeOptionalString(lineItem.sku ?? lineItem.variant?.sku);
+    const variantTitle = normalizeOptionalString(lineItem.variant?.title);
+    const variantOptions = normalizeVariantOptions(
+      lineItem.variant?.selectedOptions,
+    );
+    const imageUrl = normalizeOptionalString(image?.url);
+    const imageAltText = normalizeOptionalString(image?.altText);
+    const unitPrice = mapUnitPrice(lineItem.originalUnitPriceSet);
 
     return {
       lineItemId: lineItem.id,
       ...(returnableLineItem
         ? { fulfillmentLineItemId: returnableLineItem.fulfillmentLineItemId }
         : {}),
-      title: lineItem.title ?? undefined,
+      ...(lineItem.title ? { title: lineItem.title } : {}),
+      ...(sku ? { sku } : {}),
+      ...(variantTitle ? { variantTitle } : {}),
+      ...(variantOptions ? { variantOptions } : {}),
+      ...(imageUrl ? { imageUrl } : {}),
+      ...(imageAltText ? { imageAltText } : {}),
+      ...(unitPrice ? { unitPrice } : {}),
       returnableQuantity: returnableLineItem?.returnableQuantity ?? 0,
       category: lineItem.product?.category?.fullName ?? undefined,
       fulfillmentStatus: orderFulfillmentStatus,
       hasReturnableFulfillment: returnableLineItem !== undefined,
       alreadyRefunded:
         financialStatus === FinancialStatus.Refunded ||
-        lineItem.currentQuantity <= 0,
+        (financialStatus === FinancialStatus.PartiallyRefunded &&
+          lineItem.currentQuantity <= 0),
       finalSale: isFinalSaleLineItem(lineItem),
     };
   });
@@ -267,7 +392,7 @@ export function mapAdminOrderToRefundContext(
   returnable: ShopifyReturnableFulfillmentsResponse,
   now: Date,
 ): RefundContext {
-  const financialStatus = mapFinancialStatus(order.displayFinancialStatus);
+  const financialStatus = normalizeFinancialStatus(order);
 
   return {
     order: {

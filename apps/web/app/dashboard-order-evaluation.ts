@@ -1,4 +1,5 @@
 import {
+  createPolicyConfig,
   FinancialStatus,
   FulfillmentStatus,
   RecommendedRefundAction,
@@ -22,20 +23,11 @@ export interface DashboardOrderErrorState {
   message: string;
 }
 
-const DEMO_MERCHANT_POLICY_CONFIG: RefundPolicyConfig = {
-  refundWindowDays: 30,
-  cancelWindowDays: 30,
-  highValueOrderThreshold: 500,
-  alreadyRefundedDecision: RefundDecision.Ineligible,
-  finalSaleUnfulfilledDecision: RefundDecision.Ineligible,
-  unfulfilledOutsideWindowDecision: RefundDecision.ManualReview,
-};
-
 // Merchant refund policy should eventually be loaded from merchant-owned
-// settings storage. For now, the dashboard uses this demo merchant policy so
-// all refund checks still go through the same policy-loading boundary.
+// settings storage. For now, keep the same policy-loading boundary but source
+// it from env-backed config so local merchant settings affect the dashboard.
 export async function loadMerchantRefundPolicyConfig(): Promise<RefundPolicyConfig> {
-  return DEMO_MERCHANT_POLICY_CONFIG;
+  return createPolicyConfig();
 }
 
 function formatStatusLabel(value: string): string {
@@ -50,6 +42,26 @@ function formatCurrency(amount: number): string {
     style: "currency",
     currency: "USD",
   }).format(amount);
+}
+
+function formatMoney(value?: {
+  amount: string;
+  currencyCode: string;
+}): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const numericAmount = Number(value.amount);
+
+  if (!Number.isFinite(numericAmount)) {
+    return `${value.amount} ${value.currencyCode}`;
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: value.currencyCode,
+  }).format(numericAmount);
 }
 
 function formatCreatedAtLabel(createdAt: string): string {
@@ -72,12 +84,15 @@ function calculateOrderAgeDays(createdAt: string, now: Date): number {
 function getInitialDecision(
   order: ShopifyOrderSummary,
 ): DashboardRefundDecision {
-  if (order.financialStatus === FinancialStatus.Refunded) {
+  if (
+    order.financialStatus === FinancialStatus.Refunded ||
+    order.financialStatus === FinancialStatus.RefundPending
+  ) {
     return "ineligible";
   }
 
   if (
-    order.financialStatus === FinancialStatus.Pending ||
+    order.financialStatus === FinancialStatus.PaymentPending ||
     order.financialStatus === FinancialStatus.PartiallyPaid
   ) {
     return "manual_review";
@@ -174,12 +189,20 @@ function formatDecisionSummary(result: CheckRefundEligibilityResult): string {
   }
 
   if (policyResult.decision === RefundDecision.Ineligible) {
+    if (hasReason(result, RefundReasonCode.RefundPending)) {
+      return "Refund is already pending in Shopify.";
+    }
+
     if (hasReason(result, RefundReasonCode.AlreadyFullyRefunded)) {
       return "Order has already been fully refunded.";
     }
 
     if (hasReason(result, RefundReasonCode.FinalSaleUnavailableForRefund)) {
       return "Final-sale items block the refund path.";
+    }
+
+    if (hasReason(result, RefundReasonCode.ReturnableFulfillmentsUnavailable)) {
+      return "No returnable fulfillment is available for this order.";
     }
 
     if (hasReason(result, RefundReasonCode.OutsideRefundWindow)) {
@@ -232,7 +255,15 @@ function formatRecommendedAction(result: CheckRefundEligibilityResult): string {
       return evaluatedOrder.fulfillmentStatus === "unfulfilled"
         ? "Approve the cancellation and refund flow."
         : "Approve the standard refund flow.";
+    case RecommendedRefundAction.RefundPending:
+      return "Refund pending in Shopify. Do not create another refund yet.";
+    case RecommendedRefundAction.NoActionNeeded:
+      return "No further refund action is needed.";
     case RecommendedRefundAction.Deny:
+      if (hasReason(result, RefundReasonCode.ReturnableFulfillmentsUnavailable)) {
+        return "Review the Shopify order timeline before attempting another refund.";
+      }
+
       return "Decline the refund request with policy wording.";
     case RecommendedRefundAction.ManualReview:
       if (
@@ -375,7 +406,22 @@ function buildItemEvaluationViewModels(
     return {
       lineItemId: lineItem.lineItemId,
       title: itemTitle,
+      ...(lineItem.sku ? { sku: lineItem.sku } : {}),
+      ...(lineItem.variantTitle
+        ? { variantTitle: lineItem.variantTitle }
+        : {}),
+      ...(lineItem.variantOptions
+        ? { variantOptions: lineItem.variantOptions }
+        : {}),
+      ...(lineItem.imageUrl ? { imageUrl: lineItem.imageUrl } : {}),
+      ...(lineItem.imageAltText
+        ? { imageAltText: lineItem.imageAltText }
+        : {}),
+      ...(formatMoney(lineItem.unitPrice)
+        ? { unitPriceLabel: formatMoney(lineItem.unitPrice) }
+        : {}),
       decision: itemEvaluation.decision,
+      returnableQuantity: lineItem.returnableQuantity,
       reasonSummary,
       evidence,
     };

@@ -144,3 +144,29 @@ test("maps a Shopify Admin order node into a summary safely", () => {
     fulfillmentStatus: FulfillmentStatus.Partial,
   });
 });
+
+test("maps Shopify pending refund transactions as refund pending in summaries", () => {
+  const result = mapAdminOrderToShopifyOrderSummary({
+    id: "gid://shopify/Order/900000000404",
+    name: "#4004",
+    createdAt: "2026-04-08T00:00:00.000Z",
+    totalPriceSet: {
+      shopMoney: {
+        amount: "42.00",
+      },
+    },
+    displayFinancialStatus: "PAID",
+    displayFulfillmentStatus: "FULFILLED",
+    transactions: [
+      {
+        kind: "REFUND",
+        status: "PENDING",
+      },
+    ],
+    customer: {
+      displayName: "Robin Vale",
+    },
+  });
+
+  assert.equal(result.financialStatus, FinancialStatus.RefundPending);
+});

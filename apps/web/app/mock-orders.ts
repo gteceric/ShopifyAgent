@@ -3,7 +3,14 @@ export type RefundDecision = "eligible" | "ineligible" | "manual_review";
 export interface DashboardItemEvaluationViewModel {
   lineItemId: string;
   title: string;
+  sku?: string;
+  variantTitle?: string;
+  variantOptions?: Array<{ name: string; value: string }>;
+  imageUrl?: string;
+  imageAltText?: string;
+  unitPriceLabel?: string;
   decision: RefundDecision;
+  returnableQuantity: number;
   reasonSummary: string;
   evidence: Array<{ label: string; value: string }>;
 }

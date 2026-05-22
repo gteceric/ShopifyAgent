@@ -25,6 +25,7 @@ function makeRefundEvaluation(
       lineItemId: `gid://shopify/LineItem/${700000000100 + index}`,
       title: `Line item ${index + 1}`,
       decision,
+      returnableQuantity: 1,
       reasonSummary: "Item-level reason.",
       evidence: [],
     })),

@@ -280,7 +280,7 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
       "gid://shopify/Order/910000000008",
       "#3013",
       {
-        financialStatus: FinancialStatus.Pending,
+        financialStatus: FinancialStatus.PaymentPending,
       },
     ),
     expectedDecision: RefundDecision.ManualReview,

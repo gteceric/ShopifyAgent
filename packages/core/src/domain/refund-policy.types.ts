@@ -31,6 +31,7 @@ export const RefundReasonCode = {
   UnfulfilledOutsideWindowAllowed: "unfulfilled_outside_window_allowed",
   FinalSaleUnfulfilledAllowed: "final_sale_unfulfilled_allowed",
   AlreadyFullyRefunded: "already_fully_refunded",
+  RefundPending: "refund_pending",
   FinalSaleUnavailableForRefund: "final_sale_unavailable_for_refund",
   VipOverrideApplied: "vip_override_applied",
   OutsideRefundWindow: "outside_refund_window",
@@ -46,7 +47,8 @@ export const FinancialStatus = {
   PartiallyPaid: "partially_paid",
   PartiallyRefunded: "partially_refunded",
   Refunded: "refunded",
-  Pending: "pending",
+  RefundPending: "refund_pending",
+  PaymentPending: "payment_pending",
   Voided: "voided",
   Unknown: "unknown",
 } as const;
@@ -75,6 +77,16 @@ export interface RefundPolicyExceptionRule {
   tag: string;
   decision: RefundPolicyExceptionDecision;
   message: string;
+}
+
+export interface RefundMoney {
+  amount: string;
+  currencyCode: string;
+}
+
+export interface RefundLineItemOption {
+  name: string;
+  value: string;
 }
 
 // Policy settings are code-defined for now, but this type is meant to become
@@ -109,6 +121,12 @@ export interface RefundContextLineItem {
   lineItemId: string;
   fulfillmentLineItemId?: string;
   title?: string;
+  sku?: string;
+  variantTitle?: string;
+  variantOptions?: RefundLineItemOption[];
+  imageUrl?: string;
+  imageAltText?: string;
+  unitPrice?: RefundMoney;
   returnableQuantity: number;
   ageDaysOverride?: number;
   category?: string;
@@ -159,6 +177,12 @@ export interface EvaluatedRefundPolicyLineItem {
   lineItemId: string;
   fulfillmentLineItemId?: string;
   title?: string;
+  sku?: string;
+  variantTitle?: string;
+  variantOptions?: RefundLineItemOption[];
+  imageUrl?: string;
+  imageAltText?: string;
+  unitPrice?: RefundMoney;
   returnableQuantity: number;
   ageDays: number;
   effectiveFinancialStatus: FinancialStatus;

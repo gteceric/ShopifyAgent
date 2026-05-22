@@ -9,7 +9,10 @@ import {
   RefundReasonCode,
   type CheckRefundEligibilityResult,
 } from "@shopify-agent/core";
-import { applyRefundEvaluationToOrder } from "../app/dashboard-order-evaluation.js";
+import {
+  applyRefundEvaluationToOrder,
+  loadMerchantRefundPolicyConfig,
+} from "../app/dashboard-order-evaluation.js";
 import type { DashboardOrder } from "../app/mock-orders.js";
 
 const order = {
@@ -108,6 +111,18 @@ function makeRefundResult(): CheckRefundEligibilityResult {
             evaluatedLineItem: {
               lineItemId: "gid://shopify/LineItem/1",
               title: "Dress",
+              sku: "DRESS-RED-4",
+              variantTitle: "Red / Size 4",
+              variantOptions: [
+                { name: "Color", value: "Red" },
+                { name: "Size", value: "4" },
+              ],
+              imageUrl: "https://cdn.example.test/dress.jpg",
+              imageAltText: "Red dress",
+              unitPrice: {
+                amount: "72.00",
+                currencyCode: "USD",
+              },
               returnableQuantity: 1,
               ageDays: 20,
               effectiveFinancialStatus: FinancialStatus.Paid,
@@ -181,7 +196,17 @@ test("maps item evaluations into dashboard item view models", () => {
     {
       lineItemId: "gid://shopify/LineItem/1",
       title: "Dress",
+      sku: "DRESS-RED-4",
+      variantTitle: "Red / Size 4",
+      variantOptions: [
+        { name: "Color", value: "Red" },
+        { name: "Size", value: "4" },
+      ],
+      imageUrl: "https://cdn.example.test/dress.jpg",
+      imageAltText: "Red dress",
+      unitPriceLabel: "$72.00",
       decision: RefundDecision.Ineligible,
+      returnableQuantity: 1,
       reasonSummary: "Refund subject is outside the 14-day refund window.",
       evidence: [
         { label: "Fulfillment", value: "Fulfilled" },
@@ -198,6 +223,7 @@ test("maps item evaluations into dashboard item view models", () => {
       lineItemId: "gid://shopify/LineItem/2",
       title: "Phone Case",
       decision: RefundDecision.Eligible,
+      returnableQuantity: 2,
       reasonSummary: "Refund subject is within the 30-day refund window.",
       evidence: [
         { label: "Fulfillment", value: "Fulfilled" },
@@ -211,4 +237,82 @@ test("maps item evaluations into dashboard item view models", () => {
       ],
     },
   ]);
+});
+
+test("summarizes refund-pending decisions distinctly from refunded orders", () => {
+  const refundResult = makeRefundResult();
+  refundResult.recommendedNextAction = RecommendedRefundAction.RefundPending;
+  refundResult.policyResult.decision = RefundDecision.Ineligible;
+  refundResult.policyResult.reasons = [
+    {
+      code: RefundReasonCode.RefundPending,
+      message: "Refund has already been initiated in Shopify and is pending.",
+    },
+  ];
+  refundResult.policyResult.evidence.evaluatedOrder.effectiveFinancialStatus =
+    FinancialStatus.RefundPending;
+
+  const dashboardOrder = applyRefundEvaluationToOrder(
+    makeDashboardOrder(),
+    refundResult,
+  );
+
+  assert.equal(
+    dashboardOrder.refundEvaluation.reasonSummary,
+    "Refund is already pending in Shopify.",
+  );
+  assert.equal(
+    dashboardOrder.refundEvaluation.recommendedNextAction,
+    "Refund pending in Shopify. Do not create another refund yet.",
+  );
+  assert.deepEqual(
+    dashboardOrder.refundEvaluation.evidence.find(
+      (item) => item.label === "Financial Status",
+    ),
+    { label: "Financial Status", value: "Refund Pending" },
+  );
+});
+
+test("loads merchant policy config from refund window env", async () => {
+  const previousRefundWindowDays = process.env.REFUND_WINDOW_DAYS;
+
+  try {
+    process.env.REFUND_WINDOW_DAYS = "999";
+
+    const config = await loadMerchantRefundPolicyConfig();
+
+    assert.equal(config.refundWindowDays, 999);
+  } finally {
+    if (previousRefundWindowDays === undefined) {
+      delete process.env.REFUND_WINDOW_DAYS;
+    } else {
+      process.env.REFUND_WINDOW_DAYS = previousRefundWindowDays;
+    }
+  }
+});
+
+test("summarizes missing returnable fulfillment distinctly", () => {
+  const refundResult = makeRefundResult();
+  refundResult.recommendedNextAction = RecommendedRefundAction.Deny;
+  refundResult.policyResult.decision = RefundDecision.Ineligible;
+  refundResult.policyResult.reasons = [
+    {
+      code: RefundReasonCode.ReturnableFulfillmentsUnavailable,
+      message: "No returnable fulfillment was found for this refund subject.",
+    },
+  ];
+
+  const dashboardOrder = applyRefundEvaluationToOrder(
+    makeDashboardOrder(),
+    refundResult,
+  );
+
+  assert.equal(
+    dashboardOrder.refundEvaluation.reasonSummary,
+    "No returnable fulfillment is available for this order.",
+  );
+  assert.equal(
+    dashboardOrder.refundEvaluation.recommendedNextAction,
+    "Review the Shopify order timeline before attempting another refund.",
+  );
 });

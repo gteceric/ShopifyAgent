@@ -22,6 +22,8 @@ export const RecommendedRefundAction = {
   Approve: "approve",
   Deny: "deny",
   ManualReview: "manual_review",
+  RefundPending: "refund_pending",
+  NoActionNeeded: "no_action_needed",
 } as const;
 
 export type RecommendedRefundAction =
@@ -48,13 +50,25 @@ function hasVipOverrideApplied(result: RefundPolicyResult): boolean {
   );
 }
 
+function hasReason(result: RefundPolicyResult, code: RefundReasonCode): boolean {
+  return result.reasons.some((reason) => reason.code === code);
+}
+
 function getRecommendedNextAction(
-  decision: RefundDecision,
+  result: RefundPolicyResult,
 ): RecommendedRefundAction {
-  switch (decision) {
+  switch (result.decision) {
     case RefundDecision.Eligible:
       return RecommendedRefundAction.Approve;
     case RefundDecision.Ineligible:
+      if (hasReason(result, RefundReasonCode.RefundPending)) {
+        return RecommendedRefundAction.RefundPending;
+      }
+
+      if (hasReason(result, RefundReasonCode.AlreadyFullyRefunded)) {
+        return RecommendedRefundAction.NoActionNeeded;
+      }
+
       return RecommendedRefundAction.Deny;
     case RefundDecision.ManualReview:
       return RecommendedRefundAction.ManualReview;
@@ -79,6 +93,6 @@ export async function checkRefundEligibility(
     exceptionAvailable: hasVipOverrideApplied(policyResult),
     escalationRequired:
       policyResult.decision === RefundDecision.ManualReview,
-    recommendedNextAction: getRecommendedNextAction(policyResult.decision),
+    recommendedNextAction: getRecommendedNextAction(policyResult),
   };
 }

@@ -266,7 +266,7 @@ test("formats a pending-payment order as a manual-review response", async () => 
       "i",
     ),
   );
-  assert.match(response, /financial status is pending/i);
+  assert.match(response, /financial status is payment pending/i);
   assert.match(
     response,
     new RegExp(escapeRegExp(REFUND_RESPONSE_COPY.followupReviewStandard), "i"),

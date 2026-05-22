@@ -59,7 +59,7 @@ const CHECK_REFUND_ELIGIBILITY_TOOL = {
         type: "string",
         enum: Object.values(RecommendedRefundAction),
         description:
-          "The recommended next action for the caller: approve, deny, or route to manual review.",
+          "The recommended next action for the caller, such as approve, deny, refund_pending, no_action_needed, or route to manual review.",
       },
       policyResult: {
         type: "object",

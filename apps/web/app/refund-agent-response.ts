@@ -31,6 +31,10 @@ function formatNextStep(result: CheckRefundEligibilityResult): string {
       return "Next step: decline the refund request with policy wording.";
     case RecommendedRefundAction.ManualReview:
       return "Next step: route this case to a human reviewer.";
+    case RecommendedRefundAction.RefundPending:
+      return "Next step: wait for Shopify to finish processing the pending refund.";
+    case RecommendedRefundAction.NoActionNeeded:
+      return "Next step: no further refund action is needed.";
   }
 }
 

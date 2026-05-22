@@ -78,7 +78,31 @@ test("Shopify Admin adapter maps live Admin responses into RefundContext", async
             nodes: [
               {
                 id: "gid://shopify/LineItem/1",
+                title: "Ray-Ban RB2132 (55mm)",
+                sku: "RB2132-55-BLK-GRN",
                 currentQuantity: 1,
+                originalUnitPriceSet: {
+                  shopMoney: {
+                    amount: "149.50",
+                    currencyCode: "USD",
+                  },
+                  presentmentMoney: {
+                    amount: "149.50",
+                    currencyCode: "USD",
+                  },
+                },
+                variant: {
+                  title: "Black / Green Polarized",
+                  sku: "RB2132-55-BLK-GRN",
+                  selectedOptions: [
+                    { name: "Lens type", value: "Polarized" },
+                    { name: "Lens color", value: "Green" },
+                  ],
+                  image: {
+                    url: "https://cdn.example.test/rb2132.jpg",
+                    altText: "Ray-Ban RB2132 sunglasses",
+                  },
+                },
                 product: {
                   category: {
                     fullName: "Electronics > Audio > Headphones",
@@ -146,6 +170,19 @@ test("Shopify Admin adapter maps live Admin responses into RefundContext", async
   assert.equal(result.order.financialStatus, FinancialStatus.Paid);
   assert.equal(result.lineItems.length, 1);
   assert.equal(result.lineItems[0]?.lineItemId, "gid://shopify/LineItem/1");
+  assert.equal(result.lineItems[0]?.title, "Ray-Ban RB2132 (55mm)");
+  assert.equal(result.lineItems[0]?.sku, "RB2132-55-BLK-GRN");
+  assert.equal(result.lineItems[0]?.variantTitle, "Black / Green Polarized");
+  assert.deepEqual(result.lineItems[0]?.variantOptions, [
+    { name: "Lens type", value: "Polarized" },
+    { name: "Lens color", value: "Green" },
+  ]);
+  assert.equal(result.lineItems[0]?.imageUrl, "https://cdn.example.test/rb2132.jpg");
+  assert.equal(result.lineItems[0]?.imageAltText, "Ray-Ban RB2132 sunglasses");
+  assert.deepEqual(result.lineItems[0]?.unitPrice, {
+    amount: "149.50",
+    currencyCode: "USD",
+  });
   assert.equal(result.lineItems[0]?.category, "Electronics > Audio > Headphones");
   assert.equal(
     result.lineItems[0]?.fulfillmentStatus,
@@ -246,6 +283,122 @@ test("maps admin helper fields for final sale, statuses, and flags safely", () =
   assert.equal(result.order.flags?.fraudHold, true);
   assert.equal(result.order.flags?.manualReview, true);
   assert.equal(result.order.flags?.vipOverride, false);
+});
+
+test("maps Shopify pending refund transactions as refund pending", () => {
+  const result = mapAdminOrderToRefundContext(
+    {
+      id: "gid://shopify/Order/900000000305",
+      name: "#3005",
+      tags: [],
+      createdAt: "2026-03-25T00:00:00.000Z",
+      totalPriceSet: {
+        shopMoney: {
+          amount: "88.00",
+        },
+      },
+      displayFinancialStatus: "PAID",
+      displayFulfillmentStatus: "FULFILLED",
+      transactions: [
+        {
+          kind: "REFUND",
+          status: "PENDING",
+        },
+      ],
+      lineItems: {
+        nodes: [
+          {
+            id: "gid://shopify/LineItem/700000000305",
+            title: "Refund Pending Shirt",
+            currentQuantity: 1,
+            product: {
+              category: {
+                fullName: "Apparel & Accessories > Clothing > Shirts & Tops",
+              },
+            },
+            customAttributes: [],
+          },
+        ],
+      },
+      fraudHoldFlag: { value: "false" },
+      manualReviewFlag: { value: "false" },
+      vipOverrideFlag: { value: "false" },
+    },
+    {
+      returnableFulfillments: {
+        nodes: [
+          {
+            id: "gid://shopify/ReturnableFulfillment/3",
+            returnableFulfillmentLineItems: {
+              nodes: [
+                {
+                  quantity: 1,
+                  fulfillmentLineItem: {
+                    id: "gid://shopify/FulfillmentLineItem/800000000305",
+                    lineItem: {
+                      id: "gid://shopify/LineItem/700000000305",
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    new Date("2026-03-30T00:00:00.000Z"),
+  );
+
+  assert.equal(result.order.financialStatus, FinancialStatus.RefundPending);
+  assert.equal(result.lineItems[0]?.alreadyRefunded, false);
+});
+
+test("does not treat paid zero-current-quantity line items as refunded", () => {
+  const result = mapAdminOrderToRefundContext(
+    {
+      id: "gid://shopify/Order/900000000306",
+      name: "#3006",
+      tags: [],
+      createdAt: "2026-03-25T00:00:00.000Z",
+      totalPriceSet: {
+        shopMoney: {
+          amount: "24.99",
+        },
+      },
+      displayFinancialStatus: "PAID",
+      displayFulfillmentStatus: "FULFILLED",
+      transactions: [],
+      lineItems: {
+        nodes: [
+          {
+            id: "gid://shopify/LineItem/700000000306",
+            title: "Paid Non-returnable Sunglasses",
+            currentQuantity: 0,
+            product: {
+              category: {
+                fullName: "Apparel & Accessories > Clothing Accessories",
+              },
+            },
+            customAttributes: [],
+          },
+        ],
+      },
+      fraudHoldFlag: { value: "false" },
+      manualReviewFlag: { value: "false" },
+      vipOverrideFlag: { value: "false" },
+    },
+    {
+      returnableFulfillments: {
+        nodes: [],
+      },
+    },
+    new Date("2026-03-30T00:00:00.000Z"),
+  );
+
+  assert.equal(result.order.financialStatus, FinancialStatus.Paid);
+  assert.equal(result.lineItems[0]?.returnableQuantity, 0);
+  assert.equal(result.lineItems[0]?.hasReturnableFulfillment, false);
+  assert.equal(result.lineItems[0]?.alreadyRefunded, false);
 });
 
 test("maps multi-item Admin orders with item-level returnable and refund state", () => {

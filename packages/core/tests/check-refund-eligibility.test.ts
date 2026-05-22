@@ -161,6 +161,51 @@ test("supports platform adapters as the order-context boundary", async () => {
   );
 });
 
+test("recommends refund_pending for refund-pending orders", async () => {
+  const result = await checkRefundEligibility(
+    { orderId: "gid://shopify/Order/900000000105" },
+    {
+      adapter: {
+        platform: "test",
+        loadRefundContext: async (input) =>
+          makeContext({
+            id: input.orderId,
+            financialStatus: FinancialStatus.RefundPending,
+          }),
+      },
+    },
+  );
+
+  assert.equal(result.policyResult.decision, RefundDecision.Ineligible);
+  assert.equal(
+    result.recommendedNextAction,
+    RecommendedRefundAction.RefundPending,
+  );
+});
+
+test("recommends no_action_needed for already refunded orders", async () => {
+  const result = await checkRefundEligibility(
+    { orderId: "gid://shopify/Order/900000000106" },
+    {
+      adapter: {
+        platform: "test",
+        loadRefundContext: async (input) =>
+          makeContext({
+            id: input.orderId,
+            alreadyRefunded: true,
+            financialStatus: FinancialStatus.Refunded,
+          }),
+      },
+    },
+  );
+
+  assert.equal(result.policyResult.decision, RefundDecision.Ineligible);
+  assert.equal(
+    result.recommendedNextAction,
+    RecommendedRefundAction.NoActionNeeded,
+  );
+});
+
 test("marks VIP overrides as an active exception without requiring escalation", async () => {
   const result = await checkRefundEligibility(
     { orderId: "gid://shopify/Order/900000000103" },

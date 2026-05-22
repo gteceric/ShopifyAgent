@@ -42,6 +42,10 @@ interface ShopifyOrdersListResponse {
       } | null;
       displayFinancialStatus?: string | null;
       displayFulfillmentStatus?: string | null;
+      transactions?: Array<{
+        kind?: string | null;
+        status?: string | null;
+      }> | null;
       customer?: {
         displayName?: string | null;
       } | null;
@@ -66,12 +70,33 @@ function mapFinancialStatus(status?: string | null): FinancialStatus {
     case "REFUNDED":
       return FinancialStatus.Refunded;
     case "PENDING":
-      return FinancialStatus.Pending;
+      return FinancialStatus.PaymentPending;
     case "VOIDED":
       return FinancialStatus.Voided;
     default:
       return FinancialStatus.Unknown;
   }
+}
+
+function hasPendingRefundTransaction(
+  transactions?: Array<{ kind?: string | null; status?: string | null }> | null,
+): boolean {
+  return (
+    transactions?.some(
+      (transaction) =>
+        transaction.kind === "REFUND" && transaction.status === "PENDING",
+    ) ?? false
+  );
+}
+
+function normalizeFinancialStatus(
+  order: ShopifyOrdersListResponse["orders"]["nodes"][number],
+): FinancialStatus {
+  if (hasPendingRefundTransaction(order.transactions)) {
+    return FinancialStatus.RefundPending;
+  }
+
+  return mapFinancialStatus(order.displayFinancialStatus);
 }
 
 function mapFulfillmentStatus(status?: string | null): FulfillmentStatus {
@@ -111,7 +136,7 @@ export function mapAdminOrderToShopifyOrderSummary(
     customerName: order.customer?.displayName?.trim() || "Unknown customer",
     createdAt: order.createdAt,
     totalAmount: Number(order.totalPriceSet?.shopMoney?.amount ?? "0"),
-    financialStatus: mapFinancialStatus(order.displayFinancialStatus),
+    financialStatus: normalizeFinancialStatus(order),
     fulfillmentStatus: mapFulfillmentStatus(order.displayFulfillmentStatus),
   };
 }

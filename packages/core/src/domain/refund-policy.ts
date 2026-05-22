@@ -61,6 +61,8 @@ const REFUND_POLICY_REASON_COPY = {
   alreadyRefundedReview:
     "Refund subject has already been refunded and requires manual review.",
   alreadyRefunded: "Refund subject has already been refunded.",
+  refundPending:
+    "Refund has already been initiated in Shopify and is still pending.",
   finalSaleUnavailableForRefund: "Refund subject is marked final sale.",
   finalSaleUnfulfilledAllowed:
     "Refund subject is marked final sale, but merchant policy allows cancellation before shipment.",
@@ -79,7 +81,9 @@ const REFUND_POLICY_REASON_COPY = {
 function financialStatusReviewRequiredMessage(
   effectiveFinancialStatus: FinancialStatus,
 ): string {
-  return `Refund subject financial status is ${effectiveFinancialStatus}, so it requires human review before a refund decision is approved.`;
+  const statusLabel = effectiveFinancialStatus.replace(/_/g, " ");
+
+  return `Refund subject financial status is ${statusLabel}, so it requires human review before a refund decision is approved.`;
 }
 
 function highValueOrderReviewRequiredMessage(
@@ -244,7 +248,7 @@ function getImmediateManualReviewReasons(
     Number.isFinite(config.highValueOrderThreshold) &&
     order.totalAmount >= config.highValueOrderThreshold;
   const requiresFinancialStatusReview =
-    itemContext.effectiveFinancialStatus === FinancialStatus.Pending ||
+    itemContext.effectiveFinancialStatus === FinancialStatus.PaymentPending ||
     itemContext.effectiveFinancialStatus === FinancialStatus.PartiallyPaid ||
     itemContext.effectiveFinancialStatus === FinancialStatus.Voided ||
     itemContext.effectiveFinancialStatus === FinancialStatus.Unknown;
@@ -393,6 +397,15 @@ function evaluateRefundPolicyForItem(
       immediateManualReviewReasons,
     );
     return result;
+  }
+
+  if (itemContext.effectiveFinancialStatus === FinancialStatus.RefundPending) {
+    blockingReasons.push(
+      makeReason(
+        RefundReasonCode.RefundPending,
+        REFUND_POLICY_REASON_COPY.refundPending,
+      ),
+    );
   }
 
   if (itemContext.alreadyRefunded) {
@@ -616,6 +629,10 @@ function getLineItemFinancialStatus(
     return FinancialStatus.Refunded;
   }
 
+  if (orderFinancialStatus === FinancialStatus.RefundPending) {
+    return FinancialStatus.RefundPending;
+  }
+
   if (orderFinancialStatus === FinancialStatus.PartiallyRefunded) {
     // lineItemAlreadyRefunded is false in this case.
     return FinancialStatus.Paid;
@@ -659,6 +676,18 @@ function createLineItemEvidence(
       lineItemId: lineItem.lineItemId,
       fulfillmentLineItemId: lineItem.fulfillmentLineItemId,
       title: lineItem.title,
+      ...(lineItem.sku ? { sku: lineItem.sku } : {}),
+      ...(lineItem.variantTitle
+        ? { variantTitle: lineItem.variantTitle }
+        : {}),
+      ...(lineItem.variantOptions
+        ? { variantOptions: lineItem.variantOptions }
+        : {}),
+      ...(lineItem.imageUrl ? { imageUrl: lineItem.imageUrl } : {}),
+      ...(lineItem.imageAltText
+        ? { imageAltText: lineItem.imageAltText }
+        : {}),
+      ...(lineItem.unitPrice ? { unitPrice: lineItem.unitPrice } : {}),
       returnableQuantity: lineItem.returnableQuantity,
       ageDays: itemContext.effectiveAgeDays,
       effectiveFinancialStatus: itemContext.effectiveFinancialStatus,
@@ -795,7 +824,9 @@ function createEvaluatedOrder(
     .map((lineItem) => lineItem.category)
     .filter((category): category is string => category !== undefined);
 
-  // if the order financial status is Refunded, we treat every line item as refunded for summary purposes.
+  // If the order financial status is Refunded, we treat every line item as
+  // refunded for summary purposes. RefundPending stays distinct so the UI does
+  // not present an in-flight refund as completed.
   const allLineItemsRefunded = lineItems.every(
     (lineItem) =>
       input.order.financialStatus === FinancialStatus.Refunded ||
@@ -811,12 +842,14 @@ function createEvaluatedOrder(
 
   return {
     effectiveFinancialStatus:
-      allLineItemsRefunded ||
-      input.order.financialStatus === FinancialStatus.Refunded
-        ? FinancialStatus.Refunded
-        : input.order.financialStatus === FinancialStatus.PartiallyRefunded
-          ? FinancialStatus.Paid
-          : input.order.financialStatus,
+      input.order.financialStatus === FinancialStatus.RefundPending
+        ? FinancialStatus.RefundPending
+        : allLineItemsRefunded ||
+            input.order.financialStatus === FinancialStatus.Refunded
+          ? FinancialStatus.Refunded
+          : input.order.financialStatus === FinancialStatus.PartiallyRefunded
+            ? FinancialStatus.Paid
+            : input.order.financialStatus,
     fulfillmentStatus,
     hasAnyReturnableFulfillment,
     allLineItemsRefunded,

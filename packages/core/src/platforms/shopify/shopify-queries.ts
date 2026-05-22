@@ -12,14 +12,49 @@ export const REFUND_ORDER_CONTEXT_QUERY = /* GraphQL */ `
       }
       displayFinancialStatus
       displayFulfillmentStatus
+      transactions(first: 20) {
+        kind
+        status
+      }
       lineItems(first: 100) {
         nodes {
           id
           title
+          sku
           currentQuantity
+          originalUnitPriceSet {
+            shopMoney {
+              amount
+              currencyCode
+            }
+            presentmentMoney {
+              amount
+              currencyCode
+            }
+          }
+          variant {
+            title
+            sku
+            selectedOptions {
+              name
+              value
+            }
+            image {
+              url
+              altText
+            }
+          }
           product {
             category {
               fullName
+            }
+            featuredMedia {
+              preview {
+                image {
+                  url
+                  altText
+                }
+              }
             }
           }
           customAttributes {
@@ -218,6 +253,10 @@ export const SHOPIFY_ORDERS_LIST_QUERY = /* GraphQL */ `
         }
         displayFinancialStatus
         displayFulfillmentStatus
+        transactions(first: 20) {
+          kind
+          status
+        }
         customer {
           displayName
         }

@@ -162,7 +162,7 @@ test("returns manual_review for high-value orders when merchant policy configure
 });
 
 [
-  FinancialStatus.Pending,
+  FinancialStatus.PaymentPending,
   FinancialStatus.PartiallyPaid,
   FinancialStatus.Voided,
   FinancialStatus.Unknown,
@@ -182,6 +182,25 @@ test("returns manual_review for high-value orders when merchant policy configure
       ),
     );
   });
+});
+
+test("returns ineligible for refund-pending orders", () => {
+  const result = evaluateRefundPolicy(
+    makeInput({
+      financialStatus: FinancialStatus.RefundPending,
+    }),
+  );
+
+  assert.equal(result.decision, RefundDecision.Ineligible);
+  assert.ok(
+    result.reasons.some(
+      (reason) => reason.code === RefundReasonCode.RefundPending,
+    ),
+  );
+  assert.equal(
+    result.evidence.evaluatedOrder.effectiveFinancialStatus,
+    FinancialStatus.RefundPending,
+  );
 });
 
 test("returns ineligible for unfulfilled final-sale orders by default", () => {

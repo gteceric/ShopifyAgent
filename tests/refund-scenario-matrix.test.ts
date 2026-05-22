@@ -10,11 +10,20 @@ import { REFUND_SCENARIO_MATRIX } from "./fixtures/refund-scenario-matrix.js";
 
 function getExpectedNextAction(
   decision: RefundDecision,
+  reasonCodes: RefundReasonCode[],
 ): RecommendedRefundAction {
   switch (decision) {
     case RefundDecision.Eligible:
       return RecommendedRefundAction.Approve;
     case RefundDecision.Ineligible:
+      if (reasonCodes.includes(RefundReasonCode.RefundPending)) {
+        return RecommendedRefundAction.RefundPending;
+      }
+
+      if (reasonCodes.includes(RefundReasonCode.AlreadyFullyRefunded)) {
+        return RecommendedRefundAction.NoActionNeeded;
+      }
+
       return RecommendedRefundAction.Deny;
     case RefundDecision.ManualReview:
       return RecommendedRefundAction.ManualReview;
@@ -72,7 +81,10 @@ for (const scenario of REFUND_SCENARIO_MATRIX) {
     assert.equal(result.policyResult.decision, scenario.expectedDecision);
     assert.equal(
       result.recommendedNextAction,
-      getExpectedNextAction(scenario.expectedDecision),
+      getExpectedNextAction(
+        scenario.expectedDecision,
+        scenario.expectedReasonCodes,
+      ),
     );
     assert.equal(
       result.escalationRequired,
