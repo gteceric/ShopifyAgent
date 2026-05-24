@@ -173,6 +173,15 @@ function hasReason(
   return result.policyResult.reasons.some((reason) => reason.code === code);
 }
 
+function hasPartiallyRefundedOrderStatus(
+  result: CheckRefundEligibilityResult,
+): boolean {
+  return (
+    result.policyResult.evidence.order.financialStatus ===
+    FinancialStatus.PartiallyRefunded
+  );
+}
+
 function formatDecisionSummary(result: CheckRefundEligibilityResult): string {
   const policyResult = result.policyResult;
   const evaluatedOrder = policyResult.evidence.evaluatedOrder;
@@ -191,6 +200,10 @@ function formatDecisionSummary(result: CheckRefundEligibilityResult): string {
 
   if (policyResult.decision === RefundDecision.Ineligible) {
     if (hasReason(result, RefundReasonCode.RefundPending)) {
+      if (hasPartiallyRefundedOrderStatus(result)) {
+        return "Order is partially refunded and another refund is pending in Shopify.";
+      }
+
       return "Refund is already pending in Shopify.";
     }
 
@@ -261,6 +274,10 @@ function formatRecommendedAction(result: CheckRefundEligibilityResult): string {
         ? "Approve the cancellation and refund flow."
         : "Approve the standard refund flow.";
     case RecommendedRefundAction.RefundPending:
+      if (hasPartiallyRefundedOrderStatus(result)) {
+        return "Partially refunded order has a refund pending in Shopify. Do not create another refund yet.";
+      }
+
       return "Refund pending in Shopify. Do not create another refund yet.";
     case RecommendedRefundAction.NoActionNeeded:
       return "No further refund action is needed.";

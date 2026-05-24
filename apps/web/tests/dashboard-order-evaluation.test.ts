@@ -275,6 +275,38 @@ test("summarizes refund-pending decisions distinctly from refunded orders", () =
   );
 });
 
+test("summarizes partially refunded orders with pending refunds", () => {
+  const refundResult = makeRefundResult();
+  refundResult.recommendedNextAction = RecommendedRefundAction.RefundPending;
+  refundResult.policyResult.decision = RefundDecision.Ineligible;
+  refundResult.policyResult.reasons = [
+    {
+      code: RefundReasonCode.RefundPending,
+      message: "Refund has already been initiated in Shopify and is pending.",
+    },
+  ];
+  refundResult.policyResult.evidence.order = {
+    ...order,
+    financialStatus: FinancialStatus.PartiallyRefunded,
+  };
+  refundResult.policyResult.evidence.evaluatedOrder.effectiveFinancialStatus =
+    FinancialStatus.RefundPending;
+
+  const dashboardOrder = applyRefundEvaluationToOrder(
+    makeDashboardOrder(),
+    refundResult,
+  );
+
+  assert.equal(
+    dashboardOrder.refundEvaluation.reasonSummary,
+    "Order is partially refunded and another refund is pending in Shopify.",
+  );
+  assert.equal(
+    dashboardOrder.refundEvaluation.recommendedNextAction,
+    "Partially refunded order has a refund pending in Shopify. Do not create another refund yet.",
+  );
+});
+
 test("summarizes mixed pending and eligible line items as manual review", () => {
   const refundResult = makeRefundResult();
   refundResult.policyResult.reasons = [
