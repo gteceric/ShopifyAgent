@@ -135,6 +135,56 @@ test("validates eligible returnable line items as ready for refund execution", (
   ]);
 });
 
+test("validates remaining returnable quantity when a line item has a pending partial refund", () => {
+  const eligibilityResult = makeEligibilityResult();
+  const itemEvaluation = eligibilityResult.policyResult.itemEvaluations[0]!;
+  const validation = validateRefundAction(
+    {
+      orderId: order.id,
+      lineItems: [
+        {
+          lineItemId: "gid://shopify/LineItem/700000000070",
+          quantity: 2,
+        },
+      ],
+    },
+    {
+      ...eligibilityResult,
+      policyResult: {
+        ...eligibilityResult.policyResult,
+        itemEvaluations: [
+          {
+            ...itemEvaluation,
+            decision: RefundDecision.Eligible,
+            evidence: {
+              ...itemEvaluation.evidence,
+              evaluatedLineItem: {
+                ...itemEvaluation.evidence.evaluatedLineItem,
+                returnableQuantity: 2,
+                pendingRefundQuantity: 1,
+                effectiveFinancialStatus: FinancialStatus.Paid,
+              },
+            },
+          },
+        ],
+      },
+    },
+  );
+
+  assert.equal(validation.status, RefundActionValidationStatus.Ready);
+  assert.deepEqual(validation.blockers, []);
+  assert.deepEqual(validation.matchedLineItems, [
+    {
+      lineItemId: "gid://shopify/LineItem/700000000070",
+      fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/800000000070",
+      title: "Returnable Shirt",
+      requestedQuantity: 2,
+      returnableQuantity: 2,
+      decision: RefundDecision.Eligible,
+    },
+  ]);
+});
+
 test("validates multiple eligible returnable line items as ready for refund execution", () => {
   const eligibilityResult = makeEligibilityResult();
   const firstItemEvaluation = eligibilityResult.policyResult.itemEvaluations[0]!;

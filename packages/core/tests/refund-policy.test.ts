@@ -211,14 +211,14 @@ test("returns manual_review when one line item is refund pending and siblings re
     makeInput({
       lineItems: [
         {
-            lineItemId: "gid://shopify/LineItem/1",
-            title: "Pending Refund Shirt",
-            returnableQuantity: 0,
-            pendingRefundQuantity: 1,
-            fulfillmentStatus: FulfillmentStatus.Fulfilled,
-            hasReturnableFulfillment: false,
-            alreadyRefunded: false,
-            finalSale: false,
+          lineItemId: "gid://shopify/LineItem/1",
+          title: "Pending Refund Shirt",
+          returnableQuantity: 0,
+          pendingRefundQuantity: 1,
+          fulfillmentStatus: FulfillmentStatus.Fulfilled,
+          hasReturnableFulfillment: false,
+          alreadyRefunded: false,
+          finalSale: false,
         },
         {
           lineItemId: "gid://shopify/LineItem/2",
