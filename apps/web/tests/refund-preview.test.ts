@@ -206,6 +206,6 @@ test("stops before Shopify preview when selected item is not eligible", async ()
   assert.equal(result.validationStatus, "blocked");
   assert.deepEqual(
     result.blockers?.map((blocker) => blocker.code),
-    ["manual_review_required", "line_item_not_eligible"],
+    ["line_item_not_eligible"],
   );
 });

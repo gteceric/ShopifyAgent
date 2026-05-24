@@ -353,6 +353,116 @@ test("maps Shopify pending refund transactions as refund pending", () => {
   assert.equal(result.lineItems[0]?.alreadyRefunded, false);
 });
 
+test("maps pending refund line items without locking eligible siblings", () => {
+  const result = mapAdminOrderToRefundContext(
+    {
+      id: "gid://shopify/Order/900000000307",
+      name: "#3007",
+      tags: [],
+      createdAt: "2026-03-25T00:00:00.000Z",
+      totalPriceSet: {
+        shopMoney: {
+          amount: "125.00",
+        },
+      },
+      displayFinancialStatus: "PAID",
+      displayFulfillmentStatus: "FULFILLED",
+      transactions: [],
+      refunds: [
+        {
+          id: "gid://shopify/Refund/600000000307",
+          refundLineItems: {
+            nodes: [
+              {
+                quantity: 1,
+                lineItem: {
+                  id: "gid://shopify/LineItem/700000000307",
+                },
+              },
+            ],
+          },
+          transactions: {
+            edges: [
+              {
+                node: {
+                  status: "PENDING",
+                },
+              },
+            ],
+          },
+        },
+      ],
+      lineItems: {
+        nodes: [
+          {
+            id: "gid://shopify/LineItem/700000000307",
+            title: "Pending Refund Sunglasses",
+            currentQuantity: 1,
+            product: {
+              category: {
+                fullName: "Apparel & Accessories > Clothing Accessories",
+              },
+            },
+            customAttributes: [],
+          },
+          {
+            id: "gid://shopify/LineItem/700000000308",
+            title: "Still Eligible Sunglasses",
+            currentQuantity: 1,
+            product: {
+              category: {
+                fullName: "Apparel & Accessories > Clothing Accessories",
+              },
+            },
+            customAttributes: [],
+          },
+        ],
+      },
+      fraudHoldFlag: { value: "false" },
+      manualReviewFlag: { value: "false" },
+      vipOverrideFlag: { value: "false" },
+    },
+    {
+      returnableFulfillments: {
+        nodes: [
+          {
+            id: "gid://shopify/ReturnableFulfillment/4",
+            returnableFulfillmentLineItems: {
+              nodes: [
+                {
+                  quantity: 1,
+                  fulfillmentLineItem: {
+                    id: "gid://shopify/FulfillmentLineItem/800000000307",
+                    lineItem: {
+                      id: "gid://shopify/LineItem/700000000307",
+                    },
+                  },
+                },
+                {
+                  quantity: 1,
+                  fulfillmentLineItem: {
+                    id: "gid://shopify/FulfillmentLineItem/800000000308",
+                    lineItem: {
+                      id: "gid://shopify/LineItem/700000000308",
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    new Date("2026-03-30T00:00:00.000Z"),
+  );
+
+  assert.equal(result.order.financialStatus, FinancialStatus.Paid);
+  assert.equal(result.lineItems[0]?.pendingRefundQuantity, 1);
+  assert.equal(result.lineItems[0]?.alreadyRefunded, false);
+  assert.equal(result.lineItems[1]?.pendingRefundQuantity, undefined);
+  assert.equal(result.lineItems[1]?.hasReturnableFulfillment, true);
+});
+
 test("does not treat paid zero-current-quantity line items as refunded", () => {
   const result = mapAdminOrderToRefundContext(
     {

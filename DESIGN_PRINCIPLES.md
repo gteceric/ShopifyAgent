@@ -77,6 +77,18 @@ meaningful object shapes.
 - Avoid noisy annotations for values where the type is already obvious, such as
   `const quantity = 1` or `const hasErrors = result.userErrors.length > 0`.
 
+## Prefer Switches for Enum-Like States
+
+When branching on enum-like domain states, use `switch` instead of a chain of
+`if` statements.
+
+- Prefer `switch` for values such as `FinancialStatus`, `RefundDecision`,
+  `ManualReviewKind`, and `RecommendedRefundAction`.
+- Use `if` for boolean guards, validation checks, early returns, and compound
+  predicates.
+- Keep guard checks before the `switch` when they override the enum-like fallback,
+  such as line-item pending/refunded facts before order financial status.
+
 ## Refund Decisions Are Item-Level
 
 Refund eligibility must be decided from line items, not only from an order-level summary.

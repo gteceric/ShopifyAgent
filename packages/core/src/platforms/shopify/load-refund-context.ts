@@ -97,6 +97,24 @@ interface ShopifyRefundOrderContextResponse {
       kind?: string | null;
       status?: string | null;
     }> | null;
+    refunds?: Array<{
+        id: string;
+        refundLineItems?: {
+          nodes: Array<{
+            quantity: number;
+            lineItem?: {
+              id: string;
+            } | null;
+          }>;
+        } | null;
+        transactions?: {
+          edges: Array<{
+            node: {
+              status?: string | null;
+            };
+          }>;
+        } | null;
+      }> | null;
     lineItems: {
       nodes: ShopifyAdminLineItem[];
     };
@@ -159,15 +177,28 @@ function hasPendingRefundTransaction(
   return (
     transactions?.some(
       (transaction) =>
-        transaction.kind === "REFUND" && transaction.status === "PENDING",
+        transaction.kind === "REFUND" &&
+        isPendingRefundTransactionStatus(transaction.status),
     ) ?? false
+  );
+}
+
+function isPendingRefundTransactionStatus(status?: string | null): boolean {
+  return ["PENDING", "AWAITING_RESPONSE", "PROCESSING"].includes(
+    status ?? "",
   );
 }
 
 function normalizeFinancialStatus(
   order: NonNullable<ShopifyRefundOrderContextResponse["order"]>,
 ): FinancialStatus {
-  if (hasPendingRefundTransaction(order.transactions)) {
+  const hasLineItemScopedPendingRefunds =
+    collectPendingRefundQuantitiesByLineItemId(order).size > 0;
+
+  if (
+    hasPendingRefundTransaction(order.transactions) &&
+    !hasLineItemScopedPendingRefunds
+  ) {
     return FinancialStatus.RefundPending;
   }
 
@@ -339,18 +370,55 @@ function collectReturnableLineItems(
   return returnableLineItems;
 }
 
+function collectPendingRefundQuantitiesByLineItemId(
+  order: NonNullable<ShopifyRefundOrderContextResponse["order"]>,
+): Map<string, number> {
+  const pendingRefundQuantitiesByLineItemId = new Map<string, number>();
+
+  for (const refund of order.refunds ?? []) {
+    const hasPendingTransaction =
+      refund.transactions?.edges.some(({ node }) =>
+        isPendingRefundTransactionStatus(node.status),
+      ) ?? false;
+
+    if (!hasPendingTransaction) {
+      continue;
+    }
+
+    for (const refundLineItem of refund.refundLineItems?.nodes ?? []) {
+      const lineItemId = refundLineItem.lineItem?.id;
+
+      if (!lineItemId || refundLineItem.quantity <= 0) {
+        continue;
+      }
+
+      pendingRefundQuantitiesByLineItemId.set(
+        lineItemId,
+        (pendingRefundQuantitiesByLineItemId.get(lineItemId) ?? 0) +
+          refundLineItem.quantity,
+      );
+    }
+  }
+
+  return pendingRefundQuantitiesByLineItemId;
+}
+
 function mapAdminLineItemsToRefundContextLineItems(
   order: NonNullable<ShopifyRefundOrderContextResponse["order"]>,
   returnable: ShopifyReturnableFulfillmentsResponse,
   financialStatus: FinancialStatus,
 ): RefundContextLineItem[] {
   const returnableLineItems = collectReturnableLineItems(returnable);
+  const pendingRefundQuantitiesByLineItemId =
+    collectPendingRefundQuantitiesByLineItemId(order);
   const orderFulfillmentStatus = mapFulfillmentStatus(
     order.displayFulfillmentStatus,
   );
 
   return order.lineItems.nodes.map((lineItem) => {
     const returnableLineItem = returnableLineItems.get(lineItem.id);
+    const pendingRefundQuantity =
+      pendingRefundQuantitiesByLineItemId.get(lineItem.id);
     const image = pickLineItemImage(lineItem);
     const sku = normalizeOptionalString(lineItem.sku ?? lineItem.variant?.sku);
     const variantTitle = normalizeOptionalString(lineItem.variant?.title);
@@ -374,13 +442,18 @@ function mapAdminLineItemsToRefundContextLineItems(
       ...(imageAltText ? { imageAltText } : {}),
       ...(unitPrice ? { unitPrice } : {}),
       returnableQuantity: returnableLineItem?.returnableQuantity ?? 0,
+      ...(pendingRefundQuantity !== undefined
+        ? { pendingRefundQuantity }
+        : {}),
       category: lineItem.product?.category?.fullName ?? undefined,
       fulfillmentStatus: orderFulfillmentStatus,
       hasReturnableFulfillment: returnableLineItem !== undefined,
       alreadyRefunded:
-        financialStatus === FinancialStatus.Refunded ||
-        (financialStatus === FinancialStatus.PartiallyRefunded &&
-          lineItem.currentQuantity <= 0),
+        pendingRefundQuantity !== undefined
+          ? false
+          : financialStatus === FinancialStatus.Refunded ||
+            (financialStatus === FinancialStatus.PartiallyRefunded &&
+              lineItem.currentQuantity <= 0),
       finalSale: isFinalSaleLineItem(lineItem),
     };
   });

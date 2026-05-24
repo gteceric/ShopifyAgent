@@ -1,6 +1,7 @@
 import {
   FinancialStatus,
   FulfillmentStatus,
+  ManualReviewKind,
   RefundDecision,
   RefundReasonCode,
 } from "./refund-policy.types.js";
@@ -28,6 +29,7 @@ interface RefundPolicyItemContext {
   fulfillmentStatus: FulfillmentStatus; // Shopify-backed fulfillment status normalized by the adapter
   hasReturnableFulfillment: boolean; // from Shopify returnable fulfillments
   alreadyRefunded: boolean; // derived from Shopify order/item refund state
+  pendingRefundQuantity?: number; // quantity currently attached to an in-flight Shopify refund
   finalSale: boolean; // from Shopify line item custom attributes
   itemCategories: string[]; // normalized Shopify product category data
 }
@@ -77,6 +79,15 @@ const REFUND_POLICY_REASON_COPY = {
   unfulfilledOutsideWindowAllowed:
     "Refund subject has not been fulfilled yet, and merchant policy allows cancellation outside the standard cancellation window.",
 } as const;
+
+const HARD_MANUAL_REVIEW_REASON_CODES: RefundReasonCode[] = [
+  RefundReasonCode.ManualReviewRequired,
+  RefundReasonCode.FinancialStatusReviewRequired,
+  RefundReasonCode.HighValueOrderReviewRequired,
+  RefundReasonCode.PartialFulfillmentReviewRequired,
+  RefundReasonCode.PreFulfillmentCancellationReviewRequired,
+  RefundReasonCode.PreFulfillmentFinalSaleReviewRequired,
+];
 
 function financialStatusReviewRequiredMessage(
   effectiveFinancialStatus: FinancialStatus,
@@ -615,30 +626,30 @@ function evaluateRefundPolicyForItem(
   );
 }
 
-// Item A: ineligible, already refunded
-// Item B: eligible, still refundable
-// Overall: manual_review because mixed
-function getLineItemFinancialStatus(
+function deriveEffectiveLineItemFinancialStatus(
   orderFinancialStatus: FinancialStatus,
   lineItemAlreadyRefunded: boolean,
+  lineItemPendingRefundQuantity?: number,
 ): FinancialStatus {
-  if (
-    orderFinancialStatus === FinancialStatus.Refunded ||
-    lineItemAlreadyRefunded
-  ) {
-    return FinancialStatus.Refunded;
-  }
-
-  if (orderFinancialStatus === FinancialStatus.RefundPending) {
+  if (lineItemPendingRefundQuantity && lineItemPendingRefundQuantity > 0) {
     return FinancialStatus.RefundPending;
   }
 
-  if (orderFinancialStatus === FinancialStatus.PartiallyRefunded) {
-    // lineItemAlreadyRefunded is false in this case.
-    return FinancialStatus.Paid;
+  if (lineItemAlreadyRefunded) {
+    return FinancialStatus.Refunded;
   }
 
-  return orderFinancialStatus;
+  // order level fallback
+  switch (orderFinancialStatus) {
+    case FinancialStatus.Refunded:
+      return FinancialStatus.Refunded;
+    case FinancialStatus.RefundPending:
+      return FinancialStatus.RefundPending;
+    case FinancialStatus.PartiallyRefunded:
+      return FinancialStatus.Paid;
+    default:
+      return orderFinancialStatus;
+  }
 }
 
 // Convert adapter-normalized order and line item facts into the shape used by
@@ -650,13 +661,15 @@ function createRefundPolicyItemContext(
   return {
     order,
     effectiveAgeDays: lineItem.ageDaysOverride ?? order.ageDays,
-    effectiveFinancialStatus: getLineItemFinancialStatus(
+    effectiveFinancialStatus: deriveEffectiveLineItemFinancialStatus(
       order.financialStatus,
       lineItem.alreadyRefunded,
+      lineItem.pendingRefundQuantity,
     ),
     fulfillmentStatus: lineItem.fulfillmentStatus,
     hasReturnableFulfillment: lineItem.hasReturnableFulfillment,
     alreadyRefunded: lineItem.alreadyRefunded,
+    pendingRefundQuantity: lineItem.pendingRefundQuantity,
     finalSale: lineItem.finalSale,
     itemCategories: lineItem.category ? [lineItem.category] : [],
   };
@@ -677,18 +690,17 @@ function createLineItemEvidence(
       fulfillmentLineItemId: lineItem.fulfillmentLineItemId,
       title: lineItem.title,
       ...(lineItem.sku ? { sku: lineItem.sku } : {}),
-      ...(lineItem.variantTitle
-        ? { variantTitle: lineItem.variantTitle }
-        : {}),
+      ...(lineItem.variantTitle ? { variantTitle: lineItem.variantTitle } : {}),
       ...(lineItem.variantOptions
         ? { variantOptions: lineItem.variantOptions }
         : {}),
       ...(lineItem.imageUrl ? { imageUrl: lineItem.imageUrl } : {}),
-      ...(lineItem.imageAltText
-        ? { imageAltText: lineItem.imageAltText }
-        : {}),
+      ...(lineItem.imageAltText ? { imageAltText: lineItem.imageAltText } : {}),
       ...(lineItem.unitPrice ? { unitPrice: lineItem.unitPrice } : {}),
       returnableQuantity: lineItem.returnableQuantity,
+      ...(lineItem.pendingRefundQuantity !== undefined
+        ? { pendingRefundQuantity: lineItem.pendingRefundQuantity }
+        : {}),
       ageDays: itemContext.effectiveAgeDays,
       effectiveFinancialStatus: itemContext.effectiveFinancialStatus,
       fulfillmentStatus: itemContext.fulfillmentStatus,
@@ -788,6 +800,31 @@ function combineItemReasons(
   }
 
   return reasons;
+}
+
+function resolveManualReviewKind(
+  decision: RefundDecision,
+  reasons: RefundReason[],
+  itemEvaluations: RefundPolicyLineItemEvaluation[],
+): ManualReviewKind | undefined {
+  if (decision !== RefundDecision.ManualReview) {
+    return undefined;
+  }
+
+  if (
+    reasons.some((reason) =>
+      HARD_MANUAL_REVIEW_REASON_CODES.includes(reason.code),
+    )
+  ) {
+    return ManualReviewKind.HardReason;
+  }
+
+  const itemDecisions = itemEvaluations.map(
+    (itemEvaluation) => itemEvaluation.decision,
+  );
+  const hasMixedItemDecisions = new Set(itemDecisions).size > 1;
+
+  return hasMixedItemDecisions ? ManualReviewKind.MixedItem : undefined;
 }
 
 // [fulfilled, fulfilled]       -> fulfilled
@@ -939,10 +976,16 @@ function evaluateItemLevelRefundPolicy(
   });
   const decision = combineItemDecisions(itemEvaluations);
   const reasons = combineItemReasons(decision, itemEvaluations);
+  const manualReviewKind = resolveManualReviewKind(
+    decision,
+    reasons,
+    itemEvaluations,
+  );
   const evidence = createOrderEvidence(input, config, itemEvaluations);
 
   return {
     decision,
+    ...(manualReviewKind ? { manualReviewKind } : {}),
     reasons,
     evidence,
     itemEvaluations,

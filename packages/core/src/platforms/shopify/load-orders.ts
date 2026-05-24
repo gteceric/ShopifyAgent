@@ -84,7 +84,10 @@ function hasPendingRefundTransaction(
   return (
     transactions?.some(
       (transaction) =>
-        transaction.kind === "REFUND" && transaction.status === "PENDING",
+        transaction.kind === "REFUND" &&
+        ["PENDING", "AWAITING_RESPONSE", "PROCESSING"].includes(
+          transaction.status ?? "",
+        ),
     ) ?? false
   );
 }

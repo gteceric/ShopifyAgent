@@ -2,6 +2,7 @@ import {
   createPolicyConfig,
   FinancialStatus,
   FulfillmentStatus,
+  ManualReviewKind,
   RecommendedRefundAction,
   RefundDecision,
   RefundReasonCode,
@@ -212,12 +213,16 @@ function formatDecisionSummary(result: CheckRefundEligibilityResult): string {
     return "Merchant policy blocks an automatic refund.";
   }
 
+  if (policyResult.manualReviewKind === ManualReviewKind.MixedItem) {
+    if (hasReason(result, RefundReasonCode.RefundPending)) {
+      return "A refund is processing in Shopify for part of this order.";
+    }
+
+    return "Mixed item eligibility requires human review.";
+  }
+
   // Priority list for the one-line manual-review summary shown in the dashboard.
   const manualReviewSummaries = [
-    {
-      reasonCode: RefundReasonCode.MixedItemEligibilityReviewRequired,
-      summary: "Mixed item eligibility requires human review.",
-    },
     {
       reasonCode: RefundReasonCode.HighValueOrderReviewRequired,
       summary: "High-value order crosses the merchant review threshold.",
@@ -260,19 +265,24 @@ function formatRecommendedAction(result: CheckRefundEligibilityResult): string {
     case RecommendedRefundAction.NoActionNeeded:
       return "No further refund action is needed.";
     case RecommendedRefundAction.Deny:
-      if (hasReason(result, RefundReasonCode.ReturnableFulfillmentsUnavailable)) {
+      if (
+        hasReason(result, RefundReasonCode.ReturnableFulfillmentsUnavailable)
+      ) {
         return "Review the Shopify order timeline before attempting another refund.";
       }
 
       return "Decline the refund request with policy wording.";
     case RecommendedRefundAction.ManualReview:
-      if (
-        hasReason(result, RefundReasonCode.MixedItemEligibilityReviewRequired)
-      ) {
-        return "Review item-level eligibility before promising an outcome.";
+      switch (policyResult.manualReviewKind) {
+        case ManualReviewKind.MixedItem:
+          if (hasReason(result, RefundReasonCode.RefundPending)) {
+            return "Review item-level status before creating another refund.";
+          }
+          return "Review item-level eligibility before promising an outcome.";
+        case ManualReviewKind.HardReason:
+        default:
+          return "Escalate to a human reviewer before promising an outcome.";
       }
-
-      return "Escalate to a human reviewer before promising an outcome.";
   }
 }
 
@@ -378,6 +388,14 @@ function buildItemEvaluationViewModels(
         label: "Returnable Qty",
         value: lineItem.returnableQuantity.toString(),
       },
+      ...(lineItem.pendingRefundQuantity !== undefined
+        ? [
+            {
+              label: "Pending Refund Qty",
+              value: lineItem.pendingRefundQuantity.toString(),
+            },
+          ]
+        : []),
       {
         label: "Returnable Fulfillment",
         value: formatBooleanLabel(lineItem.hasReturnableFulfillment),
@@ -407,16 +425,12 @@ function buildItemEvaluationViewModels(
       lineItemId: lineItem.lineItemId,
       title: itemTitle,
       ...(lineItem.sku ? { sku: lineItem.sku } : {}),
-      ...(lineItem.variantTitle
-        ? { variantTitle: lineItem.variantTitle }
-        : {}),
+      ...(lineItem.variantTitle ? { variantTitle: lineItem.variantTitle } : {}),
       ...(lineItem.variantOptions
         ? { variantOptions: lineItem.variantOptions }
         : {}),
       ...(lineItem.imageUrl ? { imageUrl: lineItem.imageUrl } : {}),
-      ...(lineItem.imageAltText
-        ? { imageAltText: lineItem.imageAltText }
-        : {}),
+      ...(lineItem.imageAltText ? { imageAltText: lineItem.imageAltText } : {}),
       ...(formatMoney(lineItem.unitPrice)
         ? { unitPriceLabel: formatMoney(lineItem.unitPrice) }
         : {}),

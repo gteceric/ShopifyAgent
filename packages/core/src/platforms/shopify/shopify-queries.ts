@@ -16,6 +16,26 @@ export const REFUND_ORDER_CONTEXT_QUERY = /* GraphQL */ `
         kind
         status
       }
+      # TODO: Paginate refunds/refundLineItems/transactions before production.
+      # V2 only needs enough recent refund records for typical orders.
+      refunds(first: 20) {
+        id
+        refundLineItems(first: 50) {
+          nodes {
+            quantity
+            lineItem {
+              id
+            }
+          }
+        }
+        transactions(first: 10) {
+          edges {
+            node {
+              status
+            }
+          }
+        }
+      }
       lineItems(first: 100) {
         nodes {
           id

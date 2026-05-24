@@ -1,4 +1,4 @@
-import { RefundDecision } from "../domain/refund-policy.types.js";
+import { ManualReviewKind, RefundDecision } from "../domain/refund-policy.types.js";
 import type { RefundPolicyLineItemEvaluation } from "../domain/refund-policy.types.js";
 import type { CheckRefundEligibilityResult } from "./check-refund-eligibility.js";
 
@@ -114,6 +114,16 @@ function resolveRefundActionValidationStatus(
   return RefundActionValidationStatus.Ready;
 }
 
+function requiresOrderLevelManualReviewBlocker(
+  eligibilityResult: CheckRefundEligibilityResult,
+): boolean {
+  return (
+    eligibilityResult.policyResult.decision === RefundDecision.ManualReview &&
+    eligibilityResult.policyResult.manualReviewKind ===
+      ManualReviewKind.HardReason
+  );
+}
+
 // Validate the standard fulfilled line-item refund path before execution.
 // This does not create a Shopify refund; it decides whether execution is allowed.
 export function validateRefundAction(
@@ -143,7 +153,7 @@ export function validateRefundAction(
     );
   }
 
-  if (eligibilityResult.policyResult.decision === RefundDecision.ManualReview) {
+  if (requiresOrderLevelManualReviewBlocker(eligibilityResult)) {
     blockers.push(
       makeBlocker(
         RefundActionBlockerCode.ManualReviewRequired,

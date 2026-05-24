@@ -5,6 +5,7 @@ import { evaluateRefundPolicy } from "../src/domain/refund-policy.js";
 import {
   FinancialStatus,
   FulfillmentStatus,
+  ManualReviewKind,
   RefundDecision,
   RefundReasonCode,
 } from "../src/domain/refund-policy.types.js";
@@ -116,6 +117,7 @@ test("returns manual_review for partially fulfilled orders", () => {
   );
 
   assert.equal(result.decision, RefundDecision.ManualReview);
+  assert.equal(result.manualReviewKind, ManualReviewKind.HardReason);
   assert.ok(
     result.reasons.some(
       (reason) =>
@@ -154,6 +156,7 @@ test("returns manual_review for high-value orders when merchant policy configure
   );
 
   assert.equal(result.decision, RefundDecision.ManualReview);
+  assert.equal(result.manualReviewKind, ManualReviewKind.HardReason);
   assert.ok(
     result.reasons.some(
       (reason) => reason.code === RefundReasonCode.HighValueOrderReviewRequired,
@@ -201,6 +204,60 @@ test("returns ineligible for refund-pending orders", () => {
     result.evidence.evaluatedOrder.effectiveFinancialStatus,
     FinancialStatus.RefundPending,
   );
+});
+
+test("returns manual_review when one line item is refund pending and siblings remain eligible", () => {
+  const result = evaluateRefundPolicy(
+    makeInput({
+      lineItems: [
+        {
+          lineItemId: "gid://shopify/LineItem/1",
+          title: "Pending Refund Shirt",
+          returnableQuantity: 1,
+          pendingRefundQuantity: 1,
+          fulfillmentStatus: FulfillmentStatus.Fulfilled,
+          hasReturnableFulfillment: true,
+          alreadyRefunded: false,
+          finalSale: false,
+        },
+        {
+          lineItemId: "gid://shopify/LineItem/2",
+          title: "Still Eligible Hat",
+          returnableQuantity: 1,
+          fulfillmentStatus: FulfillmentStatus.Fulfilled,
+          hasReturnableFulfillment: true,
+          alreadyRefunded: false,
+          finalSale: false,
+        },
+      ],
+    }),
+  );
+
+  assert.equal(result.decision, RefundDecision.ManualReview);
+  assert.equal(result.manualReviewKind, ManualReviewKind.MixedItem);
+  assert.ok(
+    result.reasons.some(
+      (reason) =>
+        reason.code === RefundReasonCode.MixedItemEligibilityReviewRequired,
+    ),
+  );
+  assert.ok(
+    result.reasons.some(
+      (reason) => reason.code === RefundReasonCode.RefundPending,
+    ),
+  );
+  assert.equal(result.itemEvaluations[0]?.decision, RefundDecision.Ineligible);
+  assert.equal(
+    result.itemEvaluations[0]?.evidence.evaluatedLineItem
+      .effectiveFinancialStatus,
+    FinancialStatus.RefundPending,
+  );
+  assert.equal(
+    result.itemEvaluations[0]?.evidence.evaluatedLineItem
+      .pendingRefundQuantity,
+    1,
+  );
+  assert.equal(result.itemEvaluations[1]?.decision, RefundDecision.Eligible);
 });
 
 test("returns ineligible for unfulfilled final-sale orders by default", () => {
@@ -257,6 +314,7 @@ test("returns manual_review for unfulfilled final-sale orders when merchant poli
   );
 
   assert.equal(result.decision, RefundDecision.ManualReview);
+  assert.equal(result.manualReviewKind, ManualReviewKind.HardReason);
   assert.ok(
     result.reasons.some(
       (reason) =>
@@ -275,6 +333,7 @@ test("returns manual_review for stale unfulfilled orders outside the cancellatio
   );
 
   assert.equal(result.decision, RefundDecision.ManualReview);
+  assert.equal(result.manualReviewKind, ManualReviewKind.HardReason);
   assert.ok(
     result.reasons.some(
       (reason) =>
@@ -744,6 +803,7 @@ test("evaluates final-sale and refundable line items separately", () => {
   );
 
   assert.equal(result.decision, RefundDecision.ManualReview);
+  assert.equal(result.manualReviewKind, ManualReviewKind.MixedItem);
   assert.equal(result.itemEvaluations?.[0]?.decision, RefundDecision.Ineligible);
   assert.equal(result.itemEvaluations?.[0]?.evidence.evaluatedLineItem.finalSale, true);
   assert.ok(
@@ -786,6 +846,7 @@ test("evaluates already-refunded line items without blocking refundable siblings
   );
 
   assert.equal(result.decision, RefundDecision.ManualReview);
+  assert.equal(result.manualReviewKind, ManualReviewKind.MixedItem);
   assert.equal(result.itemEvaluations?.[0]?.decision, RefundDecision.Ineligible);
   assert.equal(
     result.itemEvaluations?.[0]?.evidence.evaluatedLineItem

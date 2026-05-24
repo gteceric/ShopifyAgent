@@ -7,6 +7,14 @@ export const RefundDecision = {
 export type RefundDecision =
   (typeof RefundDecision)[keyof typeof RefundDecision];
 
+export const ManualReviewKind = {
+  MixedItem: "mixed_item",
+  HardReason: "hard_reason",
+} as const;
+
+export type ManualReviewKind =
+  (typeof ManualReviewKind)[keyof typeof ManualReviewKind];
+
 export type RefundPolicyExceptionDecision =
   | typeof RefundDecision.Eligible
   | typeof RefundDecision.ManualReview;
@@ -128,6 +136,7 @@ export interface RefundContextLineItem {
   imageAltText?: string;
   unitPrice?: RefundMoney;
   returnableQuantity: number;
+  pendingRefundQuantity?: number;
   ageDaysOverride?: number;
   category?: string;
   fulfillmentStatus: FulfillmentStatus;
@@ -184,6 +193,7 @@ export interface EvaluatedRefundPolicyLineItem {
   imageAltText?: string;
   unitPrice?: RefundMoney;
   returnableQuantity: number;
+  pendingRefundQuantity?: number;
   ageDays: number;
   effectiveFinancialStatus: FinancialStatus;
   fulfillmentStatus: FulfillmentStatus;
@@ -215,6 +225,7 @@ export interface RefundPolicyLineItemEvaluation {
 
 export interface RefundPolicyResult {
   decision: RefundDecision;
+  manualReviewKind?: ManualReviewKind;
   reasons: RefundReason[];
   evidence: RefundPolicyOrderEvidence;
   itemEvaluations: RefundPolicyLineItemEvaluation[];

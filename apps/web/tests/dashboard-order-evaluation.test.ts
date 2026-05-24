@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   FinancialStatus,
   FulfillmentStatus,
+  ManualReviewKind,
   RecommendedRefundAction,
   RefundDecision,
   RefundReasonCode,
@@ -65,6 +66,7 @@ function makeRefundResult(): CheckRefundEligibilityResult {
     recommendedNextAction: RecommendedRefundAction.ManualReview,
     policyResult: {
       decision: RefundDecision.ManualReview,
+      manualReviewKind: ManualReviewKind.MixedItem,
       reasons: [
         {
           code: RefundReasonCode.MixedItemEligibilityReviewRequired,
@@ -270,6 +272,59 @@ test("summarizes refund-pending decisions distinctly from refunded orders", () =
       (item) => item.label === "Financial Status",
     ),
     { label: "Financial Status", value: "Refund Pending" },
+  );
+});
+
+test("summarizes mixed pending and eligible line items as manual review", () => {
+  const refundResult = makeRefundResult();
+  refundResult.policyResult.reasons = [
+    {
+      code: RefundReasonCode.MixedItemEligibilityReviewRequired,
+      message:
+        "Refund request has mixed item eligibility, so a human should review the partial refund path.",
+    },
+    {
+      code: RefundReasonCode.RefundPending,
+      message: "Refund has already been initiated in Shopify and is pending.",
+    },
+    {
+      code: RefundReasonCode.WithinRefundWindow,
+      message: "Refund subject is within the 30-day refund window.",
+    },
+  ];
+  refundResult.policyResult.itemEvaluations[0]!.reasons = [
+    {
+      code: RefundReasonCode.RefundPending,
+      message: "Refund has already been initiated in Shopify and is pending.",
+    },
+  ];
+  refundResult.policyResult.itemEvaluations[0]!.evidence.evaluatedLineItem.effectiveFinancialStatus =
+    FinancialStatus.RefundPending;
+  refundResult.policyResult.itemEvaluations[0]!.evidence.evaluatedLineItem.pendingRefundQuantity =
+    1;
+
+  const dashboardOrder = applyRefundEvaluationToOrder(
+    makeDashboardOrder(),
+    refundResult,
+  );
+
+  assert.equal(dashboardOrder.refundEvaluation.decision, RefundDecision.ManualReview);
+  assert.equal(
+    dashboardOrder.refundEvaluation.reasonSummary,
+    "A refund is processing in Shopify for part of this order.",
+  );
+  assert.equal(
+    dashboardOrder.refundEvaluation.recommendedNextAction,
+    "Review item-level status before creating another refund.",
+  );
+  assert.deepEqual(
+    dashboardOrder.refundEvaluation.itemEvaluations?.[0]?.evidence.slice(0, 4),
+    [
+      { label: "Fulfillment", value: "Fulfilled" },
+      { label: "Financial Status", value: "Refund Pending" },
+      { label: "Returnable Qty", value: "1" },
+      { label: "Pending Refund Qty", value: "1" },
+    ],
   );
 });
 

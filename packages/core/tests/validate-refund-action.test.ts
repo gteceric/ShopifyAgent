@@ -13,6 +13,7 @@ import {
 import {
   FinancialStatus,
   FulfillmentStatus,
+  ManualReviewKind,
   RefundDecision,
   RefundReasonCode,
 } from "../src/domain/refund-policy.types.js";
@@ -215,6 +216,13 @@ test("requires review before refund execution for manual-review eligibility resu
       policyResult: {
         ...makeEligibilityResult().policyResult,
         decision: RefundDecision.ManualReview,
+        manualReviewKind: ManualReviewKind.HardReason,
+        reasons: [
+          {
+            code: RefundReasonCode.ManualReviewRequired,
+            message: "Refund request is flagged for manual review.",
+          },
+        ],
       },
     }),
   );
@@ -270,6 +278,13 @@ test("blocks refund execution when manual review also has invalid quantities", (
       policyResult: {
         ...makeEligibilityResult().policyResult,
         decision: RefundDecision.ManualReview,
+        manualReviewKind: ManualReviewKind.HardReason,
+        reasons: [
+          {
+            code: RefundReasonCode.ManualReviewRequired,
+            message: "Refund request is flagged for manual review.",
+          },
+        ],
       },
     }),
   );
@@ -282,6 +297,93 @@ test("blocks refund execution when manual review also has invalid quantities", (
       RefundActionBlockerCode.QuantityMustBePositiveInteger,
     ],
   );
+});
+
+test("allows eligible selected items when order review is only mixed item eligibility", () => {
+  const eligibilityResult = makeEligibilityResult();
+  const firstItemEvaluation = eligibilityResult.policyResult.itemEvaluations[0]!;
+  const eligibleSibling = {
+    ...firstItemEvaluation,
+    evidence: {
+      ...firstItemEvaluation.evidence,
+      evaluatedLineItem: {
+        ...firstItemEvaluation.evidence.evaluatedLineItem,
+        lineItemId: "gid://shopify/LineItem/700000000071",
+        fulfillmentLineItemId:
+          "gid://shopify/FulfillmentLineItem/800000000071",
+        title: "Returnable Pants",
+        returnableQuantity: 1,
+      },
+    },
+  };
+  const validation = validateRefundAction(
+    {
+      orderId: order.id,
+      lineItems: [
+        {
+          lineItemId: "gid://shopify/LineItem/700000000071",
+          quantity: 1,
+        },
+      ],
+    },
+    {
+      ...eligibilityResult,
+      escalationRequired: true,
+      recommendedNextAction: RecommendedRefundAction.ManualReview,
+      policyResult: {
+        ...eligibilityResult.policyResult,
+        decision: RefundDecision.ManualReview,
+        manualReviewKind: ManualReviewKind.MixedItem,
+        reasons: [
+          {
+            code: RefundReasonCode.MixedItemEligibilityReviewRequired,
+            message:
+              "Refund request has mixed item eligibility, so a human should review the partial refund path.",
+          },
+          {
+            code: RefundReasonCode.RefundPending,
+            message:
+              "Refund has already been initiated in Shopify and is still pending.",
+          },
+        ],
+        itemEvaluations: [
+          {
+            ...firstItemEvaluation,
+            decision: RefundDecision.Ineligible,
+            reasons: [
+              {
+                code: RefundReasonCode.RefundPending,
+                message:
+                  "Refund has already been initiated in Shopify and is still pending.",
+              },
+            ],
+            evidence: {
+              ...firstItemEvaluation.evidence,
+              evaluatedLineItem: {
+                ...firstItemEvaluation.evidence.evaluatedLineItem,
+                effectiveFinancialStatus: FinancialStatus.RefundPending,
+                pendingRefundQuantity: 1,
+              },
+            },
+          },
+          eligibleSibling,
+        ],
+      },
+    },
+  );
+
+  assert.equal(validation.status, RefundActionValidationStatus.Ready);
+  assert.deepEqual(validation.blockers, []);
+  assert.deepEqual(validation.matchedLineItems, [
+    {
+      lineItemId: "gid://shopify/LineItem/700000000071",
+      fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/800000000071",
+      title: "Returnable Pants",
+      requestedQuantity: 1,
+      returnableQuantity: 1,
+      decision: RefundDecision.Eligible,
+    },
+  ]);
 });
 
 test("blocks refund execution for ineligible line items and invalid quantities", () => {
