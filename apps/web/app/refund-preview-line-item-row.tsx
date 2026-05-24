@@ -27,6 +27,10 @@ function getVariantDetailLabels(
   return [...optionLabels, ...variantTitle, ...sku];
 }
 
+function getLineItemIdSuffix(lineItemId: string): string {
+  return lineItemId.split("/").at(-1) ?? lineItemId;
+}
+
 export function RefundPreviewLineItemRow({
   item,
   isSelected,
@@ -61,6 +65,12 @@ export function RefundPreviewLineItemRow({
             <strong className="block truncate text-sm text-stone-950">
               {item.title}
             </strong>
+            <span
+              title={item.lineItemId}
+              className="block truncate font-mono text-[11px] text-stone-500"
+            >
+              Line item {getLineItemIdSuffix(item.lineItemId)}
+            </span>
             {variantDetailLabels.length > 0 ? (
               <span className="block text-xs leading-5 text-stone-600">
                 {variantDetailLabels.join(" / ")}
@@ -68,6 +78,9 @@ export function RefundPreviewLineItemRow({
             ) : null}
             <span className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-stone-600">
               <span>Returnable: {item.returnableQuantity}</span>
+              {item.pendingRefundQuantity !== undefined ? (
+                <span>Pending: {item.pendingRefundQuantity}</span>
+              ) : null}
               {item.unitPriceLabel ? (
                 <span>Unit price: {item.unitPriceLabel}</span>
               ) : null}

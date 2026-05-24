@@ -211,14 +211,14 @@ test("returns manual_review when one line item is refund pending and siblings re
     makeInput({
       lineItems: [
         {
-          lineItemId: "gid://shopify/LineItem/1",
-          title: "Pending Refund Shirt",
-          returnableQuantity: 1,
-          pendingRefundQuantity: 1,
-          fulfillmentStatus: FulfillmentStatus.Fulfilled,
-          hasReturnableFulfillment: true,
-          alreadyRefunded: false,
-          finalSale: false,
+            lineItemId: "gid://shopify/LineItem/1",
+            title: "Pending Refund Shirt",
+            returnableQuantity: 0,
+            pendingRefundQuantity: 1,
+            fulfillmentStatus: FulfillmentStatus.Fulfilled,
+            hasReturnableFulfillment: false,
+            alreadyRefunded: false,
+            finalSale: false,
         },
         {
           lineItemId: "gid://shopify/LineItem/2",
@@ -258,6 +258,42 @@ test("returns manual_review when one line item is refund pending and siblings re
     1,
   );
   assert.equal(result.itemEvaluations[1]?.decision, RefundDecision.Eligible);
+});
+
+test("keeps a line item eligible when pending refund quantity still has remaining returnable quantity", () => {
+  const result = evaluateRefundPolicy(
+    makeInput({
+      lineItems: [
+        {
+          lineItemId: "gid://shopify/LineItem/1",
+          title: "Partially Pending Shirt",
+          returnableQuantity: 2,
+          pendingRefundQuantity: 1,
+          fulfillmentStatus: FulfillmentStatus.Fulfilled,
+          hasReturnableFulfillment: true,
+          alreadyRefunded: false,
+          finalSale: false,
+        },
+      ],
+    }),
+  );
+
+  assert.equal(result.decision, RefundDecision.Eligible);
+  assert.equal(result.manualReviewKind, undefined);
+  assert.equal(result.itemEvaluations[0]?.decision, RefundDecision.Eligible);
+  assert.equal(
+    result.itemEvaluations[0]?.evidence.evaluatedLineItem
+      .effectiveFinancialStatus,
+    FinancialStatus.Paid,
+  );
+  assert.equal(
+    result.itemEvaluations[0]?.evidence.evaluatedLineItem.pendingRefundQuantity,
+    1,
+  );
+  assert.equal(
+    result.itemEvaluations[0]?.evidence.evaluatedLineItem.returnableQuantity,
+    2,
+  );
 });
 
 test("returns ineligible for unfulfilled final-sale orders by default", () => {

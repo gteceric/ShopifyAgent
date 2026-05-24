@@ -29,6 +29,7 @@ interface RefundPolicyItemContext {
   fulfillmentStatus: FulfillmentStatus; // Shopify-backed fulfillment status normalized by the adapter
   hasReturnableFulfillment: boolean; // from Shopify returnable fulfillments
   alreadyRefunded: boolean; // derived from Shopify order/item refund state
+  returnableQuantity: number; // quantity Shopify currently allows through the returnable fulfillment path
   pendingRefundQuantity?: number; // quantity currently attached to an in-flight Shopify refund
   finalSale: boolean; // from Shopify line item custom attributes
   itemCategories: string[]; // normalized Shopify product category data
@@ -629,9 +630,14 @@ function evaluateRefundPolicyForItem(
 function deriveEffectiveLineItemFinancialStatus(
   orderFinancialStatus: FinancialStatus,
   lineItemAlreadyRefunded: boolean,
+  lineItemReturnableQuantity: number,
   lineItemPendingRefundQuantity?: number,
 ): FinancialStatus {
-  if (lineItemPendingRefundQuantity && lineItemPendingRefundQuantity > 0) {
+  if (
+    lineItemPendingRefundQuantity &&
+    lineItemPendingRefundQuantity > 0 &&
+    lineItemReturnableQuantity <= 0
+  ) {
     return FinancialStatus.RefundPending;
   }
 
@@ -658,17 +664,20 @@ function createRefundPolicyItemContext(
   order: RefundContextOrder,
   lineItem: RefundContextLineItem,
 ): RefundPolicyItemContext {
+  const effectiveFinancialStatus = deriveEffectiveLineItemFinancialStatus(
+    order.financialStatus,
+    lineItem.alreadyRefunded,
+    lineItem.returnableQuantity,
+    lineItem.pendingRefundQuantity,
+  );
   return {
     order,
     effectiveAgeDays: lineItem.ageDaysOverride ?? order.ageDays,
-    effectiveFinancialStatus: deriveEffectiveLineItemFinancialStatus(
-      order.financialStatus,
-      lineItem.alreadyRefunded,
-      lineItem.pendingRefundQuantity,
-    ),
+    effectiveFinancialStatus,
     fulfillmentStatus: lineItem.fulfillmentStatus,
     hasReturnableFulfillment: lineItem.hasReturnableFulfillment,
     alreadyRefunded: lineItem.alreadyRefunded,
+    returnableQuantity: lineItem.returnableQuantity,
     pendingRefundQuantity: lineItem.pendingRefundQuantity,
     finalSale: lineItem.finalSale,
     itemCategories: lineItem.category ? [lineItem.category] : [],

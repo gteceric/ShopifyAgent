@@ -436,6 +436,9 @@ function buildItemEvaluationViewModels(
         : {}),
       decision: itemEvaluation.decision,
       returnableQuantity: lineItem.returnableQuantity,
+      ...(lineItem.pendingRefundQuantity !== undefined
+        ? { pendingRefundQuantity: lineItem.pendingRefundQuantity }
+        : {}),
       reasonSummary,
       evidence,
     };

@@ -11,6 +11,7 @@ export interface DashboardItemEvaluationViewModel {
   unitPriceLabel?: string;
   decision: RefundDecision;
   returnableQuantity: number;
+  pendingRefundQuantity?: number;
   reasonSummary: string;
   evidence: Array<{ label: string; value: string }>;
 }
