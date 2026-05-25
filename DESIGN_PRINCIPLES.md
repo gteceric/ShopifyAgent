@@ -136,3 +136,5 @@ For refund eligibility and the refund-agent flow:
 - mock and real Shopify data should both flow through the adapter layer.
 - avoid route-level overrides like `checkRefundEligibilityFn` when adapter injection is enough.
 - Shopify and future commerce adapters should normalize platform-specific order facts into `RefundContext.order` and item facts into `RefundContext.lineItems`.
+- Shopify Admin data that affects refund correctness should be cursor-paginated in concept-specific adapter loaders, not exposed as UI pagination.
+- Shopify array-style fields that cannot be cursor-paginated in the same way should use the largest safe page size and be revisited when persistence/backfill sync is added.

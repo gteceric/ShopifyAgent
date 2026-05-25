@@ -15,10 +15,19 @@ import type {
 import { MOCK_SHOPIFY_ORDERS } from "./mock-shopify-orders.js";
 import type { ShopifyOrderRecord } from "./mock-shopify-orders.js";
 import {
-  REFUND_ORDER_CONTEXT_QUERY,
+  REFUND_ORDER_LINE_ITEMS_QUERY,
+  REFUND_ORDER_REFUNDS_QUERY,
+  REFUND_ORDER_SUMMARY_QUERY,
+  REFUND_REFUND_LINE_ITEMS_QUERY,
   REFUND_RETURNABLE_FULFILLMENTS_QUERY,
+  REFUND_RETURNABLE_FULFILLMENT_LINE_ITEMS_QUERY,
+  REFUND_TRANSACTIONS_QUERY,
 } from "./shopify-queries.js";
-import { hasShopifyAdminConfig, shopifyAdminFetch } from "./shopify-admin.js";
+import {
+  hasShopifyAdminConfig,
+  shopifyAdminFetch,
+  type ShopifyAdminFetchOptions,
+} from "./shopify-admin.js";
 
 export interface LoadShopifyRefundContextDependencies {
   env?: NodeJS.ProcessEnv;
@@ -80,67 +89,119 @@ interface ShopifyMoneySet {
   presentmentMoney?: ShopifyMoney | null;
 }
 
-interface ShopifyRefundOrderContextResponse {
+interface ShopifyPageInfo {
+  hasNextPage: boolean;
+  endCursor?: string | null;
+}
+
+interface ShopifyNodeConnection<T> {
+  nodes: T[];
+  pageInfo?: ShopifyPageInfo | null;
+}
+
+interface ShopifyEdgeConnection<T> {
+  edges: Array<{
+    node: T;
+  }>;
+  pageInfo?: ShopifyPageInfo | null;
+}
+
+interface ShopifyRefundLineItemNode {
+  quantity: number;
+  lineItem?: {
+    id: string;
+  } | null;
+}
+
+interface ShopifyRefundTransactionNode {
+  status?: string | null;
+}
+
+interface ShopifyAdminRefund {
+  id: string;
+  refundLineItems?: ShopifyNodeConnection<ShopifyRefundLineItemNode> | null;
+  transactions?: ShopifyEdgeConnection<ShopifyRefundTransactionNode> | null;
+}
+
+interface ShopifyReturnableFulfillmentLineItemNode {
+  quantity: number;
+  fulfillmentLineItem: {
+    id: string;
+    lineItem?: {
+      id: string;
+    } | null;
+  } | null;
+}
+
+interface ShopifyReturnableFulfillmentNode {
+  id: string;
+  returnableFulfillmentLineItems: ShopifyNodeConnection<ShopifyReturnableFulfillmentLineItemNode>;
+}
+
+interface ShopifyAdminOrderSummary {
+  id: string;
+  name: string;
+  tags?: string[] | null;
+  createdAt: string;
+  totalPriceSet?: {
+    shopMoney?: {
+      amount?: string | null;
+    } | null;
+  } | null;
+  displayFinancialStatus?: string | null;
+  displayFulfillmentStatus?: string | null;
+  transactions?: Array<{
+    kind?: string | null;
+    status?: string | null;
+  }> | null;
+  fraudHoldFlag?: ShopifyMetafieldValue | null;
+  manualReviewFlag?: ShopifyMetafieldValue | null;
+  vipOverrideFlag?: ShopifyMetafieldValue | null;
+}
+
+interface ShopifyAdminRefundContextOrder extends ShopifyAdminOrderSummary {
+  refunds?: ShopifyAdminRefund[] | null;
+  lineItems: ShopifyNodeConnection<ShopifyAdminLineItem>;
+}
+
+interface ShopifyRefundOrderSummaryResponse {
+  order: ShopifyAdminOrderSummary | null;
+}
+
+interface ShopifyOrderLineItemsResponse {
   order: {
     id: string;
-    name: string;
-    tags?: string[] | null;
-    createdAt: string;
-    totalPriceSet?: {
-      shopMoney?: {
-        amount?: string | null;
-      } | null;
-    } | null;
-    displayFinancialStatus?: string | null;
-    displayFulfillmentStatus?: string | null;
-    transactions?: Array<{
-      kind?: string | null;
-      status?: string | null;
-    }> | null;
-    refunds?: Array<{
-        id: string;
-        refundLineItems?: {
-          nodes: Array<{
-            quantity: number;
-            lineItem?: {
-              id: string;
-            } | null;
-          }>;
-        } | null;
-        transactions?: {
-          edges: Array<{
-            node: {
-              status?: string | null;
-            };
-          }>;
-        } | null;
-      }> | null;
-    lineItems: {
-      nodes: ShopifyAdminLineItem[];
-    };
-    fraudHoldFlag?: ShopifyMetafieldValue | null;
-    manualReviewFlag?: ShopifyMetafieldValue | null;
-    vipOverrideFlag?: ShopifyMetafieldValue | null;
+    lineItems: ShopifyNodeConnection<ShopifyAdminLineItem>;
+  } | null;
+}
+
+interface ShopifyOrderRefundsResponse {
+  order: {
+    id: string;
+    refunds?: ShopifyAdminRefund[] | null;
+  } | null;
+}
+
+interface ShopifyRefundLineItemsResponse {
+  node: {
+    id: string;
+    refundLineItems: ShopifyNodeConnection<ShopifyRefundLineItemNode>;
+  } | null;
+}
+
+interface ShopifyRefundTransactionsResponse {
+  node: {
+    id: string;
+    transactions: ShopifyEdgeConnection<ShopifyRefundTransactionNode>;
   } | null;
 }
 
 interface ShopifyReturnableFulfillmentsResponse {
-  returnableFulfillments: {
-    nodes: Array<{
-      id: string;
-      returnableFulfillmentLineItems: {
-        nodes: Array<{
-          quantity: number;
-          fulfillmentLineItem: {
-            id: string;
-            lineItem?: {
-              id: string;
-            } | null;
-          } | null;
-        }>;
-      };
-    }>;
-  };
+  returnableFulfillments: ShopifyNodeConnection<ShopifyReturnableFulfillmentNode>;
+}
+
+interface ShopifyReturnableFulfillmentLineItemsResponse {
+  node: ShopifyReturnableFulfillmentNode | null;
 }
 
 function daysBetween(startIso: string, end: Date): number {
@@ -184,13 +245,11 @@ function hasPendingRefundTransaction(
 }
 
 function isPendingRefundTransactionStatus(status?: string | null): boolean {
-  return ["PENDING", "AWAITING_RESPONSE", "PROCESSING"].includes(
-    status ?? "",
-  );
+  return ["PENDING", "AWAITING_RESPONSE", "PROCESSING"].includes(status ?? "");
 }
 
 function normalizeFinancialStatus(
-  order: NonNullable<ShopifyRefundOrderContextResponse["order"]>,
+  order: ShopifyAdminRefundContextOrder,
 ): FinancialStatus {
   const hasLineItemScopedPendingRefunds =
     collectPendingRefundQuantitiesByLineItemId(order).size > 0;
@@ -272,9 +331,7 @@ function normalizeVariantOptions(
         value: normalizeOptionalString(option.value),
       }))
       .filter(
-        (
-          option,
-        ): option is RefundLineItemOption =>
+        (option): option is RefundLineItemOption =>
           option.name !== undefined && option.value !== undefined,
       ) ?? [];
 
@@ -291,12 +348,12 @@ function mapMoney(money?: ShopifyMoney | null): RefundMoney | undefined {
 function mapUnitPrice(
   moneySet?: ShopifyMoneySet | null,
 ): RefundMoney | undefined {
-  return (
-    mapMoney(moneySet?.presentmentMoney) ?? mapMoney(moneySet?.shopMoney)
-  );
+  return mapMoney(moneySet?.presentmentMoney) ?? mapMoney(moneySet?.shopMoney);
 }
 
-function pickLineItemImage(lineItem: ShopifyAdminLineItem): ShopifyImage | null {
+function pickLineItemImage(
+  lineItem: ShopifyAdminLineItem,
+): ShopifyImage | null {
   return (
     lineItem.variant?.image ??
     lineItem.product?.featuredMedia?.preview?.image ??
@@ -371,7 +428,7 @@ function collectReturnableLineItems(
 }
 
 function collectPendingRefundQuantitiesByLineItemId(
-  order: NonNullable<ShopifyRefundOrderContextResponse["order"]>,
+  order: ShopifyAdminRefundContextOrder,
 ): Map<string, number> {
   const pendingRefundQuantitiesByLineItemId = new Map<string, number>();
 
@@ -404,7 +461,7 @@ function collectPendingRefundQuantitiesByLineItemId(
 }
 
 function mapAdminLineItemsToRefundContextLineItems(
-  order: NonNullable<ShopifyRefundOrderContextResponse["order"]>,
+  order: ShopifyAdminRefundContextOrder,
   returnable: ShopifyReturnableFulfillmentsResponse,
   financialStatus: FinancialStatus,
 ): RefundContextLineItem[] {
@@ -417,8 +474,9 @@ function mapAdminLineItemsToRefundContextLineItems(
 
   return order.lineItems.nodes.map((lineItem) => {
     const returnableLineItem = returnableLineItems.get(lineItem.id);
-    const pendingRefundQuantity =
-      pendingRefundQuantitiesByLineItemId.get(lineItem.id);
+    const pendingRefundQuantity = pendingRefundQuantitiesByLineItemId.get(
+      lineItem.id,
+    );
     const image = pickLineItemImage(lineItem);
     const sku = normalizeOptionalString(lineItem.sku ?? lineItem.variant?.sku);
     const variantTitle = normalizeOptionalString(lineItem.variant?.title);
@@ -442,9 +500,7 @@ function mapAdminLineItemsToRefundContextLineItems(
       ...(imageAltText ? { imageAltText } : {}),
       ...(unitPrice ? { unitPrice } : {}),
       returnableQuantity: returnableLineItem?.returnableQuantity ?? 0,
-      ...(pendingRefundQuantity !== undefined
-        ? { pendingRefundQuantity }
-        : {}),
+      ...(pendingRefundQuantity !== undefined ? { pendingRefundQuantity } : {}),
       category: lineItem.product?.category?.fullName ?? undefined,
       fulfillmentStatus: orderFulfillmentStatus,
       hasReturnableFulfillment: returnableLineItem !== undefined,
@@ -459,9 +515,248 @@ function mapAdminLineItemsToRefundContextLineItems(
   });
 }
 
+function getNextPageCursor<T>(
+  connection:
+    | ShopifyNodeConnection<T>
+    | ShopifyEdgeConnection<T>
+    | undefined
+    | null,
+): string | undefined {
+  const pageInfo = connection?.pageInfo;
+
+  if (!pageInfo?.hasNextPage) {
+    return undefined;
+  }
+
+  return pageInfo.endCursor ?? undefined;
+}
+
+async function loadShopifyOrderSummaryForRefund(
+  orderId: string,
+  shopifyAdminOptions: ShopifyAdminFetchOptions,
+): Promise<ShopifyAdminOrderSummary> {
+  const response = await shopifyAdminFetch<ShopifyRefundOrderSummaryResponse>(
+    REFUND_ORDER_SUMMARY_QUERY,
+    { id: orderId },
+    shopifyAdminOptions,
+  );
+
+  if (!response.order) {
+    throw new Error(`No Shopify order exists for ${orderId}.`);
+  }
+
+  return response.order;
+}
+
+async function loadShopifyOrderLineItems(
+  orderId: string,
+  shopifyAdminOptions: ShopifyAdminFetchOptions,
+): Promise<ShopifyAdminLineItem[]> {
+  const lineItems: ShopifyAdminLineItem[] = [];
+  let cursor: string | undefined;
+
+  do {
+    const response = await shopifyAdminFetch<ShopifyOrderLineItemsResponse>(
+      REFUND_ORDER_LINE_ITEMS_QUERY,
+      { id: orderId, after: cursor },
+      shopifyAdminOptions,
+    );
+
+    if (!response.order) {
+      throw new Error(`No Shopify order exists for ${orderId}.`);
+    }
+
+    lineItems.push(...response.order.lineItems.nodes);
+    cursor = getNextPageCursor(response.order.lineItems);
+  } while (cursor);
+
+  return lineItems;
+}
+
+async function loadShopifyRefundLineItems(
+  refundId: string,
+  firstPage:
+    | ShopifyNodeConnection<ShopifyRefundLineItemNode>
+    | undefined
+    | null,
+  shopifyAdminOptions: ShopifyAdminFetchOptions,
+): Promise<ShopifyNodeConnection<ShopifyRefundLineItemNode>> {
+  const nodes = [...(firstPage?.nodes ?? [])];
+  let cursor = getNextPageCursor(firstPage);
+
+  while (cursor) {
+    const response = await shopifyAdminFetch<ShopifyRefundLineItemsResponse>(
+      REFUND_REFUND_LINE_ITEMS_QUERY,
+      { id: refundId, after: cursor },
+      shopifyAdminOptions,
+    );
+
+    if (!response.node) {
+      throw new Error(`No Shopify refund exists for ${refundId}.`);
+    }
+
+    nodes.push(...response.node.refundLineItems.nodes);
+    cursor = getNextPageCursor(response.node.refundLineItems);
+  }
+
+  return { nodes };
+}
+
+async function loadShopifyRefundTransactions(
+  refundId: string,
+  firstPage:
+    | ShopifyEdgeConnection<ShopifyRefundTransactionNode>
+    | undefined
+    | null,
+  shopifyAdminOptions: ShopifyAdminFetchOptions,
+): Promise<ShopifyEdgeConnection<ShopifyRefundTransactionNode>> {
+  const edges = [...(firstPage?.edges ?? [])];
+  let cursor = getNextPageCursor(firstPage);
+
+  while (cursor) {
+    const response = await shopifyAdminFetch<ShopifyRefundTransactionsResponse>(
+      REFUND_TRANSACTIONS_QUERY,
+      { id: refundId, after: cursor },
+      shopifyAdminOptions,
+    );
+
+    if (!response.node) {
+      throw new Error(`No Shopify refund exists for ${refundId}.`);
+    }
+
+    edges.push(...response.node.transactions.edges);
+    cursor = getNextPageCursor(response.node.transactions);
+  }
+
+  return { edges };
+}
+
+async function loadShopifyOrderRefunds(
+  orderId: string,
+  shopifyAdminOptions: ShopifyAdminFetchOptions,
+): Promise<ShopifyAdminRefund[]> {
+  const response = await shopifyAdminFetch<ShopifyOrderRefundsResponse>(
+    REFUND_ORDER_REFUNDS_QUERY,
+    { id: orderId },
+    shopifyAdminOptions,
+  );
+
+  if (!response.order) {
+    throw new Error(`No Shopify order exists for ${orderId}.`);
+  }
+
+  const refunds: ShopifyAdminRefund[] = [];
+
+  for (const refund of response.order.refunds ?? []) {
+    const refundLineItems = await loadShopifyRefundLineItems(
+      refund.id,
+      refund.refundLineItems,
+      shopifyAdminOptions,
+    );
+    const transactions = await loadShopifyRefundTransactions(
+      refund.id,
+      refund.transactions,
+      shopifyAdminOptions,
+    );
+
+    refunds.push({
+      ...refund,
+      refundLineItems,
+      transactions,
+    });
+  }
+
+  return refunds;
+}
+
+async function loadShopifyReturnableFulfillmentLineItems(
+  fulfillmentId: string,
+  firstPage:
+    | ShopifyNodeConnection<ShopifyReturnableFulfillmentLineItemNode>
+    | undefined
+    | null,
+  shopifyAdminOptions: ShopifyAdminFetchOptions,
+): Promise<ShopifyNodeConnection<ShopifyReturnableFulfillmentLineItemNode>> {
+  const nodes = [...(firstPage?.nodes ?? [])];
+  let cursor = getNextPageCursor(firstPage);
+
+  while (cursor) {
+    const response =
+      await shopifyAdminFetch<ShopifyReturnableFulfillmentLineItemsResponse>(
+        REFUND_RETURNABLE_FULFILLMENT_LINE_ITEMS_QUERY,
+        { id: fulfillmentId, after: cursor },
+        shopifyAdminOptions,
+      );
+
+    if (!response.node) {
+      throw new Error(
+        `No Shopify returnable fulfillment exists for ${fulfillmentId}.`,
+      );
+    }
+
+    nodes.push(...response.node.returnableFulfillmentLineItems.nodes);
+    cursor = getNextPageCursor(response.node.returnableFulfillmentLineItems);
+  }
+
+  return { nodes };
+}
+
+async function loadShopifyReturnableFulfillments(
+  orderId: string,
+  shopifyAdminOptions: ShopifyAdminFetchOptions,
+): Promise<ShopifyReturnableFulfillmentsResponse> {
+  const fulfillments: ShopifyReturnableFulfillmentNode[] = [];
+  let cursor: string | undefined;
+
+  do {
+    const response =
+      await shopifyAdminFetch<ShopifyReturnableFulfillmentsResponse>(
+        REFUND_RETURNABLE_FULFILLMENTS_QUERY,
+        { orderId, after: cursor },
+        shopifyAdminOptions,
+      );
+
+    for (const fulfillment of response.returnableFulfillments.nodes) {
+      const returnableFulfillmentLineItems =
+        await loadShopifyReturnableFulfillmentLineItems(
+          fulfillment.id,
+          fulfillment.returnableFulfillmentLineItems,
+          shopifyAdminOptions,
+        );
+
+      fulfillments.push({
+        ...fulfillment,
+        returnableFulfillmentLineItems,
+      });
+    }
+
+    cursor = getNextPageCursor(response.returnableFulfillments);
+  } while (cursor);
+
+  return {
+    returnableFulfillments: {
+      nodes: fulfillments,
+    },
+  };
+}
+
+function combineShopifyRefundContextParts(input: {
+  orderSummary: ShopifyAdminOrderSummary;
+  lineItems: ShopifyAdminLineItem[];
+  refunds: ShopifyAdminRefund[];
+}): ShopifyAdminRefundContextOrder {
+  return {
+    ...input.orderSummary,
+    lineItems: {
+      nodes: input.lineItems,
+    },
+    refunds: input.refunds,
+  };
+}
+
 // Map Shopify order context into the platform-neutral refund context.
 export function mapAdminOrderToRefundContext(
-  order: NonNullable<ShopifyRefundOrderContextResponse["order"]>,
+  order: ShopifyAdminRefundContextOrder,
   returnable: ShopifyReturnableFulfillmentsResponse,
   now: Date,
 ): RefundContext {
@@ -490,39 +785,41 @@ export function mapAdminOrderToRefundContext(
   };
 }
 
+// individual api to load order summary, line items (pagination), refunds (pagination), returnable fulfillments (pagination)
+
 async function loadRefundContextFromShopify(
   input: RefundContextInput,
   dependencies: LoadShopifyRefundContextDependencies,
 ): Promise<RefundContext> {
-  // The policy engine needs both the order record and Shopify's separate
-  // returnable-fulfillments view to decide whether a refund path is actually open.
-  const orderResponse =
-    await shopifyAdminFetch<ShopifyRefundOrderContextResponse>(
-      REFUND_ORDER_CONTEXT_QUERY,
-      { id: input.orderId },
-      {
-        env: dependencies.env,
-        fetchImpl: dependencies.fetchImpl,
-      },
-    );
-
-  if (!orderResponse.order) {
-    throw new Error(`No Shopify order exists for ${input.orderId}.`);
-  }
-
-  const returnableResponse =
-    await shopifyAdminFetch<ShopifyReturnableFulfillmentsResponse>(
-      REFUND_RETURNABLE_FULFILLMENTS_QUERY,
-      { orderId: input.orderId },
-      {
-        env: dependencies.env,
-        fetchImpl: dependencies.fetchImpl,
-      },
-    );
+  const shopifyAdminOptions: ShopifyAdminFetchOptions = {
+    env: dependencies.env,
+    fetchImpl: dependencies.fetchImpl,
+  };
+  const orderSummary = await loadShopifyOrderSummaryForRefund(
+    input.orderId,
+    shopifyAdminOptions,
+  );
+  const lineItems = await loadShopifyOrderLineItems(
+    input.orderId,
+    shopifyAdminOptions,
+  );
+  const refunds = await loadShopifyOrderRefunds(
+    input.orderId,
+    shopifyAdminOptions,
+  );
+  const returnableFulfillments = await loadShopifyReturnableFulfillments(
+    input.orderId,
+    shopifyAdminOptions,
+  );
+  const order = combineShopifyRefundContextParts({
+    orderSummary,
+    lineItems,
+    refunds,
+  });
 
   return mapAdminOrderToRefundContext(
-    orderResponse.order,
-    returnableResponse,
+    order,
+    returnableFulfillments,
     dependencies.now ?? new Date(),
   );
 }
@@ -540,7 +837,10 @@ async function loadRefundContextFromMockShopify(
     );
   }
 
-  return mapShopifyMockOrderToRefundContext(order, dependencies.now ?? new Date());
+  return mapShopifyMockOrderToRefundContext(
+    order,
+    dependencies.now ?? new Date(),
+  );
 }
 
 export function createMockShopifyRefundContextAdapter(

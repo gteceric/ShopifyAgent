@@ -1,5 +1,72 @@
-export const REFUND_ORDER_CONTEXT_QUERY = /* GraphQL */ `
-  query RefundOrderContext($id: ID!) {
+const REFUND_ORDER_LINE_ITEM_FIELDS = /* GraphQL */ `
+  id
+  title
+  sku
+  currentQuantity
+  originalUnitPriceSet {
+    shopMoney {
+      amount
+      currencyCode
+    }
+    presentmentMoney {
+      amount
+      currencyCode
+    }
+  }
+  variant {
+    title
+    sku
+    selectedOptions {
+      name
+      value
+    }
+    image {
+      url
+      altText
+    }
+  }
+  product {
+    category {
+      fullName
+    }
+    featuredMedia {
+      preview {
+        image {
+          url
+          altText
+        }
+      }
+    }
+  }
+  customAttributes {
+    key
+    value
+  }
+`;
+
+const REFUND_LINE_ITEM_FIELDS = /* GraphQL */ `
+  quantity
+  lineItem {
+    id
+  }
+`;
+
+const REFUND_TRANSACTION_FIELDS = /* GraphQL */ `
+  status
+`;
+
+const RETURNABLE_FULFILLMENT_LINE_ITEM_FIELDS = /* GraphQL */ `
+  quantity
+  fulfillmentLineItem {
+    id
+    lineItem {
+      id
+    }
+  }
+`;
+
+export const REFUND_ORDER_SUMMARY_QUERY = /* GraphQL */ `
+  query RefundOrderSummary($id: ID!) {
     order(id: $id) {
       id
       name
@@ -12,76 +79,9 @@ export const REFUND_ORDER_CONTEXT_QUERY = /* GraphQL */ `
       }
       displayFinancialStatus
       displayFulfillmentStatus
-      transactions(first: 20) {
+      transactions(first: 250) {
         kind
         status
-      }
-      # TODO: Paginate refunds/refundLineItems/transactions before production.
-      # V2 only needs enough recent refund records for typical orders.
-      refunds(first: 20) {
-        id
-        refundLineItems(first: 50) {
-          nodes {
-            quantity
-            lineItem {
-              id
-            }
-          }
-        }
-        transactions(first: 10) {
-          edges {
-            node {
-              status
-            }
-          }
-        }
-      }
-      lineItems(first: 100) {
-        nodes {
-          id
-          title
-          sku
-          currentQuantity
-          originalUnitPriceSet {
-            shopMoney {
-              amount
-              currencyCode
-            }
-            presentmentMoney {
-              amount
-              currencyCode
-            }
-          }
-          variant {
-            title
-            sku
-            selectedOptions {
-              name
-              value
-            }
-            image {
-              url
-              altText
-            }
-          }
-          product {
-            category {
-              fullName
-            }
-            featuredMedia {
-              preview {
-                image {
-                  url
-                  altText
-                }
-              }
-            }
-          }
-          customAttributes {
-            key
-            value
-          }
-        }
       }
       fraudHoldFlag: metafield(namespace: "refund_policy", key: "fraud_hold") {
         value
@@ -102,20 +102,131 @@ export const REFUND_ORDER_CONTEXT_QUERY = /* GraphQL */ `
   }
 `;
 
+export const REFUND_ORDER_LINE_ITEMS_QUERY = /* GraphQL */ `
+  query RefundOrderLineItems($id: ID!, $after: String) {
+    order(id: $id) {
+      id
+      lineItems(first: 250, after: $after) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        nodes {
+          ${REFUND_ORDER_LINE_ITEM_FIELDS}
+        }
+      }
+    }
+  }
+`;
+
+export const REFUND_ORDER_REFUNDS_QUERY = /* GraphQL */ `
+  query RefundOrderRefunds($id: ID!) {
+    order(id: $id) {
+      id
+      # Shopify exposes order refunds here as an array-style field, so request
+      # the largest safe page size and cursor-page each refund's nested data.
+      refunds(first: 250) {
+        id
+        refundLineItems(first: 250) {
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+          nodes {
+            ${REFUND_LINE_ITEM_FIELDS}
+          }
+        }
+        transactions(first: 250) {
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+          edges {
+            node {
+              ${REFUND_TRANSACTION_FIELDS}
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+export const REFUND_REFUND_LINE_ITEMS_QUERY = /* GraphQL */ `
+  query RefundRefundLineItems($id: ID!, $after: String) {
+    node(id: $id) {
+      ... on Refund {
+        id
+        refundLineItems(first: 250, after: $after) {
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+          nodes {
+            ${REFUND_LINE_ITEM_FIELDS}
+          }
+        }
+      }
+    }
+  }
+`;
+
+export const REFUND_TRANSACTIONS_QUERY = /* GraphQL */ `
+  query RefundTransactions($id: ID!, $after: String) {
+    node(id: $id) {
+      ... on Refund {
+        id
+        transactions(first: 250, after: $after) {
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+          edges {
+            node {
+              ${REFUND_TRANSACTION_FIELDS}
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
 export const REFUND_RETURNABLE_FULFILLMENTS_QUERY = /* GraphQL */ `
-  query RefundReturnableFulfillments($orderId: ID!) {
-    returnableFulfillments(orderId: $orderId, first: 20) {
+  query RefundReturnableFulfillments($orderId: ID!, $after: String) {
+    returnableFulfillments(orderId: $orderId, first: 250, after: $after) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
       nodes {
         id
-        returnableFulfillmentLineItems(first: 50) {
+        returnableFulfillmentLineItems(first: 250) {
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
           nodes {
-            quantity
-            fulfillmentLineItem {
-              id
-              lineItem {
-                id
-              }
-            }
+            ${RETURNABLE_FULFILLMENT_LINE_ITEM_FIELDS}
+          }
+        }
+      }
+    }
+  }
+`;
+
+export const REFUND_RETURNABLE_FULFILLMENT_LINE_ITEMS_QUERY = /* GraphQL */ `
+  query RefundReturnableFulfillmentLineItems($id: ID!, $after: String) {
+    node(id: $id) {
+      ... on ReturnableFulfillment {
+        id
+        returnableFulfillmentLineItems(first: 250, after: $after) {
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+          nodes {
+            ${RETURNABLE_FULFILLMENT_LINE_ITEM_FIELDS}
           }
         }
       }

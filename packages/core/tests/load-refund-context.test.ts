@@ -74,7 +74,21 @@ test("Shopify Admin adapter maps live Admin responses into RefundContext", async
           },
           displayFinancialStatus: "PAID",
           displayFulfillmentStatus: "FULFILLED",
+          fraudHoldFlag: { value: "false" },
+          manualReviewFlag: { value: "false" },
+          vipOverrideFlag: { value: "true" },
+        },
+      },
+    },
+    {
+      data: {
+        order: {
+          id: "gid://shopify/Order/900000000301",
           lineItems: {
+            pageInfo: {
+              hasNextPage: false,
+              endCursor: null,
+            },
             nodes: [
               {
                 id: "gid://shopify/LineItem/1",
@@ -112,19 +126,32 @@ test("Shopify Admin adapter maps live Admin responses into RefundContext", async
               },
             ],
           },
-          fraudHoldFlag: { value: "false" },
-          manualReviewFlag: { value: "false" },
-          vipOverrideFlag: { value: "true" },
+        },
+      },
+    },
+    {
+      data: {
+        order: {
+          id: "gid://shopify/Order/900000000301",
+          refunds: [],
         },
       },
     },
     {
       data: {
         returnableFulfillments: {
+          pageInfo: {
+            hasNextPage: false,
+            endCursor: null,
+          },
           nodes: [
             {
               id: "gid://shopify/ReturnableFulfillment/1",
               returnableFulfillmentLineItems: {
+                pageInfo: {
+                  hasNextPage: false,
+                  endCursor: null,
+                },
                 nodes: [
                   {
                     quantity: 1,
@@ -195,6 +222,361 @@ test("Shopify Admin adapter maps live Admin responses into RefundContext", async
   assert.equal(result.lineItems[0]?.hasReturnableFulfillment, true);
   assert.deepEqual(result.order.tags, ["vip-exception", "loyalty_recovery"]);
   assert.equal(result.order.flags?.vipOverride, true);
+});
+
+test("Shopify Admin adapter paginates separated refund context loaders", async () => {
+  const fetchCalls: Array<{
+    query: string;
+    variables: Record<string, unknown>;
+  }> = [];
+  const fetchImpl: typeof fetch = async (_input, init) => {
+    const body = JSON.parse(String(init?.body)) as {
+      query: string;
+      variables: Record<string, unknown>;
+    };
+    fetchCalls.push(body);
+
+    if (body.query.includes("RefundOrderSummary")) {
+      return new Response(
+        JSON.stringify({
+          data: {
+            order: {
+              id: "gid://shopify/Order/900000000309",
+              name: "#3009",
+              tags: [],
+              createdAt: "2026-03-25T00:00:00.000Z",
+              totalPriceSet: {
+                shopMoney: {
+                  amount: "300.00",
+                },
+              },
+              displayFinancialStatus: "PAID",
+              displayFulfillmentStatus: "FULFILLED",
+              transactions: [],
+              fraudHoldFlag: { value: "false" },
+              manualReviewFlag: { value: "false" },
+              vipOverrideFlag: { value: "false" },
+            },
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    if (body.query.includes("RefundOrderLineItems")) {
+      const isFirstPage = body.variables.after === undefined;
+
+      return new Response(
+        JSON.stringify({
+          data: {
+            order: {
+              id: "gid://shopify/Order/900000000309",
+              lineItems: {
+                pageInfo: {
+                  hasNextPage: isFirstPage,
+                  endCursor: isFirstPage ? "line-items-page-1" : null,
+                },
+                nodes: isFirstPage
+                  ? [
+                      {
+                        id: "gid://shopify/LineItem/900000000309-1",
+                        title: "First Page Sunglasses",
+                        currentQuantity: 1,
+                        product: {
+                          category: {
+                            fullName:
+                              "Apparel & Accessories > Clothing Accessories",
+                          },
+                        },
+                        customAttributes: [],
+                      },
+                    ]
+                  : [
+                      {
+                        id: "gid://shopify/LineItem/900000000309-2",
+                        title: "Second Page Pending Sunglasses",
+                        currentQuantity: 1,
+                        product: {
+                          category: {
+                            fullName:
+                              "Apparel & Accessories > Clothing Accessories",
+                          },
+                        },
+                        customAttributes: [],
+                      },
+                      {
+                        id: "gid://shopify/LineItem/900000000309-3",
+                        title: "Second Page Returnable Sunglasses",
+                        currentQuantity: 1,
+                        product: {
+                          category: {
+                            fullName:
+                              "Apparel & Accessories > Clothing Accessories",
+                          },
+                        },
+                        customAttributes: [],
+                      },
+                    ],
+              },
+            },
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    if (body.query.includes("RefundOrderRefunds")) {
+      return new Response(
+        JSON.stringify({
+          data: {
+            order: {
+              id: "gid://shopify/Order/900000000309",
+              refunds: [
+                {
+                  id: "gid://shopify/Refund/900000000309",
+                  refundLineItems: {
+                    pageInfo: {
+                      hasNextPage: true,
+                      endCursor: "refund-line-items-page-1",
+                    },
+                    nodes: [
+                      {
+                        quantity: 1,
+                        lineItem: {
+                          id: "gid://shopify/LineItem/900000000309-1",
+                        },
+                      },
+                    ],
+                  },
+                  transactions: {
+                    pageInfo: {
+                      hasNextPage: true,
+                      endCursor: "refund-transactions-page-1",
+                    },
+                    edges: [],
+                  },
+                },
+              ],
+            },
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    if (body.query.includes("RefundRefundLineItems")) {
+      return new Response(
+        JSON.stringify({
+          data: {
+            node: {
+              id: "gid://shopify/Refund/900000000309",
+              refundLineItems: {
+                pageInfo: {
+                  hasNextPage: false,
+                  endCursor: null,
+                },
+                nodes: [
+                  {
+                    quantity: 2,
+                    lineItem: {
+                      id: "gid://shopify/LineItem/900000000309-2",
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    if (body.query.includes("RefundTransactions")) {
+      return new Response(
+        JSON.stringify({
+          data: {
+            node: {
+              id: "gid://shopify/Refund/900000000309",
+              transactions: {
+                pageInfo: {
+                  hasNextPage: false,
+                  endCursor: null,
+                },
+                edges: [
+                  {
+                    node: {
+                      status: "PENDING",
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    if (body.query.includes("RefundReturnableFulfillments")) {
+      const isFirstPage = body.variables.after === undefined;
+
+      return new Response(
+        JSON.stringify({
+          data: {
+            returnableFulfillments: {
+              pageInfo: {
+                hasNextPage: isFirstPage,
+                endCursor: isFirstPage
+                  ? "returnable-fulfillments-page-1"
+                  : null,
+              },
+              nodes: isFirstPage
+                ? [
+                    {
+                      id: "gid://shopify/ReturnableFulfillment/900000000309-1",
+                      returnableFulfillmentLineItems: {
+                        pageInfo: {
+                          hasNextPage: true,
+                          endCursor: "returnable-line-items-page-1",
+                        },
+                        nodes: [
+                          {
+                            quantity: 1,
+                            fulfillmentLineItem: {
+                              id: "gid://shopify/FulfillmentLineItem/900000000309-1",
+                              lineItem: {
+                                id: "gid://shopify/LineItem/900000000309-1",
+                              },
+                            },
+                          },
+                        ],
+                      },
+                    },
+                  ]
+                : [
+                    {
+                      id: "gid://shopify/ReturnableFulfillment/900000000309-2",
+                      returnableFulfillmentLineItems: {
+                        pageInfo: {
+                          hasNextPage: false,
+                          endCursor: null,
+                        },
+                        nodes: [
+                          {
+                            quantity: 1,
+                            fulfillmentLineItem: {
+                              id: "gid://shopify/FulfillmentLineItem/900000000309-2",
+                              lineItem: {
+                                id: "gid://shopify/LineItem/900000000309-2",
+                              },
+                            },
+                          },
+                        ],
+                      },
+                    },
+                  ],
+            },
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    if (body.query.includes("RefundReturnableFulfillmentLineItems")) {
+      return new Response(
+        JSON.stringify({
+          data: {
+            node: {
+              id: "gid://shopify/ReturnableFulfillment/900000000309-1",
+              returnableFulfillmentLineItems: {
+                pageInfo: {
+                  hasNextPage: false,
+                  endCursor: null,
+                },
+                nodes: [
+                  {
+                    quantity: 1,
+                    fulfillmentLineItem: {
+                      id: "gid://shopify/FulfillmentLineItem/900000000309-3",
+                      lineItem: {
+                        id: "gid://shopify/LineItem/900000000309-3",
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    throw new Error(`Unexpected Shopify query: ${body.query}`);
+  };
+
+  const adapter = createShopifyAdminRefundContextAdapter({
+    now: new Date("2026-03-30T00:00:00.000Z"),
+    env: {
+      USE_REAL_SHOPIFY: "true",
+      SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
+      SHOPIFY_ADMIN_TOKEN: "shpat_test",
+    },
+    fetchImpl,
+  });
+  const result = await adapter.loadRefundContext({
+    orderId: "gid://shopify/Order/900000000309",
+  });
+
+  assert.equal(result.lineItems.length, 3);
+  assert.deepEqual(
+    result.lineItems.map((lineItem) => lineItem.lineItemId),
+    [
+      "gid://shopify/LineItem/900000000309-1",
+      "gid://shopify/LineItem/900000000309-2",
+      "gid://shopify/LineItem/900000000309-3",
+    ],
+  );
+  assert.equal(result.lineItems[0]?.pendingRefundQuantity, 1);
+  assert.equal(result.lineItems[1]?.pendingRefundQuantity, 2);
+  assert.equal(
+    result.lineItems[1]?.fulfillmentLineItemId,
+    "gid://shopify/FulfillmentLineItem/900000000309-2",
+  );
+  assert.equal(
+    result.lineItems[2]?.fulfillmentLineItemId,
+    "gid://shopify/FulfillmentLineItem/900000000309-3",
+  );
+  assert.equal(
+    fetchCalls.some(
+      (call) =>
+        call.query.includes("RefundOrderLineItems") &&
+        call.variables.after === "line-items-page-1",
+    ),
+    true,
+  );
+  assert.equal(
+    fetchCalls.some((call) => call.query.includes("RefundRefundLineItems")),
+    true,
+  );
+  assert.equal(
+    fetchCalls.some((call) => call.query.includes("RefundTransactions")),
+    true,
+  );
+  assert.equal(
+    fetchCalls.some(
+      (call) =>
+        call.query.includes("RefundReturnableFulfillments") &&
+        call.variables.after === "returnable-fulfillments-page-1",
+    ),
+    true,
+  );
+  assert.equal(
+    fetchCalls.some((call) =>
+      call.query.includes("RefundReturnableFulfillmentLineItems"),
+    ),
+    true,
+  );
 });
 
 test("Shopify Admin adapter throws when Admin env vars are incomplete", async () => {
