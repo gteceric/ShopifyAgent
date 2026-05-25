@@ -39,7 +39,7 @@ export interface CheckRefundEligibilityResult {
   recommendedNextAction: RecommendedRefundAction;
 }
 
-export interface CheckRefundEligibilityDeps {
+export interface CheckRefundEligibilityDependencies {
   config?: RefundPolicyConfig;
   adapter: RefundContextPlatformAdapter;
 }
@@ -77,12 +77,12 @@ function getRecommendedNextAction(
 
 export async function checkRefundEligibility(
   input: CheckRefundEligibilityInput,
-  deps: CheckRefundEligibilityDeps,
+  dependencies: CheckRefundEligibilityDependencies,
 ): Promise<CheckRefundEligibilityResult> {
-  const context = await deps.adapter.loadRefundContext(input);
+  const context = await dependencies.adapter.loadRefundContext(input);
   const policyResult = evaluateRefundPolicy(
     context,
-    deps.config ?? DEFAULT_POLICY,
+    dependencies.config ?? DEFAULT_POLICY,
   );
 
   return {

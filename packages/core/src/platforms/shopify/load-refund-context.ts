@@ -20,7 +20,7 @@ import {
 } from "./shopify-queries.js";
 import { hasShopifyAdminConfig, shopifyAdminFetch } from "./shopify-admin.js";
 
-export interface LoadShopifyRefundContextDeps {
+export interface LoadShopifyRefundContextDependencies {
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
   now?: Date;
@@ -492,7 +492,7 @@ export function mapAdminOrderToRefundContext(
 
 async function loadRefundContextFromShopify(
   input: RefundContextInput,
-  deps: LoadShopifyRefundContextDeps,
+  dependencies: LoadShopifyRefundContextDependencies,
 ): Promise<RefundContext> {
   // The policy engine needs both the order record and Shopify's separate
   // returnable-fulfillments view to decide whether a refund path is actually open.
@@ -501,8 +501,8 @@ async function loadRefundContextFromShopify(
       REFUND_ORDER_CONTEXT_QUERY,
       { id: input.orderId },
       {
-        env: deps.env,
-        fetchImpl: deps.fetchImpl,
+        env: dependencies.env,
+        fetchImpl: dependencies.fetchImpl,
       },
     );
 
@@ -515,21 +515,21 @@ async function loadRefundContextFromShopify(
       REFUND_RETURNABLE_FULFILLMENTS_QUERY,
       { orderId: input.orderId },
       {
-        env: deps.env,
-        fetchImpl: deps.fetchImpl,
+        env: dependencies.env,
+        fetchImpl: dependencies.fetchImpl,
       },
     );
 
   return mapAdminOrderToRefundContext(
     orderResponse.order,
     returnableResponse,
-    deps.now ?? new Date(),
+    dependencies.now ?? new Date(),
   );
 }
 
 async function loadRefundContextFromMockShopify(
   input: RefundContextInput,
-  deps: LoadShopifyRefundContextDeps = {},
+  dependencies: LoadShopifyRefundContextDependencies = {},
 ): Promise<RefundContext> {
   const order = MOCK_SHOPIFY_ORDERS[input.orderId];
 
@@ -540,41 +540,41 @@ async function loadRefundContextFromMockShopify(
     );
   }
 
-  return mapShopifyMockOrderToRefundContext(order, deps.now ?? new Date());
+  return mapShopifyMockOrderToRefundContext(order, dependencies.now ?? new Date());
 }
 
 export function createMockShopifyRefundContextAdapter(
-  deps: LoadShopifyRefundContextDeps = {},
+  dependencies: LoadShopifyRefundContextDependencies = {},
 ): RefundContextPlatformAdapter {
   return {
     platform: "shopify-mock",
     loadRefundContext(input) {
-      return loadRefundContextFromMockShopify(input, deps);
+      return loadRefundContextFromMockShopify(input, dependencies);
     },
   };
 }
 
 export function createShopifyAdminRefundContextAdapter(
-  deps: LoadShopifyRefundContextDeps = {},
+  dependencies: LoadShopifyRefundContextDependencies = {},
 ): RefundContextPlatformAdapter {
   return {
     platform: "shopify-admin",
     loadRefundContext(input) {
-      if (!hasShopifyAdminConfig(deps.env)) {
+      if (!hasShopifyAdminConfig(dependencies.env)) {
         throw new Error(
           "USE_REAL_SHOPIFY=true requires SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_TOKEN.",
         );
       }
 
-      return loadRefundContextFromShopify(input, deps);
+      return loadRefundContextFromShopify(input, dependencies);
     },
   };
 }
 
 export function createRefundContextAdapter(
-  deps: LoadShopifyRefundContextDeps = {},
+  dependencies: LoadShopifyRefundContextDependencies = {},
 ): RefundContextPlatformAdapter {
-  return shouldUseRealShopify(deps.env)
-    ? createShopifyAdminRefundContextAdapter(deps)
-    : createMockShopifyRefundContextAdapter(deps);
+  return shouldUseRealShopify(dependencies.env)
+    ? createShopifyAdminRefundContextAdapter(dependencies)
+    : createMockShopifyRefundContextAdapter(dependencies);
 }

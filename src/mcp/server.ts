@@ -1,7 +1,7 @@
 import { z, type ZodType } from "zod";
 
 import {
-  type CheckRefundEligibilityDeps,
+  type CheckRefundEligibilityDependencies,
 } from "@shopify-agent/core";
 import {
   makeErrorResponse,
@@ -200,9 +200,9 @@ export function createMcpServer(tools: McpTool[]): McpServer {
 }
 
 export function createShopifyAgentMcpServer(
-  deps: CheckRefundEligibilityDeps,
+  dependencies: CheckRefundEligibilityDependencies,
 ): McpServer {
   return createMcpServer([
-    createCheckRefundEligibilityTool(deps),
+    createCheckRefundEligibilityTool(dependencies),
   ]);
 }

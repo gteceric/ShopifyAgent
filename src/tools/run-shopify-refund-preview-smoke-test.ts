@@ -6,9 +6,9 @@ import {
   RefundDecision,
 } from "@shopify-agent/core";
 import type {
-  CheckRefundEligibilityDeps,
+  CheckRefundEligibilityDependencies,
   CheckRefundEligibilityInput,
-  PreviewShopifyRefundDeps,
+  PreviewShopifyRefundDependencies,
   PreviewShopifyRefundInput,
   RefundPolicyLineItemEvaluation,
 } from "@shopify-agent/core";
@@ -222,13 +222,13 @@ async function main(): Promise<void> {
   const quantities = readSmokeRefundQuantities(selectedLineItemIds.length);
   const adapter = createShopifyAdminRefundContextAdapter();
   const eligibilityInput: CheckRefundEligibilityInput = { orderId };
-  const eligibilityDeps: CheckRefundEligibilityDeps = {
+  const eligibilityDependencies: CheckRefundEligibilityDependencies = {
     config: createPolicyConfig(),
     adapter,
   };
   const eligibilityResult = await checkRefundEligibility(
     eligibilityInput,
-    eligibilityDeps,
+    eligibilityDependencies,
   );
   const selectedItemEvaluations = selectSmokeRefundLineItems(
     eligibilityResult.policyResult.itemEvaluations,
@@ -242,10 +242,10 @@ async function main(): Promise<void> {
       quantity: quantities[index]!,
     })),
   };
-  const refundPreviewDeps: PreviewShopifyRefundDeps = {};
+  const refundPreviewDependencies: PreviewShopifyRefundDependencies = {};
   const refundPreview = await previewShopifyRefund(
     refundPreviewInput,
-    refundPreviewDeps,
+    refundPreviewDependencies,
   );
 
   console.log("Refund preview smoke test input");

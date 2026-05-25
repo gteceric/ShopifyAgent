@@ -10,7 +10,7 @@ import {
   validateRefundAction,
 } from "@shopify-agent/core";
 import type {
-  CheckRefundEligibilityDeps,
+  CheckRefundEligibilityDependencies,
   CheckRefundEligibilityInput,
   ExecuteShopifyRefundActionInput,
   RefundActionRequest,
@@ -236,13 +236,13 @@ async function main(): Promise<void> {
   const note = process.env.SMOKE_REFUND_NOTE?.trim();
   const adapter = createShopifyAdminRefundContextAdapter();
   const eligibilityInput: CheckRefundEligibilityInput = { orderId };
-  const eligibilityDeps: CheckRefundEligibilityDeps = {
+  const eligibilityDependencies: CheckRefundEligibilityDependencies = {
     config: createPolicyConfig(),
     adapter,
   };
   const eligibilityResult = await checkRefundEligibility(
     eligibilityInput,
-    eligibilityDeps,
+    eligibilityDependencies,
   );
   const selectedItemEvaluations = selectSmokeRefundLineItems(
     eligibilityResult.policyResult.itemEvaluations,

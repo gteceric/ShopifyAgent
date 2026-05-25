@@ -2,7 +2,7 @@ import {
   createRefundContextAdapter,
   executeShopifyRefundAction,
   RefundActionValidationStatus,
-  type ExecuteShopifyRefundActionDeps,
+  type ExecuteShopifyRefundActionDependencies,
   type RefundActionBlocker,
   type RefundActionMatchedLineItem,
   type ShopifyRefundActionResult,
@@ -44,7 +44,7 @@ export type RefundConfirmResult =
 
 export interface ConfirmRefundDependencies
   extends DashboardRefundActionValidationDependencies {
-  shopifyExecutionDependencies?: ExecuteShopifyRefundActionDeps;
+  shopifyExecutionDependencies?: ExecuteShopifyRefundActionDependencies;
 }
 
 function parseIdempotencyKey(idempotencyKey: string): string {

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   previewShopifyRefund,
-  type PreviewShopifyRefundDeps,
+  type PreviewShopifyRefundDependencies,
   type PreviewShopifyRefundInput,
 } from "../src/index.js";
 
@@ -146,7 +146,7 @@ test("loads Shopify refund preview for selected line items", async () => {
       },
     ],
   };
-  const deps: PreviewShopifyRefundDeps = {
+  const dependencies: PreviewShopifyRefundDependencies = {
     env: {
       SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
       SHOPIFY_ADMIN_TOKEN: "shpat_test",
@@ -154,7 +154,7 @@ test("loads Shopify refund preview for selected line items", async () => {
     fetchImpl,
   };
 
-  const refundPreview = await previewShopifyRefund(input, deps);
+  const refundPreview = await previewShopifyRefund(input, dependencies);
 
   const requestBody = capturedRequestBody as {
     query: string;
@@ -300,7 +300,7 @@ test("throws when Shopify refund preview response has no order", async () => {
       },
     ],
   };
-  const deps: PreviewShopifyRefundDeps = {
+  const dependencies: PreviewShopifyRefundDependencies = {
     env: {
       SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
       SHOPIFY_ADMIN_TOKEN: "shpat_test",
@@ -309,7 +309,7 @@ test("throws when Shopify refund preview response has no order", async () => {
   };
 
   await assert.rejects(
-    () => previewShopifyRefund(input, deps),
+    () => previewShopifyRefund(input, dependencies),
     /was not found/,
   );
 });
@@ -339,7 +339,7 @@ test("throws when Shopify order does not return a refund preview", async () => {
       },
     ],
   };
-  const deps: PreviewShopifyRefundDeps = {
+  const dependencies: PreviewShopifyRefundDependencies = {
     env: {
       SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
       SHOPIFY_ADMIN_TOKEN: "shpat_test",
@@ -348,7 +348,7 @@ test("throws when Shopify order does not return a refund preview", async () => {
   };
 
   await assert.rejects(
-    () => previewShopifyRefund(input, deps),
+    () => previewShopifyRefund(input, dependencies),
     /did not return a refund preview/,
   );
 });

@@ -154,7 +154,7 @@ test("previews a selected eligible refund through Shopify", async () => {
     {
       adapter: makeAdapter(),
       config: policyConfig,
-      shopifyPreviewDeps: {
+      shopifyPreviewDependencies: {
         env: {
           SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
           SHOPIFY_ADMIN_TOKEN: "shpat_test",
@@ -189,7 +189,7 @@ test("stops before Shopify preview when selected item is not eligible", async ()
     {
       adapter: makeAdapter({ secondItemFinalSale: true }),
       config: policyConfig,
-      shopifyPreviewDeps: {
+      shopifyPreviewDependencies: {
         fetchImpl: async () => {
           throw new Error("Blocked preview should not call Shopify.");
         },

@@ -5,7 +5,7 @@ import {
   RefundReasonCode,
 } from "@shopify-agent/core";
 import type {
-  CheckRefundEligibilityDeps,
+  CheckRefundEligibilityDependencies,
   CheckRefundEligibilityInput,
   CheckRefundEligibilityResult,
 } from "@shopify-agent/core";
@@ -125,7 +125,7 @@ const CHECK_REFUND_ELIGIBILITY_TOOL = {
 } as const;
 
 export function createCheckRefundEligibilityTool(
-  deps: CheckRefundEligibilityDeps,
+  dependencies: CheckRefundEligibilityDependencies,
 ): McpTool<CheckRefundEligibilityInput, CheckRefundEligibilityResult> {
   return {
     name: CHECK_REFUND_ELIGIBILITY_TOOL_NAME,
@@ -135,7 +135,7 @@ export function createCheckRefundEligibilityTool(
     argsSchema: CheckRefundEligibilityArgsSchema,
     async execute(args) {
       try {
-        const result = await checkRefundEligibility(args, deps);
+        const result = await checkRefundEligibility(args, dependencies);
         return makeMcpToolResult(result);
       } catch (error) {
         const message =

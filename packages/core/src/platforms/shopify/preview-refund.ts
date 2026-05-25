@@ -12,7 +12,7 @@ export interface PreviewShopifyRefundInput {
   refundLineItems: RefundPreviewLineItemInput[];
 }
 
-export interface PreviewShopifyRefundDeps {
+export interface PreviewShopifyRefundDependencies {
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
 }
@@ -174,15 +174,15 @@ function mapRefundPreview(
 
 export async function previewShopifyRefund(
   input: PreviewShopifyRefundInput,
-  deps: PreviewShopifyRefundDeps = {},
+  dependencies: PreviewShopifyRefundDependencies = {},
 ): Promise<ShopifyRefundPreview> {
   const variables: ShopifyRefundPreviewVariables = {
     orderId: input.orderId,
     refundLineItems: input.refundLineItems,
   };
   const shopifyAdminOptions: ShopifyAdminFetchOptions = {
-    env: deps.env,
-    fetchImpl: deps.fetchImpl,
+    env: dependencies.env,
+    fetchImpl: dependencies.fetchImpl,
   };
   const response = await shopifyAdminFetch<ShopifyRefundPreviewResponse>(
     SHOPIFY_REFUND_PREVIEW_QUERY,

@@ -24,7 +24,7 @@ export interface LoadShopifyOrdersInput {
   limit?: number;
 }
 
-export interface LoadShopifyOrdersDeps {
+export interface LoadShopifyOrdersDependencies {
   env?: NodeJS.ProcessEnv;
   fetchImpl?: typeof fetch;
 }
@@ -146,14 +146,14 @@ export function mapAdminOrderToShopifyOrderSummary(
 
 async function loadOrdersFromShopify(
   input: LoadShopifyOrdersInput,
-  deps: LoadShopifyOrdersDeps,
+  dependencies: LoadShopifyOrdersDependencies,
 ): Promise<ShopifyOrderSummary[]> {
   const response = await shopifyAdminFetch<ShopifyOrdersListResponse>(
     SHOPIFY_ORDERS_LIST_QUERY,
     { first: input.limit ?? DEFAULT_ORDERS_LIMIT },
     {
-      env: deps.env,
-      fetchImpl: deps.fetchImpl,
+      env: dependencies.env,
+      fetchImpl: dependencies.fetchImpl,
     },
   );
 
@@ -162,16 +162,16 @@ async function loadOrdersFromShopify(
 
 export async function loadOrders(
   input: LoadShopifyOrdersInput = {},
-  deps: LoadShopifyOrdersDeps = {},
+  dependencies: LoadShopifyOrdersDependencies = {},
 ): Promise<ShopifyOrderSummary[]> {
-  if (shouldUseRealShopify(deps.env)) {
-    if (!hasShopifyAdminConfig(deps.env)) {
+  if (shouldUseRealShopify(dependencies.env)) {
+    if (!hasShopifyAdminConfig(dependencies.env)) {
       throw new Error(
         "USE_REAL_SHOPIFY=true requires SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_TOKEN.",
       );
     }
 
-    return loadOrdersFromShopify(input, deps);
+    return loadOrdersFromShopify(input, dependencies);
   }
 
   const limit = input.limit ?? DEFAULT_ORDERS_LIMIT;

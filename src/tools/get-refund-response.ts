@@ -1,6 +1,6 @@
 import { checkRefundEligibility } from "@shopify-agent/core";
 import type {
-  CheckRefundEligibilityDeps,
+  CheckRefundEligibilityDependencies,
   CheckRefundEligibilityResult,
 } from "@shopify-agent/core";
 import { formatRefundEligibilityResponse } from "./format-refund-eligibility-response.js";
@@ -17,7 +17,7 @@ export interface RefundResponseResponder {
   ): Promise<string | undefined>;
 }
 
-export interface RefundResponseDeps extends CheckRefundEligibilityDeps {
+export interface RefundResponseDependencies extends CheckRefundEligibilityDependencies {
   responder: RefundResponseResponder | undefined;
 }
 
@@ -33,16 +33,16 @@ export interface GetRefundResponseResult {
 export async function getRefundResponse(
   orderId: string,
   agentQuestion: string,
-  deps: RefundResponseDeps,
+  dependencies: RefundResponseDependencies,
 ): Promise<GetRefundResponseResult> {
-  const result = await checkRefundEligibility({ orderId }, deps);
+  const result = await checkRefundEligibility({ orderId }, dependencies);
   const fallbackResponse = formatRefundEligibilityResponse(
     agentQuestion,
     result,
   );
 
   // fallback to deterministic response if no custom responder / AI generator
-  if (!deps.responder) {
+  if (!dependencies.responder) {
     return {
       orderId,
       agentQuestion,
@@ -54,7 +54,7 @@ export async function getRefundResponse(
   }
 
   try {
-    const generatedResponse = await deps.responder.generateResponse({
+    const generatedResponse = await dependencies.responder.generateResponse({
       agentQuestion,
       result,
       fallbackResponse,

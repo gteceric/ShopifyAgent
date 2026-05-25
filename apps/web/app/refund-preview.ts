@@ -2,7 +2,7 @@ import {
   createRefundContextAdapter,
   previewShopifyRefund,
   RefundActionValidationStatus,
-  type PreviewShopifyRefundDeps,
+  type PreviewShopifyRefundDependencies,
   type RefundActionBlocker,
   type RefundActionMatchedLineItem,
   type RefundContextPlatformAdapter,
@@ -42,7 +42,7 @@ export type RefundPreviewResult =
 export interface PreviewRefundDependencies {
   adapter: RefundContextPlatformAdapter;
   config: RefundPolicyConfig;
-  shopifyPreviewDeps?: PreviewShopifyRefundDeps;
+  shopifyPreviewDependencies?: PreviewShopifyRefundDependencies;
 }
 
 export async function previewRefund(
@@ -71,7 +71,7 @@ export async function previewRefund(
           quantity: lineItem.requestedQuantity,
         })),
       },
-      dependencies.shopifyPreviewDeps,
+      dependencies.shopifyPreviewDependencies,
     );
 
     return {

@@ -48,14 +48,14 @@ export default async function Home({ searchParams }: HomeProps) {
       const evaluationOutcomes = await Promise.allSettled(
         orderSummaries.map((order) => {
           const refundEligibilityInput = { orderId: order.id };
-          const refundEligibilityDeps = {
+          const refundEligibilityDependencies = {
             config: merchantPolicyConfig,
             adapter: refundContextAdapter,
           };
 
           return checkRefundEligibility(
             refundEligibilityInput,
-            refundEligibilityDeps,
+            refundEligibilityDependencies,
           );
         }),
       );

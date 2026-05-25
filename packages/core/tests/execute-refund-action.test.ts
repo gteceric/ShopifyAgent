@@ -5,7 +5,7 @@ import {
   executeShopifyRefundAction,
   RefundActionValidationStatus,
   ShopifyRefundActionExecutionStatus,
-  type ExecuteShopifyRefundActionDeps,
+  type ExecuteShopifyRefundActionDependencies,
   type ExecuteShopifyRefundActionInput,
 } from "../src/index.js";
 import { RefundDecision } from "../src/domain/refund-policy.types.js";
@@ -50,12 +50,12 @@ test("uses mock Shopify refund execution when real Shopify is disabled", async (
     idempotencyKey: "refund-action-910000000070-700000000070",
     note: "Customer requested a refund.",
   };
-  const deps: ExecuteShopifyRefundActionDeps = {
+  const dependencies: ExecuteShopifyRefundActionDependencies = {
     env: {},
     fetchImpl,
   };
 
-  const result = await executeShopifyRefundAction(input, deps);
+  const result = await executeShopifyRefundAction(input, dependencies);
 
   assert.equal(result.status, ShopifyRefundActionExecutionStatus.Succeeded);
   assert.equal(result.source, "mock");
@@ -82,12 +82,12 @@ test("uses mock Shopify refund execution for multiple line items", async () => {
     validation: multiItemReadyValidation,
     idempotencyKey: "refund-action-910000000070-multi-item",
   };
-  const deps: ExecuteShopifyRefundActionDeps = {
+  const dependencies: ExecuteShopifyRefundActionDependencies = {
     env: {},
     fetchImpl,
   };
 
-  const result = await executeShopifyRefundAction(input, deps);
+  const result = await executeShopifyRefundAction(input, dependencies);
 
   assert.equal(result.status, ShopifyRefundActionExecutionStatus.Succeeded);
   assert.deepEqual(result.lineItems, [
@@ -271,7 +271,7 @@ test("executes Shopify refundCreate from Shopify refund preview", async () => {
     idempotencyKey: "refund-action-910000000070-700000000070",
     note: "Customer requested a refund.",
   };
-  const deps: ExecuteShopifyRefundActionDeps = {
+  const dependencies: ExecuteShopifyRefundActionDependencies = {
     env: {
       USE_REAL_SHOPIFY: "true",
       ENABLE_REAL_REFUND_EXECUTION: "true",
@@ -281,7 +281,7 @@ test("executes Shopify refundCreate from Shopify refund preview", async () => {
     fetchImpl,
   };
 
-  const result = await executeShopifyRefundAction(input, deps);
+  const result = await executeShopifyRefundAction(input, dependencies);
 
   assert.equal(result.status, ShopifyRefundActionExecutionStatus.Succeeded);
   assert.equal(result.source, "shopify");
@@ -498,7 +498,7 @@ test("returns pending when Shopify refund transaction is pending", async () => {
     validation: readyValidation,
     idempotencyKey: "refund-action-910000000070-700000000070",
   };
-  const deps: ExecuteShopifyRefundActionDeps = {
+  const dependencies: ExecuteShopifyRefundActionDependencies = {
     env: {
       USE_REAL_SHOPIFY: "true",
       ENABLE_REAL_REFUND_EXECUTION: "true",
@@ -508,7 +508,7 @@ test("returns pending when Shopify refund transaction is pending", async () => {
     fetchImpl,
   };
 
-  const result = await executeShopifyRefundAction(input, deps);
+  const result = await executeShopifyRefundAction(input, dependencies);
 
   assert.equal(result.status, ShopifyRefundActionExecutionStatus.Pending);
   assert.deepEqual(result.refundTransactions, [
@@ -530,14 +530,14 @@ test("throws when real Shopify refund execution is requested without admin confi
     validation: readyValidation,
     idempotencyKey: "refund-action-910000000070-700000000070",
   };
-  const deps: ExecuteShopifyRefundActionDeps = {
+  const dependencies: ExecuteShopifyRefundActionDependencies = {
     env: {
       USE_REAL_SHOPIFY: "true",
     },
   };
 
   await assert.rejects(
-    () => executeShopifyRefundAction(input, deps),
+    () => executeShopifyRefundAction(input, dependencies),
     /USE_REAL_SHOPIFY=true requires SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_TOKEN\./,
   );
 });
@@ -550,7 +550,7 @@ test("throws when real Shopify refund execution is not explicitly enabled", asyn
     validation: readyValidation,
     idempotencyKey: "refund-action-910000000070-700000000070",
   };
-  const deps: ExecuteShopifyRefundActionDeps = {
+  const dependencies: ExecuteShopifyRefundActionDependencies = {
     env: {
       USE_REAL_SHOPIFY: "true",
       SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
@@ -560,7 +560,7 @@ test("throws when real Shopify refund execution is not explicitly enabled", asyn
   };
 
   await assert.rejects(
-    () => executeShopifyRefundAction(input, deps),
+    () => executeShopifyRefundAction(input, dependencies),
     /ENABLE_REAL_REFUND_EXECUTION=true/,
   );
 });

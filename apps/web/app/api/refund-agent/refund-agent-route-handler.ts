@@ -13,7 +13,7 @@ import { formatMerchantRefundAgentResponse } from "../../refund-agent-response";
 import { parseRefundAgentRequest } from "./refund-agent-request";
 import type { RefundAgentResponder } from "./select-refund-agent-responder";
 
-export interface RefundAgentRouteHandlerDeps {
+export interface RefundAgentRouteHandlerDependencies {
   adapter: RefundContextPlatformAdapter;
   responder: RefundAgentResponder | undefined;
 }
@@ -25,7 +25,7 @@ export type RefundAgentRouteHandlerResult = {
 
 export async function handleRefundAgentRequest(
   body: RefundAgentRequestBody,
-  deps: RefundAgentRouteHandlerDeps,
+  dependencies: RefundAgentRouteHandlerDependencies,
 ): Promise<RefundAgentRouteHandlerResult> {
   const logPrefix = "[handleRefundAgentRequest]";
   const startedAt = Date.now();
@@ -43,12 +43,12 @@ export async function handleRefundAgentRequest(
   const result = await checkRefundEligibility(
     { orderId },
     {
-      adapter: deps.adapter,
+      adapter: dependencies.adapter,
       config: merchantPolicyConfig,
     },
   );
   const fallbackResponse = formatMerchantRefundAgentResponse(question, result);
-  const responder = deps.responder;
+  const responder = dependencies.responder;
   let response = fallbackResponse;
   let usedFallback = true;
   let provider: RefundAgentResponse["provider"] = "fallback";
