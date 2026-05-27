@@ -1,0 +1,368 @@
+import { Prisma } from "@prisma/client";
+import type {
+  Order,
+  OrderLineItem,
+  PlatformAccount,
+  Refund,
+  RefundTransaction,
+} from "@prisma/client";
+
+export type SnapshotJson = Prisma.InputJsonValue;
+export type SnapshotMoneyAmount = string;
+
+export interface PlatformAccountSnapshot {
+  platform: string;
+  platformAccountId: string;
+  name?: string;
+  shopDomain?: string;
+  rawPayload?: SnapshotJson;
+}
+
+export interface OrderSnapshot {
+  platformOrderId: string;
+  orderName?: string;
+  createdAtPlatform: Date | string;
+  financialStatus: string;
+  fulfillmentStatus?: string;
+  totalAmount?: SnapshotMoneyAmount;
+  currencyCode?: string;
+  rawPayload?: SnapshotJson;
+  syncedAt?: Date | string;
+}
+
+export interface OrderLineItemSnapshot {
+  platformLineItemId: string;
+  title?: string;
+  sku?: string;
+  variantTitle?: string;
+  variantOptions?: SnapshotJson;
+  imageUrl?: string;
+  imageAltText?: string;
+  fulfillmentLineItemId?: string;
+  category?: string;
+  fulfillmentStatus?: string;
+  hasReturnableFulfillment?: boolean;
+  finalSale?: boolean;
+  unitPrice?: SnapshotMoneyAmount;
+  currencyCode?: string;
+  currentQuantity?: number;
+  returnableQuantity?: number;
+  pendingRefundQuantity?: number;
+  rawPayload?: SnapshotJson;
+}
+
+export interface RefundLineItemSnapshot {
+  platformLineItemId: string;
+  quantity: number;
+  subtotalAmount?: SnapshotMoneyAmount;
+  currencyCode?: string;
+  rawPayload?: SnapshotJson;
+}
+
+export interface RefundTransactionSnapshot {
+  platformRefundTransactionId: string;
+  kind?: string;
+  gateway?: string;
+  status: string;
+  amount?: SnapshotMoneyAmount;
+  currencyCode?: string;
+  rawPayload?: SnapshotJson;
+}
+
+export interface RefundSnapshot {
+  platformRefundId: string;
+  status: string;
+  totalAmount?: SnapshotMoneyAmount;
+  currencyCode?: string;
+  rawPayload?: SnapshotJson;
+  lineItems?: RefundLineItemSnapshot[];
+  transactions?: RefundTransactionSnapshot[];
+}
+
+export interface PersistOrderSnapshotInput {
+  platformAccount: PlatformAccountSnapshot;
+  order: OrderSnapshot;
+  lineItems?: OrderLineItemSnapshot[];
+  refunds?: RefundSnapshot[];
+}
+
+export interface PersistOrderSnapshotResult {
+  platformAccountId: string;
+  orderId: string;
+  lineItemIdsByPlatformLineItemId: Map<string, string>;
+  refundIdsByPlatformRefundId: Map<string, string>;
+}
+
+export interface PersistOrderSnapshotTransaction {
+  platformAccount: {
+    upsert(args: Prisma.PlatformAccountUpsertArgs): Promise<PlatformAccount>;
+  };
+  order: {
+    upsert(args: Prisma.OrderUpsertArgs): Promise<Order>;
+  };
+  orderLineItem: {
+    upsert(args: Prisma.OrderLineItemUpsertArgs): Promise<OrderLineItem>;
+  };
+  refund: {
+    upsert(args: Prisma.RefundUpsertArgs): Promise<Refund>;
+  };
+  refundLineItem: {
+    deleteMany(
+      args: Prisma.RefundLineItemDeleteManyArgs,
+    ): Promise<Prisma.BatchPayload>;
+    create(args: Prisma.RefundLineItemCreateArgs): Promise<unknown>;
+  };
+  refundTransaction: {
+    upsert(
+      args: Prisma.RefundTransactionUpsertArgs,
+    ): Promise<RefundTransaction>;
+  };
+}
+
+export interface PersistOrderSnapshotClient {
+  $transaction<T>(
+    callback: (transaction: PersistOrderSnapshotTransaction) => Promise<T>,
+  ): Promise<T>;
+}
+
+function nullable<T>(value: T | undefined): T | null {
+  return value ?? null;
+}
+
+function nullableJson(
+  value: SnapshotJson | undefined,
+): SnapshotJson | Prisma.NullTypes.JsonNull {
+  return value ?? Prisma.JsonNull;
+}
+
+function normalizeDate(value: Date | string, fieldName: string): Date {
+  const date = value instanceof Date ? value : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`${fieldName} must be a valid date.`);
+  }
+
+  return date;
+}
+
+function buildOrderLineItemData(input: {
+  platform: string;
+  orderId: string;
+  lineItem: OrderLineItemSnapshot;
+}): Prisma.OrderLineItemUncheckedCreateInput {
+  return {
+    orderId: input.orderId,
+    platform: input.platform,
+    platformLineItemId: input.lineItem.platformLineItemId,
+    title: nullable(input.lineItem.title),
+    sku: nullable(input.lineItem.sku),
+    variantTitle: nullable(input.lineItem.variantTitle),
+    variantOptions: nullableJson(input.lineItem.variantOptions),
+    imageUrl: nullable(input.lineItem.imageUrl),
+    imageAltText: nullable(input.lineItem.imageAltText),
+    fulfillmentLineItemId: nullable(input.lineItem.fulfillmentLineItemId),
+    category: nullable(input.lineItem.category),
+    fulfillmentStatus: nullable(input.lineItem.fulfillmentStatus),
+    hasReturnableFulfillment: input.lineItem.hasReturnableFulfillment ?? false,
+    finalSale: input.lineItem.finalSale ?? false,
+    unitPrice: nullable(input.lineItem.unitPrice),
+    currencyCode: nullable(input.lineItem.currencyCode),
+    currentQuantity: input.lineItem.currentQuantity ?? 0,
+    returnableQuantity: input.lineItem.returnableQuantity ?? 0,
+    pendingRefundQuantity: input.lineItem.pendingRefundQuantity ?? 0,
+    rawPayload: nullableJson(input.lineItem.rawPayload),
+  };
+}
+
+function buildRefundData(input: {
+  platform: string;
+  orderId: string;
+  refund: RefundSnapshot;
+}): Prisma.RefundUncheckedCreateInput {
+  return {
+    orderId: input.orderId,
+    platform: input.platform,
+    platformRefundId: input.refund.platformRefundId,
+    status: input.refund.status,
+    totalAmount: nullable(input.refund.totalAmount),
+    currencyCode: nullable(input.refund.currencyCode),
+    rawPayload: nullableJson(input.refund.rawPayload),
+  };
+}
+
+function buildRefundTransactionData(input: {
+  platform: string;
+  refundId: string;
+  transaction: RefundTransactionSnapshot;
+}): Prisma.RefundTransactionUncheckedCreateInput {
+  return {
+    refundId: input.refundId,
+    platform: input.platform,
+    platformRefundTransactionId: input.transaction.platformRefundTransactionId,
+    kind: nullable(input.transaction.kind),
+    gateway: nullable(input.transaction.gateway),
+    status: input.transaction.status,
+    amount: nullable(input.transaction.amount),
+    currencyCode: nullable(input.transaction.currencyCode),
+    rawPayload: nullableJson(input.transaction.rawPayload),
+  };
+}
+
+export async function persistOrderSnapshot(
+  input: PersistOrderSnapshotInput,
+  client: PersistOrderSnapshotClient,
+): Promise<PersistOrderSnapshotResult> {
+  return client.$transaction(async (transaction) => {
+    const platformAccountData: Prisma.PlatformAccountCreateInput = {
+      platform: input.platformAccount.platform,
+      platformAccountId: input.platformAccount.platformAccountId,
+      name: nullable(input.platformAccount.name),
+      shopDomain: nullable(input.platformAccount.shopDomain),
+      rawPayload: nullableJson(input.platformAccount.rawPayload),
+    };
+
+    const platformAccount = await transaction.platformAccount.upsert({
+      where: {
+        platform_platformAccountId: {
+          platform: input.platformAccount.platform,
+          platformAccountId: input.platformAccount.platformAccountId,
+        },
+      },
+      create: platformAccountData,
+      update: platformAccountData,
+    });
+
+    const orderData: Prisma.OrderUncheckedCreateInput = {
+      platformAccountId: platformAccount.id,
+      platform: input.platformAccount.platform,
+      platformOrderId: input.order.platformOrderId,
+      orderName: nullable(input.order.orderName),
+      createdAtPlatform: normalizeDate(
+        input.order.createdAtPlatform,
+        "order.createdAtPlatform",
+      ),
+      financialStatus: input.order.financialStatus,
+      fulfillmentStatus: nullable(input.order.fulfillmentStatus),
+      totalAmount: nullable(input.order.totalAmount),
+      currencyCode: nullable(input.order.currencyCode),
+      rawPayload: nullableJson(input.order.rawPayload),
+      syncedAt: normalizeDate(
+        input.order.syncedAt ?? new Date(),
+        "order.syncedAt",
+      ),
+    };
+    const order = await transaction.order.upsert({
+      where: {
+        platformAccountId_platformOrderId: {
+          platformAccountId: platformAccount.id,
+          platformOrderId: input.order.platformOrderId,
+        },
+      },
+      create: orderData,
+      update: orderData,
+    });
+
+    const lineItemIdsByPlatformLineItemId = new Map<string, string>();
+
+    for (const lineItem of input.lineItems ?? []) {
+      const lineItemData = buildOrderLineItemData({
+        platform: input.platformAccount.platform,
+        orderId: order.id,
+        lineItem,
+      });
+      const persistedLineItem = await transaction.orderLineItem.upsert({
+        where: {
+          orderId_platformLineItemId: {
+            orderId: order.id,
+            platformLineItemId: lineItem.platformLineItemId,
+          },
+        },
+        create: lineItemData,
+        update: lineItemData,
+      });
+
+      lineItemIdsByPlatformLineItemId.set(
+        lineItem.platformLineItemId,
+        persistedLineItem.id,
+      );
+    }
+
+    const refundIdsByPlatformRefundId = new Map<string, string>();
+
+    for (const refund of input.refunds ?? []) {
+      const refundData = buildRefundData({
+        platform: input.platformAccount.platform,
+        orderId: order.id,
+        refund,
+      });
+      const persistedRefund = await transaction.refund.upsert({
+        where: {
+          orderId_platformRefundId: {
+            orderId: order.id,
+            platformRefundId: refund.platformRefundId,
+          },
+        },
+        create: refundData,
+        update: refundData,
+      });
+
+      refundIdsByPlatformRefundId.set(
+        refund.platformRefundId,
+        persistedRefund.id,
+      );
+
+      // refundId alone cannot uniquely identify one RefundLineItem.
+      // so delete all and then create
+      await transaction.refundLineItem.deleteMany({
+        where: {
+          refundId: persistedRefund.id,
+        },
+      });
+
+      for (const refundLineItem of refund.lineItems ?? []) {
+        await transaction.refundLineItem.create({
+          data: {
+            refundId: persistedRefund.id,
+            orderLineItemId:
+              lineItemIdsByPlatformLineItemId.get(
+                refundLineItem.platformLineItemId,
+              ) ?? null,
+            platform: input.platformAccount.platform,
+            platformLineItemId: refundLineItem.platformLineItemId,
+            quantity: refundLineItem.quantity,
+            subtotalAmount: nullable(refundLineItem.subtotalAmount),
+            currencyCode: nullable(refundLineItem.currencyCode),
+            rawPayload: nullableJson(refundLineItem.rawPayload),
+          },
+        });
+      }
+
+      for (const refundTransaction of refund.transactions ?? []) {
+        const refundTransactionData = buildRefundTransactionData({
+          platform: input.platformAccount.platform,
+          refundId: persistedRefund.id,
+          transaction: refundTransaction,
+        });
+
+        await transaction.refundTransaction.upsert({
+          where: {
+            refundId_platformRefundTransactionId: {
+              refundId: persistedRefund.id,
+              platformRefundTransactionId:
+                refundTransaction.platformRefundTransactionId,
+            },
+          },
+          create: refundTransactionData,
+          update: refundTransactionData,
+        });
+      }
+    }
+
+    return {
+      platformAccountId: platformAccount.id,
+      orderId: order.id,
+      lineItemIdsByPlatformLineItemId,
+      refundIdsByPlatformRefundId,
+    };
+  });
+}
