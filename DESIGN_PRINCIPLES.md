@@ -138,3 +138,28 @@ For refund eligibility and the refund-agent flow:
 - Shopify and future commerce adapters should normalize platform-specific order facts into `RefundContext.order` and item facts into `RefundContext.lineItems`.
 - Shopify Admin data that affects refund correctness should be cursor-paginated in concept-specific adapter loaders, not exposed as UI pagination.
 - Shopify array-style fields that cannot be cursor-paginated in the same way should use the largest safe page size and be revisited when persistence/backfill sync is added.
+
+## Persistence, Webhooks, And Reconciliation
+
+Use Postgres as the durable operational store and Prisma as the schema,
+migration, and typed database client layer.
+
+Persistence should support more than one commerce platform. Keep local tables
+platform-neutral and store platform-specific identifiers in explicit fields such
+as `platform`, `platformOrderId`, `platformLineItemId`, and `platformRefundId`.
+Keep the raw platform payload alongside normalized columns so we can add fields
+later without losing evidence from earlier syncs.
+
+The database is not allowed to replace live platform validation for money
+movement. Refund preview and confirm flows should still re-check the commerce
+platform before showing or creating a refund. The database is for fast dashboard
+loading, webhook-backed state, auditing, reconciliation, and future return/RMA
+workflows.
+
+Webhooks should write idempotent `PlatformEvent` records first, then update the
+normalized order, line item, refund, and transaction tables. Background
+reconciliation jobs should periodically re-fetch recent or open orders from the
+platform, compare them with local state, and repair drift.
+
+Add database changes as small migrations. Prefer additive schema changes while
+the refund and return domain is still evolving.

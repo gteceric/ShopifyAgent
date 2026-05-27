@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model PlatformAccount {
+  id                String   @id @default(cuid())
+  platform          String   @db.VarChar(50)
+  platformAccountId String   @map("platform_account_id")
+  name              String?  @db.VarChar(255)
+  shopDomain        String?  @map("shop_domain") @db.VarChar(255)
+  rawPayload        Json?    @map("raw_payload")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  orders         Order[]
+  platformEvents PlatformEvent[]
+  syncRuns       SyncRun[]
+
+  @@unique([platform, platformAccountId])
+  @@index([platform])
+  @@map("platform_accounts")
+}
+
+model Order {
+  id                String   @id @default(cuid())
+  platformAccountId String   @map("platform_account_id")
+  platform          String   @db.VarChar(50)
+  platformOrderId   String   @map("platform_order_id")
+  orderName         String?  @map("order_name") @db.VarChar(128)
+  createdAtPlatform DateTime @map("created_at_platform")
+  financialStatus   String   @map("financial_status") @db.VarChar(64)
+  fulfillmentStatus String?  @map("fulfillment_status") @db.VarChar(64)
+  totalAmount       Decimal? @map("total_amount") @db.Decimal(18, 4)
+  currencyCode      String?  @map("currency_code") @db.VarChar(3)
+  rawPayload        Json?    @map("raw_payload")
+  syncedAt          DateTime @default(now()) @map("synced_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  platformAccount PlatformAccount @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
+  lineItems       OrderLineItem[]
+  refunds         Refund[]
+
+  @@unique([platformAccountId, platformOrderId])
+  @@index([platformAccountId])
+  @@index([platform, platformOrderId])
+  @@index([platform, financialStatus])
+  @@map("orders")
+}
+
+model OrderLineItem {
+  id                       String   @id @default(cuid())
+  orderId                  String   @map("order_id")
+  platform                 String   @db.VarChar(50)
+  platformLineItemId       String   @map("platform_line_item_id")
+  title                    String?
+  sku                      String?  @db.VarChar(128)
+  variantTitle             String?  @map("variant_title") @db.VarChar(255)
+  variantOptions           Json?    @map("variant_options")
+  imageUrl                 String?  @map("image_url")
+  imageAltText             String?  @map("image_alt_text")
+  fulfillmentLineItemId    String?  @map("fulfillment_line_item_id")
+  category                 String?
+  fulfillmentStatus        String?  @map("fulfillment_status") @db.VarChar(64)
+  hasReturnableFulfillment Boolean  @default(false) @map("has_returnable_fulfillment")
+  finalSale                Boolean  @default(false) @map("final_sale")
+  unitPrice                Decimal? @map("unit_price") @db.Decimal(18, 4)
+  currencyCode             String?  @map("currency_code") @db.VarChar(3)
+  currentQuantity          Int      @default(0) @map("current_quantity")
+  returnableQuantity       Int      @default(0) @map("returnable_quantity")
+  pendingRefundQuantity    Int      @default(0) @map("pending_refund_quantity")
+  rawPayload               Json?    @map("raw_payload")
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
+
+  order           Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  refundLineItems RefundLineItem[]
+
+  @@unique([orderId, platformLineItemId])
+  @@index([orderId])
+  @@index([platform, platformLineItemId])
+  @@map("order_line_items")
+}
+
+model Refund {
+  id               String   @id @default(cuid())
+  orderId          String   @map("order_id")
+  platform         String   @db.VarChar(50)
+  platformRefundId String   @map("platform_refund_id")
+  status           String   @db.VarChar(64)
+  totalAmount      Decimal? @map("total_amount") @db.Decimal(18, 4)
+  currencyCode     String?  @map("currency_code") @db.VarChar(3)
+  rawPayload       Json?    @map("raw_payload")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  order        Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  lineItems    RefundLineItem[]
+  transactions RefundTransaction[]
+
+  @@unique([orderId, platformRefundId])
+  @@index([orderId])
+  @@index([platform, platformRefundId])
+  @@index([platform, status])
+  @@map("refunds")
+}
+
+model RefundLineItem {
+  id                 String   @id @default(cuid())
+  refundId           String   @map("refund_id")
+  orderLineItemId    String?  @map("order_line_item_id")
+  platform           String   @db.VarChar(50)
+  platformLineItemId String   @map("platform_line_item_id")
+  quantity           Int
+  subtotalAmount     Decimal? @map("subtotal_amount") @db.Decimal(18, 4)
+  currencyCode       String?  @map("currency_code") @db.VarChar(3)
+  rawPayload         Json?    @map("raw_payload")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  refund        Refund         @relation(fields: [refundId], references: [id], onDelete: Cascade)
+  orderLineItem OrderLineItem? @relation(fields: [orderLineItemId], references: [id], onDelete: SetNull)
+
+  @@index([refundId])
+  @@index([orderLineItemId])
+  @@index([platform, platformLineItemId])
+  @@map("refund_line_items")
+}
+
+model RefundTransaction {
+  id                          String   @id @default(cuid())
+  refundId                    String   @map("refund_id")
+  platform                    String   @db.VarChar(50)
+  platformRefundTransactionId String   @map("platform_refund_transaction_id")
+  kind                        String?  @db.VarChar(64)
+  gateway                     String?  @db.VarChar(128)
+  status                      String   @db.VarChar(64)
+  amount                      Decimal? @db.Decimal(18, 4)
+  currencyCode                String?  @map("currency_code") @db.VarChar(3)
+  rawPayload                  Json?    @map("raw_payload")
+  createdAt                   DateTime @default(now()) @map("created_at")
+  updatedAt                   DateTime @updatedAt @map("updated_at")
+
+  refund Refund @relation(fields: [refundId], references: [id], onDelete: Cascade)
+
+  @@unique([refundId, platformRefundTransactionId])
+  @@index([refundId])
+  @@index([platform, platformRefundTransactionId])
+  @@index([platform, status])
+  @@map("refund_transactions")
+}
+
+// Webhook/event inbox for idempotent platform event processing.
+model PlatformEvent {
+  id                String    @id @default(cuid())
+  platformAccountId String?   @map("platform_account_id")
+  platform          String    @db.VarChar(50)
+  eventType         String    @map("event_type") @db.VarChar(128)
+  platformEventId   String    @map("platform_event_id")
+  resourceType      String?   @map("resource_type") @db.VarChar(64)
+  resourceId        String?   @map("resource_id")
+  payload           Json
+  processedAt       DateTime? @map("processed_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  platformAccount PlatformAccount? @relation(fields: [platformAccountId], references: [id], onDelete: SetNull)
+
+  @@unique([platform, platformEventId])
+  @@index([platformAccountId])
+  @@index([platform, eventType])
+  @@map("platform_events")
+}
+
+// Reconciliation/manual sync job log.
+model SyncRun {
+  id                String    @id @default(cuid())
+  platformAccountId String?   @map("platform_account_id")
+  platform          String    @db.VarChar(50)
+  syncType          String    @map("sync_type") @db.VarChar(64)
+  status            String    @db.VarChar(64)
+  startedAt         DateTime  @default(now()) @map("started_at")
+  finishedAt        DateTime? @map("finished_at")
+  summary           Json?
+
+  platformAccount PlatformAccount? @relation(fields: [platformAccountId], references: [id], onDelete: SetNull)
+
+  @@index([platformAccountId])
+  @@index([platform, syncType, status])
+  @@map("sync_runs")
+}
