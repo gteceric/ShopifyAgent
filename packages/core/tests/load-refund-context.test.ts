@@ -9,6 +9,7 @@ import {
   createRefundContextAdapter,
   createMockShopifyRefundContextAdapter,
   createShopifyAdminRefundContextAdapter,
+  loadShopifyOrderRefundSyncData,
   mapAdminOrderToRefundContext,
 } from "../src/platforms/shopify/load-refund-context.js";
 
@@ -222,6 +223,192 @@ test("Shopify Admin adapter maps live Admin responses into RefundContext", async
   assert.equal(result.lineItems[0]?.hasReturnableFulfillment, true);
   assert.deepEqual(result.order.tags, ["vip-exception", "loyalty_recovery"]);
   assert.equal(result.order.flags?.vipOverride, true);
+});
+
+test("Shopify order sync snapshot includes refund records", async () => {
+  const responses = [
+    {
+      data: {
+        order: {
+          id: "gid://shopify/Order/900000000310",
+          name: "#3010",
+          tags: [],
+          createdAt: "2026-03-20T00:00:00.000Z",
+          totalPriceSet: {
+            shopMoney: {
+              amount: "56.99",
+            },
+          },
+          displayFinancialStatus: "PARTIALLY_REFUNDED",
+          displayFulfillmentStatus: "FULFILLED",
+          transactions: [],
+          fraudHoldFlag: { value: "false" },
+          manualReviewFlag: { value: "false" },
+          vipOverrideFlag: { value: "false" },
+        },
+      },
+    },
+    {
+      data: {
+        order: {
+          id: "gid://shopify/Order/900000000310",
+          lineItems: {
+            pageInfo: {
+              hasNextPage: false,
+              endCursor: null,
+            },
+            nodes: [
+              {
+                id: "gid://shopify/LineItem/900000000310-1",
+                title: "Refunded Sunglasses",
+                sku: "REFUNDED-SUN",
+                currentQuantity: 0,
+                originalUnitPriceSet: {
+                  presentmentMoney: {
+                    amount: "56.99",
+                    currencyCode: "HKD",
+                  },
+                },
+                product: {
+                  category: {
+                    fullName: "Apparel & Accessories > Sunglasses",
+                  },
+                },
+                customAttributes: [],
+              },
+            ],
+          },
+        },
+      },
+    },
+    {
+      data: {
+        order: {
+          id: "gid://shopify/Order/900000000310",
+          refunds: [
+            {
+              id: "gid://shopify/Refund/900000000310",
+              totalRefundedSet: {
+                presentmentMoney: {
+                  amount: "56.99",
+                  currencyCode: "HKD",
+                },
+              },
+              refundLineItems: {
+                pageInfo: {
+                  hasNextPage: false,
+                  endCursor: null,
+                },
+                nodes: [
+                  {
+                    id: "gid://shopify/RefundLineItem/900000000310-1",
+                    quantity: 1,
+                    subtotalSet: {
+                      presentmentMoney: {
+                        amount: "56.99",
+                        currencyCode: "HKD",
+                      },
+                    },
+                    lineItem: {
+                      id: "gid://shopify/LineItem/900000000310-1",
+                    },
+                  },
+                ],
+              },
+              transactions: {
+                pageInfo: {
+                  hasNextPage: false,
+                  endCursor: null,
+                },
+                edges: [
+                  {
+                    node: {
+                      id: "gid://shopify/OrderTransaction/900000000310",
+                      kind: "REFUND",
+                      gateway: "shopify_payments",
+                      status: "SUCCESS",
+                      amountSet: {
+                        presentmentMoney: {
+                          amount: "56.99",
+                          currencyCode: "HKD",
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    },
+    {
+      data: {
+        returnableFulfillments: {
+          pageInfo: {
+            hasNextPage: false,
+            endCursor: null,
+          },
+          nodes: [],
+        },
+      },
+    },
+  ];
+
+  const fetchImpl: typeof fetch = async () =>
+    new Response(JSON.stringify(responses.shift()), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+
+  const result = await loadShopifyOrderRefundSyncData(
+    {
+      orderId: "gid://shopify/Order/900000000310",
+    },
+    {
+      now: new Date("2026-03-30T00:00:00.000Z"),
+      env: {
+        USE_REAL_SHOPIFY: "true",
+        SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
+        SHOPIFY_ADMIN_TOKEN: "shpat_test",
+      },
+      fetchImpl,
+    },
+  );
+
+  assert.equal(result.context.order.id, "gid://shopify/Order/900000000310");
+  assert.deepEqual(result.refunds, [
+    {
+      refundId: "gid://shopify/Refund/900000000310",
+      status: "succeeded",
+      totalRefunded: {
+        amount: "56.99",
+        currencyCode: "HKD",
+      },
+      lineItems: [
+        {
+          lineItemId: "gid://shopify/LineItem/900000000310-1",
+          quantity: 1,
+          subtotal: {
+            amount: "56.99",
+            currencyCode: "HKD",
+          },
+        },
+      ],
+      transactions: [
+        {
+          transactionId: "gid://shopify/OrderTransaction/900000000310",
+          kind: "REFUND",
+          gateway: "shopify_payments",
+          status: "SUCCESS",
+          amount: {
+            amount: "56.99",
+            currencyCode: "HKD",
+          },
+        },
+      ],
+    },
+  ]);
 });
 
 test("Shopify Admin adapter paginates separated refund context loaders", async () => {

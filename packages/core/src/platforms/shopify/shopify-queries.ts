@@ -45,14 +45,38 @@ const REFUND_ORDER_LINE_ITEM_FIELDS = /* GraphQL */ `
 `;
 
 const REFUND_LINE_ITEM_FIELDS = /* GraphQL */ `
+  id
   quantity
+  subtotalSet {
+    shopMoney {
+      amount
+      currencyCode
+    }
+    presentmentMoney {
+      amount
+      currencyCode
+    }
+  }
   lineItem {
     id
   }
 `;
 
 const REFUND_TRANSACTION_FIELDS = /* GraphQL */ `
+  id
+  kind
+  gateway
   status
+  amountSet {
+    shopMoney {
+      amount
+      currencyCode
+    }
+    presentmentMoney {
+      amount
+      currencyCode
+    }
+  }
 `;
 
 const RETURNABLE_FULFILLMENT_LINE_ITEM_FIELDS = /* GraphQL */ `
@@ -127,6 +151,16 @@ export const REFUND_ORDER_REFUNDS_QUERY = /* GraphQL */ `
       # the largest safe page size and cursor-page each refund's nested data.
       refunds(first: 250) {
         id
+        totalRefundedSet {
+          shopMoney {
+            amount
+            currencyCode
+          }
+          presentmentMoney {
+            amount
+            currencyCode
+          }
+        }
         refundLineItems(first: 250) {
           pageInfo {
             hasNextPage

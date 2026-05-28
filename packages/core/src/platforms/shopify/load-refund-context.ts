@@ -107,18 +107,25 @@ interface ShopifyEdgeConnection<T> {
 }
 
 interface ShopifyRefundLineItemNode {
+  id?: string | null;
   quantity: number;
+  subtotalSet?: ShopifyMoneySet | null;
   lineItem?: {
     id: string;
   } | null;
 }
 
 interface ShopifyRefundTransactionNode {
+  id?: string | null;
+  kind?: string | null;
+  gateway?: string | null;
   status?: string | null;
+  amountSet?: ShopifyMoneySet | null;
 }
 
 interface ShopifyAdminRefund {
   id: string;
+  totalRefundedSet?: ShopifyMoneySet | null;
   refundLineItems?: ShopifyNodeConnection<ShopifyRefundLineItemNode> | null;
   transactions?: ShopifyEdgeConnection<ShopifyRefundTransactionNode> | null;
 }
@@ -202,6 +209,33 @@ interface ShopifyReturnableFulfillmentsResponse {
 
 interface ShopifyReturnableFulfillmentLineItemsResponse {
   node: ShopifyReturnableFulfillmentNode | null;
+}
+
+export interface ShopifyRefundSyncLineItem {
+  lineItemId: string;
+  quantity: number;
+  subtotal?: RefundMoney;
+}
+
+export interface ShopifyRefundSyncTransaction {
+  transactionId: string;
+  kind?: string;
+  gateway?: string;
+  status: string;
+  amount?: RefundMoney;
+}
+
+export interface ShopifyRefundSyncRecord {
+  refundId: string;
+  status: string;
+  totalRefunded?: RefundMoney;
+  lineItems: ShopifyRefundSyncLineItem[];
+  transactions: ShopifyRefundSyncTransaction[];
+}
+
+export interface ShopifyOrderRefundSyncData {
+  context: RefundContext;
+  refunds: ShopifyRefundSyncRecord[];
 }
 
 function daysBetween(startIso: string, end: Date): number {
@@ -351,6 +385,12 @@ function mapUnitPrice(
   return mapMoney(moneySet?.presentmentMoney) ?? mapMoney(moneySet?.shopMoney);
 }
 
+function mapMoneySet(
+  moneySet?: ShopifyMoneySet | null,
+): RefundMoney | undefined {
+  return mapMoney(moneySet?.presentmentMoney) ?? mapMoney(moneySet?.shopMoney);
+}
+
 function pickLineItemImage(
   lineItem: ShopifyAdminLineItem,
 ): ShopifyImage | null {
@@ -458,6 +498,107 @@ function collectPendingRefundQuantitiesByLineItemId(
   }
 
   return pendingRefundQuantitiesByLineItemId;
+}
+
+function isFailedRefundTransactionStatus(status?: string | null): boolean {
+  return ["FAILURE", "ERROR"].includes(status ?? "");
+}
+
+function deriveRefundRecordStatus(
+  transactions: ShopifyRefundSyncTransaction[],
+): string {
+  if (
+    transactions.some((transaction) =>
+      isPendingRefundTransactionStatus(transaction.status),
+    )
+  ) {
+    return "pending";
+  }
+
+  if (
+    transactions.some((transaction) =>
+      isFailedRefundTransactionStatus(transaction.status),
+    )
+  ) {
+    return "failed";
+  }
+
+  if (transactions.length > 0) {
+    return "succeeded";
+  }
+
+  return "unknown";
+}
+
+function mapShopifyRefundLineItemsToSyncLineItems(
+  refund: ShopifyAdminRefund,
+): ShopifyRefundSyncLineItem[] {
+  const lineItems: ShopifyRefundSyncLineItem[] = [];
+
+  for (const refundLineItem of refund.refundLineItems?.nodes ?? []) {
+    const lineItemId = refundLineItem.lineItem?.id;
+
+    if (!lineItemId || refundLineItem.quantity <= 0) {
+      continue;
+    }
+
+    const subtotal = mapMoneySet(refundLineItem.subtotalSet);
+
+    lineItems.push({
+      lineItemId,
+      quantity: refundLineItem.quantity,
+      ...(subtotal ? { subtotal } : {}),
+    });
+  }
+
+  return lineItems;
+}
+
+function mapShopifyRefundTransactionsToSyncTransactions(
+  refund: ShopifyAdminRefund,
+): ShopifyRefundSyncTransaction[] {
+  const transactions: ShopifyRefundSyncTransaction[] = [];
+
+  for (const { node } of refund.transactions?.edges ?? []) {
+    const transactionId = normalizeOptionalString(node.id);
+
+    if (!transactionId) {
+      continue;
+    }
+
+    const kind = normalizeOptionalString(node.kind);
+    const gateway = normalizeOptionalString(node.gateway);
+    const status = normalizeOptionalString(node.status) ?? "unknown";
+    const amount = mapMoneySet(node.amountSet);
+
+    transactions.push({
+      transactionId,
+      ...(kind ? { kind } : {}),
+      ...(gateway ? { gateway } : {}),
+      status,
+      ...(amount ? { amount } : {}),
+    });
+  }
+
+  return transactions;
+}
+
+function mapShopifyRefundsToSyncRecords(
+  refunds: ShopifyAdminRefund[],
+): ShopifyRefundSyncRecord[] {
+  return refunds.map((refund) => {
+    const transactions = mapShopifyRefundTransactionsToSyncTransactions(refund);
+    const lineItems = mapShopifyRefundLineItemsToSyncLineItems(refund);
+    const totalRefunded = mapMoneySet(refund.totalRefundedSet);
+
+    return {
+      refundId: refund.id,
+      status: deriveRefundRecordStatus(transactions),
+      ...(totalRefunded ? { totalRefunded } : {}),
+      lineItems,
+      transactions,
+    };
+  });
 }
 
 function mapAdminLineItemsToRefundContextLineItems(
@@ -740,17 +881,63 @@ async function loadShopifyReturnableFulfillments(
   };
 }
 
-function combineShopifyRefundContextParts(input: {
+interface CombineShopifyRefundContextPartsInput {
   orderSummary: ShopifyAdminOrderSummary;
   lineItems: ShopifyAdminLineItem[];
   refunds: ShopifyAdminRefund[];
-}): ShopifyAdminRefundContextOrder {
+}
+
+function combineShopifyRefundContextParts(
+  input: CombineShopifyRefundContextPartsInput,
+): ShopifyAdminRefundContextOrder {
   return {
     ...input.orderSummary,
     lineItems: {
       nodes: input.lineItems,
     },
     refunds: input.refunds,
+  };
+}
+
+interface LoadShopifyRefundContextPartsInput {
+  orderId: string;
+  shopifyAdminOptions: ShopifyAdminFetchOptions;
+}
+
+interface ShopifyRefundContextParts {
+  order: ShopifyAdminRefundContextOrder;
+  returnableFulfillments: ShopifyReturnableFulfillmentsResponse;
+}
+
+async function loadShopifyRefundContextParts(
+  input: LoadShopifyRefundContextPartsInput,
+): Promise<ShopifyRefundContextParts> {
+  const orderSummary = await loadShopifyOrderSummaryForRefund(
+    input.orderId,
+    input.shopifyAdminOptions,
+  );
+  const lineItems = await loadShopifyOrderLineItems(
+    input.orderId,
+    input.shopifyAdminOptions,
+  );
+  const refunds = await loadShopifyOrderRefunds(
+    input.orderId,
+    input.shopifyAdminOptions,
+  );
+  const returnableFulfillments = await loadShopifyReturnableFulfillments(
+    input.orderId,
+    input.shopifyAdminOptions,
+  );
+  const combineContextPartsInput: CombineShopifyRefundContextPartsInput = {
+    orderSummary,
+    lineItems,
+    refunds,
+  };
+  const order = combineShopifyRefundContextParts(combineContextPartsInput);
+
+  return {
+    order,
+    returnableFulfillments,
   };
 }
 
@@ -795,33 +982,51 @@ async function loadRefundContextFromShopify(
     env: dependencies.env,
     fetchImpl: dependencies.fetchImpl,
   };
-  const orderSummary = await loadShopifyOrderSummaryForRefund(
-    input.orderId,
+  const contextPartsInput: LoadShopifyRefundContextPartsInput = {
+    orderId: input.orderId,
     shopifyAdminOptions,
-  );
-  const lineItems = await loadShopifyOrderLineItems(
-    input.orderId,
-    shopifyAdminOptions,
-  );
-  const refunds = await loadShopifyOrderRefunds(
-    input.orderId,
-    shopifyAdminOptions,
-  );
-  const returnableFulfillments = await loadShopifyReturnableFulfillments(
-    input.orderId,
-    shopifyAdminOptions,
-  );
-  const order = combineShopifyRefundContextParts({
-    orderSummary,
-    lineItems,
-    refunds,
-  });
+  };
+  const contextParts = await loadShopifyRefundContextParts(contextPartsInput);
 
   return mapAdminOrderToRefundContext(
-    order,
-    returnableFulfillments,
+    contextParts.order,
+    contextParts.returnableFulfillments,
     dependencies.now ?? new Date(),
   );
+}
+
+export async function loadShopifyOrderRefundSyncData(
+  input: RefundContextInput,
+  dependencies: LoadShopifyRefundContextDependencies = {},
+): Promise<ShopifyOrderRefundSyncData> {
+  if (!hasShopifyAdminConfig(dependencies.env)) {
+    throw new Error(
+      "USE_REAL_SHOPIFY=true requires SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_TOKEN.",
+    );
+  }
+
+  const shopifyAdminOptions: ShopifyAdminFetchOptions = {
+    env: dependencies.env,
+    fetchImpl: dependencies.fetchImpl,
+  };
+  const contextPartsInput: LoadShopifyRefundContextPartsInput = {
+    orderId: input.orderId,
+    shopifyAdminOptions,
+  };
+  const contextParts = await loadShopifyRefundContextParts(contextPartsInput);
+  const context = mapAdminOrderToRefundContext(
+    contextParts.order,
+    contextParts.returnableFulfillments,
+    dependencies.now ?? new Date(),
+  );
+  const refunds = mapShopifyRefundsToSyncRecords(
+    contextParts.order.refunds ?? [],
+  );
+
+  return {
+    context,
+    refunds,
+  };
 }
 
 async function loadRefundContextFromMockShopify(

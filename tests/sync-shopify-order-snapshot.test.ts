@@ -4,6 +4,7 @@ import {
   FinancialStatus,
   FulfillmentStatus,
   type RefundContext,
+  type ShopifyRefundSyncRecord,
 } from "@shopify-agent/core";
 import {
   buildShopifyOrderSnapshotInput,
@@ -56,8 +57,41 @@ test("maps normalized Shopify refund context into a persistable order snapshot",
     ],
   };
   const syncedAt = new Date("2026-05-28T01:00:00.000Z");
+  const refunds: ShopifyRefundSyncRecord[] = [
+    {
+      refundId: "gid://shopify/Refund/983552032881",
+      status: "pending",
+      totalRefunded: {
+        amount: "56.99",
+        currencyCode: "HKD",
+      },
+      lineItems: [
+        {
+          lineItemId: "gid://shopify/LineItem/15870468554865",
+          quantity: 1,
+          subtotal: {
+            amount: "56.99",
+            currencyCode: "HKD",
+          },
+        },
+      ],
+      transactions: [
+        {
+          transactionId: "gid://shopify/OrderTransaction/8429734035569",
+          kind: "REFUND",
+          gateway: "shopify_payments",
+          status: "PENDING",
+          amount: {
+            amount: "56.99",
+            currencyCode: "HKD",
+          },
+        },
+      ],
+    },
+  ];
   const buildSnapshotInput: BuildShopifyOrderSnapshotInput = {
     context,
+    refunds,
     shopDomain: "demo-shop.myshopify.com",
     syncedAt,
   };
@@ -99,6 +133,33 @@ test("maps normalized Shopify refund context into a persistable order snapshot",
       currencyCode: "HKD",
       returnableQuantity: 2,
       pendingRefundQuantity: 1,
+    },
+  ]);
+  assert.deepEqual(snapshotInput.refunds, [
+    {
+      platformRefundId: "gid://shopify/Refund/983552032881",
+      status: "pending",
+      totalAmount: "56.99",
+      currencyCode: "HKD",
+      lineItems: [
+        {
+          platformLineItemId: "gid://shopify/LineItem/15870468554865",
+          quantity: 1,
+          subtotalAmount: "56.99",
+          currencyCode: "HKD",
+        },
+      ],
+      transactions: [
+        {
+          platformRefundTransactionId:
+            "gid://shopify/OrderTransaction/8429734035569",
+          kind: "REFUND",
+          gateway: "shopify_payments",
+          status: "PENDING",
+          amount: "56.99",
+          currencyCode: "HKD",
+        },
+      ],
     },
   ]);
 });
