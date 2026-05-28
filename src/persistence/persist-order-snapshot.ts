@@ -125,6 +125,24 @@ export interface PersistOrderSnapshotClient {
   ): Promise<T>;
 }
 
+interface BuildOrderLineItemDataInput {
+  platform: string;
+  orderId: string;
+  lineItem: OrderLineItemSnapshot;
+}
+
+interface BuildRefundDataInput {
+  platform: string;
+  orderId: string;
+  refund: RefundSnapshot;
+}
+
+interface BuildRefundTransactionDataInput {
+  platform: string;
+  refundId: string;
+  transaction: RefundTransactionSnapshot;
+}
+
 function nullable<T>(value: T | undefined): T | null {
   return value ?? null;
 }
@@ -145,11 +163,9 @@ function normalizeDate(value: Date | string, fieldName: string): Date {
   return date;
 }
 
-function buildOrderLineItemData(input: {
-  platform: string;
-  orderId: string;
-  lineItem: OrderLineItemSnapshot;
-}): Prisma.OrderLineItemUncheckedCreateInput {
+function buildOrderLineItemData(
+  input: BuildOrderLineItemDataInput,
+): Prisma.OrderLineItemUncheckedCreateInput {
   return {
     orderId: input.orderId,
     platform: input.platform,
@@ -174,11 +190,9 @@ function buildOrderLineItemData(input: {
   };
 }
 
-function buildRefundData(input: {
-  platform: string;
-  orderId: string;
-  refund: RefundSnapshot;
-}): Prisma.RefundUncheckedCreateInput {
+function buildRefundData(
+  input: BuildRefundDataInput,
+): Prisma.RefundUncheckedCreateInput {
   return {
     orderId: input.orderId,
     platform: input.platform,
@@ -190,11 +204,9 @@ function buildRefundData(input: {
   };
 }
 
-function buildRefundTransactionData(input: {
-  platform: string;
-  refundId: string;
-  transaction: RefundTransactionSnapshot;
-}): Prisma.RefundTransactionUncheckedCreateInput {
+function buildRefundTransactionData(
+  input: BuildRefundTransactionDataInput,
+): Prisma.RefundTransactionUncheckedCreateInput {
   return {
     refundId: input.refundId,
     platform: input.platform,
@@ -220,17 +232,20 @@ export async function persistOrderSnapshot(
       shopDomain: nullable(input.platformAccount.shopDomain),
       rawPayload: nullableJson(input.platformAccount.rawPayload),
     };
-
-    const platformAccount = await transaction.platformAccount.upsert({
-      where: {
-        platform_platformAccountId: {
-          platform: input.platformAccount.platform,
-          platformAccountId: input.platformAccount.platformAccountId,
-        },
+    const platformAccountWhere: Prisma.PlatformAccountWhereUniqueInput = {
+      platform_platformAccountId: {
+        platform: input.platformAccount.platform,
+        platformAccountId: input.platformAccount.platformAccountId,
       },
+    };
+    const platformAccountUpsertArgs: Prisma.PlatformAccountUpsertArgs = {
+      where: platformAccountWhere,
       create: platformAccountData,
       update: platformAccountData,
-    });
+    };
+
+    const platformAccount =
+      await transaction.platformAccount.upsert(platformAccountUpsertArgs);
 
     const orderData: Prisma.OrderUncheckedCreateInput = {
       platformAccountId: platformAccount.id,
@@ -251,35 +266,41 @@ export async function persistOrderSnapshot(
         "order.syncedAt",
       ),
     };
-    const order = await transaction.order.upsert({
-      where: {
-        platformAccountId_platformOrderId: {
-          platformAccountId: platformAccount.id,
-          platformOrderId: input.order.platformOrderId,
-        },
+    const orderWhere: Prisma.OrderWhereUniqueInput = {
+      platformAccountId_platformOrderId: {
+        platformAccountId: platformAccount.id,
+        platformOrderId: input.order.platformOrderId,
       },
+    };
+    const orderUpsertArgs: Prisma.OrderUpsertArgs = {
+      where: orderWhere,
       create: orderData,
       update: orderData,
-    });
+    };
+    const order = await transaction.order.upsert(orderUpsertArgs);
 
     const lineItemIdsByPlatformLineItemId = new Map<string, string>();
 
     for (const lineItem of input.lineItems ?? []) {
-      const lineItemData = buildOrderLineItemData({
+      const lineItemDataInput: BuildOrderLineItemDataInput = {
         platform: input.platformAccount.platform,
         orderId: order.id,
         lineItem,
-      });
-      const persistedLineItem = await transaction.orderLineItem.upsert({
-        where: {
-          orderId_platformLineItemId: {
-            orderId: order.id,
-            platformLineItemId: lineItem.platformLineItemId,
-          },
+      };
+      const lineItemData = buildOrderLineItemData(lineItemDataInput);
+      const lineItemWhere: Prisma.OrderLineItemWhereUniqueInput = {
+        orderId_platformLineItemId: {
+          orderId: order.id,
+          platformLineItemId: lineItem.platformLineItemId,
         },
+      };
+      const lineItemUpsertArgs: Prisma.OrderLineItemUpsertArgs = {
+        where: lineItemWhere,
         create: lineItemData,
         update: lineItemData,
-      });
+      };
+      const persistedLineItem =
+        await transaction.orderLineItem.upsert(lineItemUpsertArgs);
 
       lineItemIdsByPlatformLineItemId.set(
         lineItem.platformLineItemId,
@@ -290,29 +311,32 @@ export async function persistOrderSnapshot(
     const refundIdsByPlatformRefundId = new Map<string, string>();
 
     for (const refund of input.refunds ?? []) {
-      const refundData = buildRefundData({
+      const refundDataInput: BuildRefundDataInput = {
         platform: input.platformAccount.platform,
         orderId: order.id,
         refund,
-      });
-      const persistedRefund = await transaction.refund.upsert({
-        where: {
-          orderId_platformRefundId: {
-            orderId: order.id,
-            platformRefundId: refund.platformRefundId,
-          },
+      };
+      const refundData = buildRefundData(refundDataInput);
+      const refundWhere: Prisma.RefundWhereUniqueInput = {
+        orderId_platformRefundId: {
+          orderId: order.id,
+          platformRefundId: refund.platformRefundId,
         },
+      };
+      const refundUpsertArgs: Prisma.RefundUpsertArgs = {
+        where: refundWhere,
         create: refundData,
         update: refundData,
-      });
+      };
+      const persistedRefund = await transaction.refund.upsert(refundUpsertArgs);
 
       refundIdsByPlatformRefundId.set(
         refund.platformRefundId,
         persistedRefund.id,
       );
 
-      // refundId alone cannot uniquely identify one RefundLineItem.
-      // so delete all and then create
+      // RefundLineItem has no stable platform child id yet, so replace the
+      // refund's child list with the latest snapshot inside the transaction.
       await transaction.refundLineItem.deleteMany({
         where: {
           refundId: persistedRefund.id,
@@ -320,41 +344,53 @@ export async function persistOrderSnapshot(
       });
 
       for (const refundLineItem of refund.lineItems ?? []) {
-        await transaction.refundLineItem.create({
-          data: {
-            refundId: persistedRefund.id,
-            orderLineItemId:
-              lineItemIdsByPlatformLineItemId.get(
-                refundLineItem.platformLineItemId,
-              ) ?? null,
-            platform: input.platformAccount.platform,
-            platformLineItemId: refundLineItem.platformLineItemId,
-            quantity: refundLineItem.quantity,
-            subtotalAmount: nullable(refundLineItem.subtotalAmount),
-            currencyCode: nullable(refundLineItem.currencyCode),
-            rawPayload: nullableJson(refundLineItem.rawPayload),
-          },
-        });
+        const refundLineItemData: Prisma.RefundLineItemUncheckedCreateInput = {
+          refundId: persistedRefund.id,
+          orderLineItemId:
+            lineItemIdsByPlatformLineItemId.get(
+              refundLineItem.platformLineItemId,
+            ) ?? null,
+          platform: input.platformAccount.platform,
+          platformLineItemId: refundLineItem.platformLineItemId,
+          quantity: refundLineItem.quantity,
+          subtotalAmount: nullable(refundLineItem.subtotalAmount),
+          currencyCode: nullable(refundLineItem.currencyCode),
+          rawPayload: nullableJson(refundLineItem.rawPayload),
+        };
+        const refundLineItemCreateArgs: Prisma.RefundLineItemCreateArgs = {
+          data: refundLineItemData,
+        };
+
+        await transaction.refundLineItem.create(refundLineItemCreateArgs);
       }
 
       for (const refundTransaction of refund.transactions ?? []) {
-        const refundTransactionData = buildRefundTransactionData({
+        const refundTransactionDataInput: BuildRefundTransactionDataInput = {
           platform: input.platformAccount.platform,
           refundId: persistedRefund.id,
           transaction: refundTransaction,
-        });
-
-        await transaction.refundTransaction.upsert({
-          where: {
+        };
+        const refundTransactionData = buildRefundTransactionData(
+          refundTransactionDataInput,
+        );
+        const refundTransactionWhere: Prisma.RefundTransactionWhereUniqueInput =
+          {
             refundId_platformRefundTransactionId: {
               refundId: persistedRefund.id,
               platformRefundTransactionId:
                 refundTransaction.platformRefundTransactionId,
             },
-          },
-          create: refundTransactionData,
-          update: refundTransactionData,
-        });
+          };
+        const refundTransactionUpsertArgs: Prisma.RefundTransactionUpsertArgs =
+          {
+            where: refundTransactionWhere,
+            create: refundTransactionData,
+            update: refundTransactionData,
+          };
+
+        await transaction.refundTransaction.upsert(
+          refundTransactionUpsertArgs,
+        );
       }
     }
 

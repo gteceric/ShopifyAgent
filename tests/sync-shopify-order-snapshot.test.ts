@@ -1,0 +1,104 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+  FinancialStatus,
+  FulfillmentStatus,
+  type RefundContext,
+} from "@shopify-agent/core";
+import {
+  buildShopifyOrderSnapshotInput,
+  type BuildShopifyOrderSnapshotInput,
+} from "../src/sync/shopify-order-snapshot.js";
+
+test("maps normalized Shopify refund context into a persistable order snapshot", () => {
+  const context: RefundContext = {
+    order: {
+      id: "gid://shopify/Order/6609533698161",
+      name: "#1001",
+      createdAt: "2026-05-27T07:00:00.000Z",
+      ageDays: 1,
+      totalAmount: 150.97,
+      financialStatus: FinancialStatus.PartiallyRefunded,
+      tags: [],
+      flags: {
+        fraudHold: false,
+        manualReview: false,
+        vipOverride: false,
+      },
+    },
+    lineItems: [
+      {
+        lineItemId: "gid://shopify/LineItem/15870468554865",
+        fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/1",
+        title: "Maui Jim MJ2113 Peahi 58mm Wide",
+        sku: "MJ2113-58",
+        variantTitle: "Lens Type / Lens Color",
+        variantOptions: [
+          {
+            name: "Lens Type",
+            value: "Polarized",
+          },
+        ],
+        imageUrl: "https://example.test/image.jpg",
+        imageAltText: "Maui Jim sunglasses",
+        unitPrice: {
+          amount: "56.99",
+          currencyCode: "HKD",
+        },
+        returnableQuantity: 2,
+        pendingRefundQuantity: 1,
+        category: "Apparel & Accessories > Sunglasses",
+        fulfillmentStatus: FulfillmentStatus.Fulfilled,
+        hasReturnableFulfillment: true,
+        alreadyRefunded: false,
+        finalSale: false,
+      },
+    ],
+  };
+  const syncedAt = new Date("2026-05-28T01:00:00.000Z");
+  const buildSnapshotInput: BuildShopifyOrderSnapshotInput = {
+    context,
+    shopDomain: "demo-shop.myshopify.com",
+    syncedAt,
+  };
+  const snapshotInput = buildShopifyOrderSnapshotInput(buildSnapshotInput);
+
+  assert.deepEqual(snapshotInput.platformAccount, {
+    platform: "shopify",
+    platformAccountId: "demo-shop.myshopify.com",
+    shopDomain: "demo-shop.myshopify.com",
+  });
+  assert.deepEqual(snapshotInput.order, {
+    platformOrderId: "gid://shopify/Order/6609533698161",
+    orderName: "#1001",
+    createdAtPlatform: "2026-05-27T07:00:00.000Z",
+    financialStatus: "partially_refunded",
+    totalAmount: "150.97",
+    syncedAt,
+  });
+  assert.deepEqual(snapshotInput.lineItems, [
+    {
+      platformLineItemId: "gid://shopify/LineItem/15870468554865",
+      title: "Maui Jim MJ2113 Peahi 58mm Wide",
+      sku: "MJ2113-58",
+      variantTitle: "Lens Type / Lens Color",
+      variantOptions: [
+        {
+          name: "Lens Type",
+          value: "Polarized",
+        },
+      ],
+      imageUrl: "https://example.test/image.jpg",
+      imageAltText: "Maui Jim sunglasses",
+      fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/1",
+      category: "Apparel & Accessories > Sunglasses",
+      fulfillmentStatus: "fulfilled",
+      hasReturnableFulfillment: true,
+      finalSale: false,
+      unitPrice: "56.99",
+      currencyCode: "HKD",
+      returnableQuantity: 2,
+      pendingRefundQuantity: 1,
+    },
+  ]);
+});
