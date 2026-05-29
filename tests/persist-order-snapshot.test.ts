@@ -6,6 +6,7 @@ import type {
   PlatformAccount,
   Prisma,
   Refund,
+  RefundLineItem,
   RefundTransaction,
 } from "@prisma/client";
 import {
@@ -84,6 +85,17 @@ class FakePersistOrderSnapshotClient implements PersistOrderSnapshotClient {
 
         return {};
       },
+      upsert: async (args) => {
+        this.calls.push({ operation: "refundLineItem.upsert", args });
+        const platformRefundLineItemId = args.create.platformRefundLineItemId;
+
+        return {
+          id: `refund-line-item:${platformRefundLineItemId}`,
+          ...args.create,
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+        } as RefundLineItem;
+      },
     },
     refundTransaction: {
       upsert: async (args) => {
@@ -156,6 +168,8 @@ test("persists an order snapshot using platform-neutral unique keys", async () =
           currencyCode: "HKD",
           lineItems: [
             {
+              platformRefundLineItemId:
+                "gid://shopify/RefundLineItem/1",
               platformLineItemId: "gid://shopify/LineItem/1",
               quantity: 1,
               subtotalAmount: "56.99",
@@ -235,9 +249,20 @@ test("persists an order snapshot using platform-neutral unique keys", async () =
       platformRefundTransactionId: "gid://shopify/OrderTransaction/1",
     },
   });
+
+  const refundLineItemUpsert = findCall<Prisma.RefundLineItemUpsertArgs>(
+    client.calls,
+    "refundLineItem.upsert",
+  );
+  assert.deepEqual(refundLineItemUpsert.where, {
+    refundId_platformRefundLineItemId: {
+      refundId: "refund:gid://shopify/Refund/1",
+      platformRefundLineItemId: "gid://shopify/RefundLineItem/1",
+    },
+  });
 });
 
-test("replaces refund line item children from the latest refund snapshot", async () => {
+test("replaces refund line item children when no stable child ids are available", async () => {
   const client = new FakePersistOrderSnapshotClient();
 
   await persistOrderSnapshot(
@@ -304,4 +329,3 @@ test("rejects invalid platform order dates before writing", async () => {
     /order\.createdAtPlatform must be a valid date/,
   );
 });
-

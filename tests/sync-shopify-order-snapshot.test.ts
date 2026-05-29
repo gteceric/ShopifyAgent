@@ -67,6 +67,7 @@ test("maps normalized Shopify refund context into a persistable order snapshot",
       },
       lineItems: [
         {
+          platformRefundLineItemId: "gid://shopify/RefundLineItem/983552032881-1",
           lineItemId: "gid://shopify/LineItem/15870468554865",
           quantity: 1,
           subtotal: {
@@ -143,6 +144,7 @@ test("maps normalized Shopify refund context into a persistable order snapshot",
       currencyCode: "HKD",
       lineItems: [
         {
+          platformRefundLineItemId: "gid://shopify/RefundLineItem/983552032881-1",
           platformLineItemId: "gid://shopify/LineItem/15870468554865",
           quantity: 1,
           subtotalAmount: "56.99",

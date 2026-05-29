@@ -4,6 +4,7 @@ import type {
   OrderLineItem,
   PlatformAccount,
   Refund,
+  RefundLineItem,
   RefundTransaction,
 } from "@prisma/client";
 
@@ -52,6 +53,7 @@ export interface OrderLineItemSnapshot {
 }
 
 export interface RefundLineItemSnapshot {
+  platformRefundLineItemId?: string;
   platformLineItemId: string;
   quantity: number;
   subtotalAmount?: SnapshotMoneyAmount;
@@ -111,6 +113,7 @@ export interface PersistOrderSnapshotTransaction {
       args: Prisma.RefundLineItemDeleteManyArgs,
     ): Promise<Prisma.BatchPayload>;
     create(args: Prisma.RefundLineItemCreateArgs): Promise<unknown>;
+    upsert(args: Prisma.RefundLineItemUpsertArgs): Promise<RefundLineItem>;
   };
   refundTransaction: {
     upsert(
@@ -141,6 +144,13 @@ interface BuildRefundTransactionDataInput {
   platform: string;
   refundId: string;
   transaction: RefundTransactionSnapshot;
+}
+
+interface BuildRefundLineItemDataInput {
+  platform: string;
+  refundId: string;
+  orderLineItemId: string | null;
+  refundLineItem: RefundLineItemSnapshot;
 }
 
 function nullable<T>(value: T | undefined): T | null {
@@ -220,6 +230,24 @@ function buildRefundTransactionData(
   };
 }
 
+function buildRefundLineItemData(
+  input: BuildRefundLineItemDataInput,
+): Prisma.RefundLineItemUncheckedCreateInput {
+  return {
+    refundId: input.refundId,
+    orderLineItemId: input.orderLineItemId,
+    platform: input.platform,
+    platformRefundLineItemId: nullable(
+      input.refundLineItem.platformRefundLineItemId,
+    ),
+    platformLineItemId: input.refundLineItem.platformLineItemId,
+    quantity: input.refundLineItem.quantity,
+    subtotalAmount: nullable(input.refundLineItem.subtotalAmount),
+    currencyCode: nullable(input.refundLineItem.currencyCode),
+    rawPayload: nullableJson(input.refundLineItem.rawPayload),
+  };
+}
+
 export async function persistOrderSnapshot(
   input: PersistOrderSnapshotInput,
   client: PersistOrderSnapshotClient,
@@ -244,8 +272,9 @@ export async function persistOrderSnapshot(
       update: platformAccountData,
     };
 
-    const platformAccount =
-      await transaction.platformAccount.upsert(platformAccountUpsertArgs);
+    const platformAccount = await transaction.platformAccount.upsert(
+      platformAccountUpsertArgs,
+    );
 
     const orderData: Prisma.OrderUncheckedCreateInput = {
       platformAccountId: platformAccount.id,
@@ -335,33 +364,72 @@ export async function persistOrderSnapshot(
         persistedRefund.id,
       );
 
-      // RefundLineItem has no stable platform child id yet, so replace the
-      // refund's child list with the latest snapshot inside the transaction.
-      await transaction.refundLineItem.deleteMany({
-        where: {
-          refundId: persistedRefund.id,
-        },
-      });
+      const refundLineItems = refund.lineItems ?? [];
+      const shouldReplaceRefundLineItems =
+        refundLineItems.length === 0 ||
+        refundLineItems.some(
+          (refundLineItem) => !refundLineItem.platformRefundLineItemId,
+        );
 
-      for (const refundLineItem of refund.lineItems ?? []) {
-        const refundLineItemData: Prisma.RefundLineItemUncheckedCreateInput = {
-          refundId: persistedRefund.id,
-          orderLineItemId:
-            lineItemIdsByPlatformLineItemId.get(
-              refundLineItem.platformLineItemId,
-            ) ?? null,
+      //         Shopify gives no refund line items now
+      // Then we delete old children for this refund so stale rows don’t remain.
+
+      // Some refund line item has no platformRefundLineItemId
+      // Then we cannot uniquely match old row vs new row, so safest behavior is:
+      // delete this refund’s child rows, then recreate from latest snapshot.
+
+      if (shouldReplaceRefundLineItems) {
+        const replaceRefundLineItemsArgs: Prisma.RefundLineItemDeleteManyArgs =
+          {
+            where: {
+              refundId: persistedRefund.id,
+            },
+          };
+
+        await transaction.refundLineItem.deleteMany(replaceRefundLineItemsArgs);
+      }
+
+      const shouldUpsertRefundLineItems = !shouldReplaceRefundLineItems;
+
+      for (const refundLineItem of refundLineItems) {
+        const orderLineItemId =
+          lineItemIdsByPlatformLineItemId.get(
+            refundLineItem.platformLineItemId,
+          ) ?? null;
+        const refundLineItemDataInput: BuildRefundLineItemDataInput = {
           platform: input.platformAccount.platform,
-          platformLineItemId: refundLineItem.platformLineItemId,
-          quantity: refundLineItem.quantity,
-          subtotalAmount: nullable(refundLineItem.subtotalAmount),
-          currencyCode: nullable(refundLineItem.currencyCode),
-          rawPayload: nullableJson(refundLineItem.rawPayload),
+          refundId: persistedRefund.id,
+          orderLineItemId,
+          refundLineItem,
         };
-        const refundLineItemCreateArgs: Prisma.RefundLineItemCreateArgs = {
-          data: refundLineItemData,
-        };
+        const refundLineItemData = buildRefundLineItemData(
+          refundLineItemDataInput,
+        );
 
-        await transaction.refundLineItem.create(refundLineItemCreateArgs);
+        if (
+          shouldUpsertRefundLineItems &&
+          refundLineItem.platformRefundLineItemId
+        ) {
+          const refundLineItemWhere: Prisma.RefundLineItemWhereUniqueInput = {
+            refundId_platformRefundLineItemId: {
+              refundId: persistedRefund.id,
+              platformRefundLineItemId: refundLineItem.platformRefundLineItemId,
+            },
+          };
+          const refundLineItemUpsertArgs: Prisma.RefundLineItemUpsertArgs = {
+            where: refundLineItemWhere,
+            create: refundLineItemData,
+            update: refundLineItemData,
+          };
+
+          await transaction.refundLineItem.upsert(refundLineItemUpsertArgs);
+        } else {
+          const refundLineItemCreateArgs: Prisma.RefundLineItemCreateArgs = {
+            data: refundLineItemData,
+          };
+
+          await transaction.refundLineItem.create(refundLineItemCreateArgs);
+        }
       }
 
       for (const refundTransaction of refund.transactions ?? []) {
@@ -388,9 +456,7 @@ export async function persistOrderSnapshot(
             update: refundTransactionData,
           };
 
-        await transaction.refundTransaction.upsert(
-          refundTransactionUpsertArgs,
-        );
+        await transaction.refundTransaction.upsert(refundTransactionUpsertArgs);
       }
     }
 

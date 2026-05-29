@@ -88,6 +88,7 @@ function mapRefundLineItemToSnapshot(
   lineItem: ShopifyRefundSyncLineItem,
 ): RefundLineItemSnapshot {
   return {
+    platformRefundLineItemId: lineItem.platformRefundLineItemId,
     platformLineItemId: lineItem.lineItemId,
     quantity: lineItem.quantity,
     subtotalAmount: lineItem.subtotal?.amount,

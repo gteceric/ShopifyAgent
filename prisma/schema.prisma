@@ -110,23 +110,26 @@ model Refund {
 }
 
 model RefundLineItem {
-  id                 String   @id @default(cuid())
-  refundId           String   @map("refund_id")
-  orderLineItemId    String?  @map("order_line_item_id")
-  platform           String   @db.VarChar(50)
-  platformLineItemId String   @map("platform_line_item_id")
-  quantity           Int
-  subtotalAmount     Decimal? @map("subtotal_amount") @db.Decimal(18, 4)
-  currencyCode       String?  @map("currency_code") @db.VarChar(3)
-  rawPayload         Json?    @map("raw_payload")
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
+  id                       String   @id @default(cuid())
+  refundId                 String   @map("refund_id")
+  orderLineItemId          String?  @map("order_line_item_id")
+  platform                 String   @db.VarChar(50)
+  platformRefundLineItemId String?  @map("platform_refund_line_item_id")
+  platformLineItemId       String   @map("platform_line_item_id")
+  quantity                 Int
+  subtotalAmount           Decimal? @map("subtotal_amount") @db.Decimal(18, 4)
+  currencyCode             String?  @map("currency_code") @db.VarChar(3)
+  rawPayload               Json?    @map("raw_payload")
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
 
   refund        Refund         @relation(fields: [refundId], references: [id], onDelete: Cascade)
   orderLineItem OrderLineItem? @relation(fields: [orderLineItemId], references: [id], onDelete: SetNull)
 
+  @@unique([refundId, platformRefundLineItemId])
   @@index([refundId])
   @@index([orderLineItemId])
+  @@index([platform, platformRefundLineItemId])
   @@index([platform, platformLineItemId])
   @@map("refund_line_items")
 }

@@ -3,6 +3,7 @@ export * from "./application/validate-refund-action.js";
 export * from "./application/refund-context-adapter.js";
 export * from "./domain/refund-policy.js";
 export * from "./domain/refund-policy.types.js";
+export * from "./domain/refund-processing-status.js";
 export * from "./domain/create-policy-config.js";
 export * from "./platforms/shopify/load-refund-context.js";
 export * from "./platforms/shopify/load-orders.js";

@@ -83,6 +83,7 @@ CREATE TABLE "refund_line_items" (
     "refund_id" TEXT NOT NULL,
     "order_line_item_id" TEXT,
     "platform" VARCHAR(50) NOT NULL,
+    "platform_refund_line_item_id" TEXT,
     "platform_line_item_id" TEXT NOT NULL,
     "quantity" INTEGER NOT NULL,
     "subtotal_amount" DECIMAL(18,4),
@@ -188,7 +189,13 @@ CREATE INDEX "refund_line_items_refund_id_idx" ON "refund_line_items"("refund_id
 CREATE INDEX "refund_line_items_order_line_item_id_idx" ON "refund_line_items"("order_line_item_id");
 
 -- CreateIndex
+CREATE INDEX "refund_line_items_platform_platform_refund_line_item_id_idx" ON "refund_line_items"("platform", "platform_refund_line_item_id");
+
+-- CreateIndex
 CREATE INDEX "refund_line_items_platform_platform_line_item_id_idx" ON "refund_line_items"("platform", "platform_line_item_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "refund_line_items_refund_id_platform_refund_line_item_id_key" ON "refund_line_items"("refund_id", "platform_refund_line_item_id");
 
 -- CreateIndex
 CREATE INDEX "refund_transactions_refund_id_idx" ON "refund_transactions"("refund_id");

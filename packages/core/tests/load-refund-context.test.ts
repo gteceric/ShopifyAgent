@@ -387,6 +387,8 @@ test("Shopify order sync snapshot includes refund records", async () => {
       },
       lineItems: [
         {
+          platformRefundLineItemId:
+            "gid://shopify/RefundLineItem/900000000310-1",
           lineItemId: "gid://shopify/LineItem/900000000310-1",
           quantity: 1,
           subtotal: {

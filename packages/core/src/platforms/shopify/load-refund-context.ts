@@ -2,6 +2,11 @@ import {
   FinancialStatus,
   FulfillmentStatus,
 } from "../../domain/refund-policy.types.js";
+import {
+  deriveRefundProcessingStatusFromTransactions,
+  hasPendingRefundTransaction,
+  hasPendingOrderRefundTransaction,
+} from "../../domain/refund-processing-status.js";
 import type {
   RefundContext,
   RefundContextLineItem,
@@ -212,6 +217,7 @@ interface ShopifyReturnableFulfillmentLineItemsResponse {
 }
 
 export interface ShopifyRefundSyncLineItem {
+  platformRefundLineItemId?: string;
   lineItemId: string;
   quantity: number;
   subtotal?: RefundMoney;
@@ -266,22 +272,6 @@ function mapFinancialStatus(status?: string | null) {
   }
 }
 
-function hasPendingRefundTransaction(
-  transactions?: Array<{ kind?: string | null; status?: string | null }> | null,
-): boolean {
-  return (
-    transactions?.some(
-      (transaction) =>
-        transaction.kind === "REFUND" &&
-        isPendingRefundTransactionStatus(transaction.status),
-    ) ?? false
-  );
-}
-
-function isPendingRefundTransactionStatus(status?: string | null): boolean {
-  return ["PENDING", "AWAITING_RESPONSE", "PROCESSING"].includes(status ?? "");
-}
-
 function normalizeFinancialStatus(
   order: ShopifyAdminRefundContextOrder,
 ): FinancialStatus {
@@ -289,7 +279,7 @@ function normalizeFinancialStatus(
     collectPendingRefundQuantitiesByLineItemId(order).size > 0;
 
   if (
-    hasPendingRefundTransaction(order.transactions) &&
+    hasPendingOrderRefundTransaction(order.transactions) &&
     !hasLineItemScopedPendingRefunds
   ) {
     return FinancialStatus.RefundPending;
@@ -473,12 +463,10 @@ function collectPendingRefundQuantitiesByLineItemId(
   const pendingRefundQuantitiesByLineItemId = new Map<string, number>();
 
   for (const refund of order.refunds ?? []) {
-    const hasPendingTransaction =
-      refund.transactions?.edges.some(({ node }) =>
-        isPendingRefundTransactionStatus(node.status),
-      ) ?? false;
+    const refundTransactions =
+      refund.transactions?.edges.map(({ node }) => node) ?? [];
 
-    if (!hasPendingTransaction) {
+    if (!hasPendingRefundTransaction(refundTransactions)) {
       continue;
     }
 
@@ -500,36 +488,6 @@ function collectPendingRefundQuantitiesByLineItemId(
   return pendingRefundQuantitiesByLineItemId;
 }
 
-function isFailedRefundTransactionStatus(status?: string | null): boolean {
-  return ["FAILURE", "ERROR"].includes(status ?? "");
-}
-
-function deriveRefundRecordStatus(
-  transactions: ShopifyRefundSyncTransaction[],
-): string {
-  if (
-    transactions.some((transaction) =>
-      isPendingRefundTransactionStatus(transaction.status),
-    )
-  ) {
-    return "pending";
-  }
-
-  if (
-    transactions.some((transaction) =>
-      isFailedRefundTransactionStatus(transaction.status),
-    )
-  ) {
-    return "failed";
-  }
-
-  if (transactions.length > 0) {
-    return "succeeded";
-  }
-
-  return "unknown";
-}
-
 function mapShopifyRefundLineItemsToSyncLineItems(
   refund: ShopifyAdminRefund,
 ): ShopifyRefundSyncLineItem[] {
@@ -543,8 +501,10 @@ function mapShopifyRefundLineItemsToSyncLineItems(
     }
 
     const subtotal = mapMoneySet(refundLineItem.subtotalSet);
+    const platformRefundLineItemId = normalizeOptionalString(refundLineItem.id);
 
     lineItems.push({
+      ...(platformRefundLineItemId ? { platformRefundLineItemId } : {}),
       lineItemId,
       quantity: refundLineItem.quantity,
       ...(subtotal ? { subtotal } : {}),
@@ -590,10 +550,11 @@ function mapShopifyRefundsToSyncRecords(
     const transactions = mapShopifyRefundTransactionsToSyncTransactions(refund);
     const lineItems = mapShopifyRefundLineItemsToSyncLineItems(refund);
     const totalRefunded = mapMoneySet(refund.totalRefundedSet);
+    const status = deriveRefundProcessingStatusFromTransactions(transactions);
 
     return {
       refundId: refund.id,
-      status: deriveRefundRecordStatus(transactions),
+      status,
       ...(totalRefunded ? { totalRefunded } : {}),
       lineItems,
       transactions,

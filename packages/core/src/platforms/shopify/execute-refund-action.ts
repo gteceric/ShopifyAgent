@@ -1,5 +1,9 @@
 import type { RefundActionValidation } from "../../application/validate-refund-action.js";
 import {
+  RefundProcessingStatus,
+  deriveRefundProcessingStatusFromTransactions,
+} from "../../domain/refund-processing-status.js";
+import {
   buildShopifyRefundCreateGraphqlRequest,
   resolveRefundTransactionInputs,
   type ResolveRefundTransactionInputsInput,
@@ -167,25 +171,21 @@ function mapShopifyRefundTransactions(
 function deriveRefundActionExecutionStatus(
   refundTransactions: ShopifyRefundActionTransaction[],
 ): ShopifyRefundActionExecutionStatus {
-  if (refundTransactions.length === 0) {
-    return ShopifyRefundActionExecutionStatus.Succeeded;
-  }
+  const refundProcessingStatus = deriveRefundProcessingStatusFromTransactions(
+    refundTransactions,
+  );
 
-  if (
-    refundTransactions.some((transaction) =>
-      ["FAILURE", "ERROR"].includes(transaction.status),
-    )
-  ) {
-    return ShopifyRefundActionExecutionStatus.Failed;
-  }
+  switch (refundProcessingStatus) {
+    case RefundProcessingStatus.Pending:
+      return ShopifyRefundActionExecutionStatus.Pending;
 
-  if (
-    refundTransactions.some((transaction) => transaction.status === "PENDING")
-  ) {
-    return ShopifyRefundActionExecutionStatus.Pending;
-  }
+    case RefundProcessingStatus.Failed:
+      return ShopifyRefundActionExecutionStatus.Failed;
 
-  return ShopifyRefundActionExecutionStatus.Succeeded;
+    case RefundProcessingStatus.Succeeded:
+    case RefundProcessingStatus.Unknown:
+      return ShopifyRefundActionExecutionStatus.Succeeded;
+  }
 }
 
 function mapShopifyRefundActionResult(
