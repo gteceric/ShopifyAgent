@@ -7,6 +7,7 @@ export * from "./domain/refund-processing-status.js";
 export * from "./domain/create-policy-config.js";
 export * from "./platforms/shopify/load-refund-context.js";
 export * from "./platforms/shopify/load-orders.js";
+export * from "./platforms/shopify/load-shop-identity.js";
 export * from "./platforms/shopify/mock-shopify-orders.js";
 export * from "./platforms/shopify/shopify-admin.js";
 export * from "./platforms/shopify/build-refund-create-request.js";

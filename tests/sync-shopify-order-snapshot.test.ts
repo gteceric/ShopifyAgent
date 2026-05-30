@@ -9,7 +9,7 @@ import {
 import {
   buildShopifyOrderSnapshotInput,
   type BuildShopifyOrderSnapshotInput,
-} from "../src/sync/shopify-order-snapshot.js";
+} from "../src/platforms/shopify/sync-order-snapshot.js";
 
 test("maps normalized Shopify refund context into a persistable order snapshot", () => {
   const context: RefundContext = {

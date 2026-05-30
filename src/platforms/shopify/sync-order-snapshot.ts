@@ -18,8 +18,8 @@ import type {
   RefundTransactionSnapshot,
   OrderSnapshot,
   SnapshotJson,
-} from "../persistence/persist-order-snapshot.js";
-import { persistOrderSnapshot } from "../persistence/persist-order-snapshot.js";
+} from "../../persistence/persist-order-snapshot.js";
+import { persistOrderSnapshot } from "../../persistence/persist-order-snapshot.js";
 
 export interface BuildShopifyOrderSnapshotInput {
   context: RefundContext;
@@ -109,9 +109,7 @@ function mapRefundTransactionToSnapshot(
   };
 }
 
-function mapRefundToSnapshot(
-  refund: ShopifyRefundSyncRecord,
-): RefundSnapshot {
+function mapRefundToSnapshot(refund: ShopifyRefundSyncRecord): RefundSnapshot {
   const lineItemSnapshots: RefundLineItemSnapshot[] = refund.lineItems.map(
     mapRefundLineItemToSnapshot,
   );
@@ -167,13 +165,13 @@ export async function syncShopifyOrderSnapshot(
   };
   const shopifyOrderRefundSyncData =
     await loadShopifyOrderRefundSyncData(loadSnapshotInput);
-  const buildSnapshotInput: BuildShopifyOrderSnapshotInput = {
+  const orderSnapshotInput: BuildShopifyOrderSnapshotInput = {
     context: shopifyOrderRefundSyncData.context,
     refunds: shopifyOrderRefundSyncData.refunds,
     shopDomain: input.shopDomain,
     syncedAt: input.syncedAt,
   };
-  const snapshotInput = buildShopifyOrderSnapshotInput(buildSnapshotInput);
+  const snapshotInput = buildShopifyOrderSnapshotInput(orderSnapshotInput);
 
   return persistOrderSnapshot(snapshotInput, dependencies.prisma);
 }

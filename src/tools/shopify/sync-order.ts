@@ -1,5 +1,5 @@
-import { createPrismaClient } from "../persistence/prisma-client.js";
-import { syncShopifyOrderSnapshot } from "../sync/shopify-order-snapshot.js";
+import { createPrismaClient } from "../../persistence/prisma-client.js";
+import { syncShopifyOrderSnapshot } from "../../platforms/shopify/sync-order-snapshot.js";
 
 function readRequiredEnv(name: string): string {
   const value = process.env[name]?.trim();

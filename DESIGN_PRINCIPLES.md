@@ -31,6 +31,36 @@ Core logic should consume dependencies, not silently create them.
 - Default wiring belongs at the application edge, such as route entrypoints, CLI entrypoints, or server startup.
 - This keeps the core contract honest and easier to follow.
 
+## Keep Shared Orchestration Platform-Generic
+
+Shared orchestration functions must support multiple commerce platforms.
+
+- Keep generic modules free of Shopify-specific names, assumptions, GraphQL
+  loaders, and identifiers.
+- Pass platform-specific behavior as dependencies, such as
+  `loadOrderCandidatesFn` and `syncOrderSnapshotFn`.
+- Use generic names in shared code, such as `platform`, `platformAccountId`,
+  `platformContext`, and `platformAccountData`.
+- Put Shopify-specific fields like `shopDomain`, Shopify GIDs, Admin GraphQL
+  calls, and Shopify environment checks in Shopify adapters, CLI wiring, or
+  Shopify-specific modules.
+- Avoid hidden Shopify defaults inside generic functions. If the generic
+  function needs platform behavior, require the caller to provide it.
+
+## Name Function Dependencies With Fn
+
+When a dependency object accepts an injected function, suffix the field name with
+`Fn`.
+
+- Prefer `loadOrdersFn`, `syncOrderSnapshotFn`, or `generateResponseFn` for
+  injected function dependencies.
+- Do not add `Fn` to objects, clients, adapters, or providers. Names like
+  `prisma`, `adapter`, `responder`, and `fetchImpl` should stay noun-like.
+- Use the suffix only on the dependency field, not necessarily on local
+  variables derived from it when a domain name is clearer.
+- Prefer injecting an adapter or provider object over a function when the
+  dependency is a real production extension point with multiple methods.
+
 ## Tests Should Follow the Real Shape
 
 Tests can still stay isolated while following the same architecture as production.
