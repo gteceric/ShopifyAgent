@@ -13,3 +13,4 @@ export * from "./platforms/shopify/shopify-admin.js";
 export * from "./platforms/shopify/build-refund-create-request.js";
 export * from "./platforms/shopify/execute-refund-action.js";
 export * from "./platforms/shopify/preview-refund.js";
+export * from "./platforms/shopify/refund-processing-status.js";

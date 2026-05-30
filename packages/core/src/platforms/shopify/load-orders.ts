@@ -2,7 +2,7 @@ import {
   FinancialStatus,
   FulfillmentStatus,
 } from "../../domain/refund-policy.types.js";
-import { hasPendingOrderRefundTransaction } from "../../domain/refund-processing-status.js";
+import { hasPendingShopifyOrderRefundTransaction } from "./refund-processing-status.js";
 import { MOCK_SHOPIFY_ORDERS } from "./mock-shopify-orders.js";
 import type { ShopifyOrderRecord } from "./mock-shopify-orders.js";
 import {
@@ -82,7 +82,7 @@ function mapFinancialStatus(status?: string | null): FinancialStatus {
 function normalizeFinancialStatus(
   order: ShopifyOrdersListResponse["orders"]["nodes"][number],
 ): FinancialStatus {
-  if (hasPendingOrderRefundTransaction(order.transactions)) {
+  if (hasPendingShopifyOrderRefundTransaction(order.transactions)) {
     return FinancialStatus.RefundPending;
   }
 

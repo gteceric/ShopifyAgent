@@ -1,8 +1,8 @@
 import type { RefundActionValidation } from "../../application/validate-refund-action.js";
 import {
   RefundProcessingStatus,
-  deriveRefundProcessingStatusFromTransactions,
 } from "../../domain/refund-processing-status.js";
+import { deriveShopifyRefundProcessingStatusFromTransactions } from "./refund-processing-status.js";
 import {
   buildShopifyRefundCreateGraphqlRequest,
   resolveRefundTransactionInputs,
@@ -171,9 +171,8 @@ function mapShopifyRefundTransactions(
 function deriveRefundActionExecutionStatus(
   refundTransactions: ShopifyRefundActionTransaction[],
 ): ShopifyRefundActionExecutionStatus {
-  const refundProcessingStatus = deriveRefundProcessingStatusFromTransactions(
-    refundTransactions,
-  );
+  const refundProcessingStatus =
+    deriveShopifyRefundProcessingStatusFromTransactions(refundTransactions);
 
   switch (refundProcessingStatus) {
     case RefundProcessingStatus.Pending:

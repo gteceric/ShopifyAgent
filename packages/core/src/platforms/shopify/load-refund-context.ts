@@ -3,10 +3,10 @@ import {
   FulfillmentStatus,
 } from "../../domain/refund-policy.types.js";
 import {
-  deriveRefundProcessingStatusFromTransactions,
-  hasPendingRefundTransaction,
-  hasPendingOrderRefundTransaction,
-} from "../../domain/refund-processing-status.js";
+  deriveShopifyRefundProcessingStatusFromTransactions,
+  hasPendingShopifyOrderRefundTransaction,
+  hasPendingShopifyRefundTransaction,
+} from "./refund-processing-status.js";
 import type {
   RefundContext,
   RefundContextLineItem,
@@ -279,7 +279,7 @@ function normalizeFinancialStatus(
     collectPendingRefundQuantitiesByLineItemId(order).size > 0;
 
   if (
-    hasPendingOrderRefundTransaction(order.transactions) &&
+    hasPendingShopifyOrderRefundTransaction(order.transactions) &&
     !hasLineItemScopedPendingRefunds
   ) {
     return FinancialStatus.RefundPending;
@@ -466,7 +466,7 @@ function collectPendingRefundQuantitiesByLineItemId(
     const refundTransactions =
       refund.transactions?.edges.map(({ node }) => node) ?? [];
 
-    if (!hasPendingRefundTransaction(refundTransactions)) {
+    if (!hasPendingShopifyRefundTransaction(refundTransactions)) {
       continue;
     }
 
@@ -550,7 +550,8 @@ function mapShopifyRefundsToSyncRecords(
     const transactions = mapShopifyRefundTransactionsToSyncTransactions(refund);
     const lineItems = mapShopifyRefundLineItemsToSyncLineItems(refund);
     const totalRefunded = mapMoneySet(refund.totalRefundedSet);
-    const status = deriveRefundProcessingStatusFromTransactions(transactions);
+    const status =
+      deriveShopifyRefundProcessingStatusFromTransactions(transactions);
 
     return {
       refundId: refund.id,
