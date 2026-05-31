@@ -1,0 +1,8 @@
+{
+  "files.exclude": {
+    "apps/web/.next": true,
+    "build": true,
+    "packages/core/build": true,
+    "packages/core/dist": true
+  }
+}
