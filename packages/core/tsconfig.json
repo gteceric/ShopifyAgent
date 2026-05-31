@@ -14,7 +14,8 @@
     "sourceMap": true, //tells TypeScript to generate source map files for the compiled JavaScript.
 
     "inlineSources": true,
-    "declaration": true //TypeScript will generate .d.ts files when it builds the package. Those .d.ts files are type declaration files. They describe the types exported by the package so that other projects can understand them without reading the original .ts source.
+    "declaration": true, //TypeScript will generate .d.ts files when it builds the package. Those .d.ts files are type declaration files. They describe the types exported by the package so that other projects can understand them without reading the original .ts source.
+    "declarationMap": true
   },
   "include": ["src/**/*.ts"],
   "exclude": ["dist", "node_modules"]
