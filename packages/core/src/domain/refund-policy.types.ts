@@ -118,7 +118,7 @@ export interface RefundPolicyFlags {
 
 export type NormalizedRefundPolicyFlags = Required<RefundPolicyFlags>;
 
-// normalized refund facts loaded from Shopify order + returnable fulfillment data
+// normalized refund facts loaded by the platform adapter
 export interface RefundContext {
   order: RefundContextOrder;
   lineItems: RefundContextLineItem[];
@@ -144,7 +144,7 @@ export interface RefundContextLineItem {
   finalSale: boolean;
 }
 
-// RefundContext contains normalized facts from Shopify / adapter.
+// RefundContext contains normalized facts from the platform adapter.
 export interface RefundContextOrder {
   id: string;
   name: string;

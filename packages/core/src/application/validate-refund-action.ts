@@ -124,7 +124,7 @@ function requiresOrderLevelManualReviewBlocker(
 }
 
 // Validate the standard fulfilled line-item refund path before execution.
-// This does not create a Shopify refund; it decides whether execution is allowed.
+// This does not create a platform refund; it decides whether execution is allowed.
 export function validateRefundAction(
   request: RefundActionRequest,
   eligibilityResult: CheckRefundEligibilityResult,

@@ -26,13 +26,13 @@ interface RefundPolicyItemContext {
   order: RefundContextOrder;
   effectiveAgeDays: number; // order age adjusted by any line-item age override
   effectiveFinancialStatus: FinancialStatus; // derived from order financial status plus this item's refund state
-  fulfillmentStatus: FulfillmentStatus; // Shopify-backed fulfillment status normalized by the adapter
-  hasReturnableFulfillment: boolean; // from Shopify returnable fulfillments
-  alreadyRefunded: boolean; // derived from Shopify order/item refund state
-  returnableQuantity: number; // quantity Shopify currently allows through the returnable fulfillment path
-  pendingRefundQuantity?: number; // quantity currently attached to an in-flight Shopify refund
-  finalSale: boolean; // from Shopify line item custom attributes
-  itemCategories: string[]; // normalized Shopify product category data
+  fulfillmentStatus: FulfillmentStatus; // fulfillment status normalized by the adapter
+  hasReturnableFulfillment: boolean; // whether the adapter found returnable fulfillment
+  alreadyRefunded: boolean; // derived from normalized order/item refund state
+  returnableQuantity: number; // quantity currently available through the returnable fulfillment path
+  pendingRefundQuantity?: number; // quantity currently attached to an in-flight refund
+  finalSale: boolean; // normalized final-sale status
+  itemCategories: string[]; // normalized product category data
 }
 
 interface RefundPolicyEvaluationResult {
@@ -1000,7 +1000,7 @@ function evaluateItemLevelRefundPolicy(
   };
 }
 
-// RefundContext contains normalized facts from Shopify / adapter.
+// RefundContext contains normalized facts from the platform adapter.
 // ResolvedPolicyContext contains effective windows and matched policy rules.
 // RefundPolicyResult is the final decision with reasons and evidence.
 export function evaluateRefundPolicy(
