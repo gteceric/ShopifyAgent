@@ -13,6 +13,16 @@ export interface ReconcileOrdersInput {
   syncedAt?: Date;
 }
 
+export type ReconciliationPlatformContext = Prisma.InputJsonObject & {
+  shopDomain: string;
+};
+
+export interface PlatformReconciliationInput {
+  platformAccountId: string;
+  platformAccountData: ReconcilePlatformAccountData;
+  platformContext: ReconciliationPlatformContext;
+}
+
 export interface OrderReconciliationCandidate {
   id: string;
 }

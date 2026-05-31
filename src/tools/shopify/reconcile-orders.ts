@@ -2,10 +2,10 @@ import { loadOrders, loadShopifyShopIdentity } from "@shopify-agent/core";
 import { createPrismaClient } from "../../persistence/prisma-client.js";
 import {
   reconcileOrders,
+  type PlatformReconciliationInput,
   type ReconcileOrderSnapshotInput,
   type ReconcileOrdersDependencies,
   type ReconcileOrdersInput,
-  type ReconcilePlatformAccountData,
 } from "../../sync/reconcile-orders.js";
 import { syncShopifyOrderSnapshot } from "../../platforms/shopify/sync-order-snapshot.js";
 
@@ -41,13 +41,7 @@ function readOptionalPositiveIntegerEnv(name: string): number | undefined {
   return parsedValue;
 }
 
-async function loadShopifyReconciliationInput(): Promise<{
-  platformAccountId: string;
-  platformAccountData: ReconcilePlatformAccountData;
-  platformContext: {
-    shopDomain: string;
-  };
-}> {
+async function loadShopifyReconciliationInput(): Promise<PlatformReconciliationInput> {
   if (process.env.USE_REAL_SHOPIFY !== "true") {
     throw new Error(
       "Shopify order reconciliation requires USE_REAL_SHOPIFY=true.",
@@ -68,13 +62,9 @@ async function loadShopifyReconciliationInput(): Promise<{
   };
 }
 
-async function loadPlatformReconciliationInput(platform: string): Promise<{
-  platformAccountId: string;
-  platformAccountData?: ReconcilePlatformAccountData;
-  platformContext?: {
-    shopDomain: string;
-  };
-}> {
+async function loadPlatformReconciliationInput(
+  platform: string,
+): Promise<PlatformReconciliationInput> {
   switch (platform) {
     case "shopify":
       return loadShopifyReconciliationInput();
