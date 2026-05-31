@@ -40,7 +40,6 @@ function makeRefundContext(options: { secondItemFinalSale?: boolean } = {}): Ref
     lineItems: [
       {
         lineItemId: eligibleLineItemId,
-        fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/800000000090",
         title: "Returnable Shirt",
         returnableQuantity: 2,
         category: "apparel",
@@ -51,7 +50,6 @@ function makeRefundContext(options: { secondItemFinalSale?: boolean } = {}): Ref
       },
       {
         lineItemId: ineligibleLineItemId,
-        fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/800000000091",
         title: "Final Sale Hat",
         returnableQuantity: 1,
         category: "apparel",

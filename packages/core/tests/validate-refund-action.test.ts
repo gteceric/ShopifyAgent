@@ -87,8 +87,6 @@ function makeEligibilityResult(
             },
             evaluatedLineItem: {
               lineItemId: "gid://shopify/LineItem/700000000070",
-              fulfillmentLineItemId:
-                "gid://shopify/FulfillmentLineItem/800000000070",
               title: "Returnable Shirt",
               returnableQuantity: 2,
               ageDays: 10,
@@ -126,7 +124,6 @@ test("validates eligible returnable line items as ready for refund execution", (
   assert.deepEqual(validation.matchedLineItems, [
     {
       lineItemId: "gid://shopify/LineItem/700000000070",
-      fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/800000000070",
       title: "Returnable Shirt",
       requestedQuantity: 1,
       returnableQuantity: 2,
@@ -176,7 +173,6 @@ test("validates remaining returnable quantity when a line item has a pending par
   assert.deepEqual(validation.matchedLineItems, [
     {
       lineItemId: "gid://shopify/LineItem/700000000070",
-      fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/800000000070",
       title: "Returnable Shirt",
       requestedQuantity: 2,
       returnableQuantity: 2,
@@ -215,8 +211,6 @@ test("validates multiple eligible returnable line items as ready for refund exec
               evaluatedLineItem: {
                 ...firstItemEvaluation.evidence.evaluatedLineItem,
                 lineItemId: "gid://shopify/LineItem/700000000071",
-                fulfillmentLineItemId:
-                  "gid://shopify/FulfillmentLineItem/800000000071",
                 title: "Returnable Pants",
                 returnableQuantity: 3,
               },
@@ -232,7 +226,6 @@ test("validates multiple eligible returnable line items as ready for refund exec
   assert.deepEqual(validation.matchedLineItems, [
     {
       lineItemId: "gid://shopify/LineItem/700000000070",
-      fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/800000000070",
       title: "Returnable Shirt",
       requestedQuantity: 1,
       returnableQuantity: 2,
@@ -240,7 +233,6 @@ test("validates multiple eligible returnable line items as ready for refund exec
     },
     {
       lineItemId: "gid://shopify/LineItem/700000000071",
-      fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/800000000071",
       title: "Returnable Pants",
       requestedQuantity: 2,
       returnableQuantity: 3,
@@ -359,8 +351,6 @@ test("allows eligible selected items when order review is only mixed item eligib
       evaluatedLineItem: {
         ...firstItemEvaluation.evidence.evaluatedLineItem,
         lineItemId: "gid://shopify/LineItem/700000000071",
-        fulfillmentLineItemId:
-          "gid://shopify/FulfillmentLineItem/800000000071",
         title: "Returnable Pants",
         returnableQuantity: 1,
       },
@@ -427,7 +417,6 @@ test("allows eligible selected items when order review is only mixed item eligib
   assert.deepEqual(validation.matchedLineItems, [
     {
       lineItemId: "gid://shopify/LineItem/700000000071",
-      fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/800000000071",
       title: "Returnable Pants",
       requestedQuantity: 1,
       returnableQuantity: 1,
@@ -562,7 +551,6 @@ test("blocks refund execution when returnable fulfillment is unavailable", () =>
               ...itemEvaluation.evidence,
               evaluatedLineItem: {
                 ...itemEvaluation.evidence.evaluatedLineItem,
-                fulfillmentLineItemId: undefined,
                 hasReturnableFulfillment: false,
               },
             },

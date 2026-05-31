@@ -696,7 +696,6 @@ function createLineItemEvidence(
     policyContext: result.policyContext,
     evaluatedLineItem: {
       lineItemId: lineItem.lineItemId,
-      fulfillmentLineItemId: lineItem.fulfillmentLineItemId,
       title: lineItem.title,
       ...(lineItem.sku ? { sku: lineItem.sku } : {}),
       ...(lineItem.variantTitle ? { variantTitle: lineItem.variantTitle } : {}),

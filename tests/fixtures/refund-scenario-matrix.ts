@@ -530,8 +530,6 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
         lineItems: [
           {
             lineItemId: "gid://shopify/LineItem/7000000000191",
-            fulfillmentLineItemId:
-              "gid://shopify/FulfillmentLineItem/8000000000191",
             title: "Apparel item",
             returnableQuantity: 1,
             category: "apparel",
@@ -542,8 +540,6 @@ export const REFUND_SCENARIO_MATRIX: RefundScenario[] = [
           },
           {
             lineItemId: "gid://shopify/LineItem/7000000000192",
-            fulfillmentLineItemId:
-              "gid://shopify/FulfillmentLineItem/8000000000192",
             title: "Accessory item",
             returnableQuantity: 1,
             category: "accessories",

@@ -49,7 +49,6 @@ export interface RefundActionBlocker {
 
 export interface RefundActionMatchedLineItem {
   lineItemId: string;
-  fulfillmentLineItemId?: string;
   title?: string;
   requestedQuantity: number;
   returnableQuantity: number;
@@ -219,7 +218,6 @@ export function validateRefundAction(
 
     matchedLineItems.push({
       lineItemId: evaluatedLineItem.lineItemId,
-      fulfillmentLineItemId: evaluatedLineItem.fulfillmentLineItemId,
       title: evaluatedLineItem.title,
       requestedQuantity: requestedLineItem.quantity,
       returnableQuantity: evaluatedLineItem.returnableQuantity,
@@ -250,10 +248,7 @@ export function validateRefundAction(
       );
     }
 
-    if (
-      !evaluatedLineItem.hasReturnableFulfillment ||
-      !evaluatedLineItem.fulfillmentLineItemId
-    ) {
+    if (!evaluatedLineItem.hasReturnableFulfillment) {
       blockers.push(
         makeBlocker(
           RefundActionBlockerCode.ReturnableFulfillmentUnavailable,

@@ -127,7 +127,6 @@ export interface RefundContext {
 // one line item prepared for policy rules
 export interface RefundContextLineItem {
   lineItemId: string;
-  fulfillmentLineItemId?: string;
   title?: string;
   sku?: string;
   variantTitle?: string;
@@ -184,7 +183,6 @@ export interface EvaluatedRefundPolicyOrder {
 
 export interface EvaluatedRefundPolicyLineItem {
   lineItemId: string;
-  fulfillmentLineItemId?: string;
   title?: string;
   sku?: string;
   variantTitle?: string;

@@ -82,7 +82,6 @@ const REFUND_TRANSACTION_FIELDS = /* GraphQL */ `
 const RETURNABLE_FULFILLMENT_LINE_ITEM_FIELDS = /* GraphQL */ `
   quantity
   fulfillmentLineItem {
-    id
     lineItem {
       id
     }

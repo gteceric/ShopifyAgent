@@ -138,7 +138,6 @@ interface ShopifyAdminRefund {
 interface ShopifyReturnableFulfillmentLineItemNode {
   quantity: number;
   fulfillmentLineItem: {
-    id: string;
     lineItem?: {
       id: string;
     } | null;
@@ -430,31 +429,24 @@ function mapShopifyMockOrderToRefundContext(
   };
 }
 
-function collectReturnableLineItems(
+function collectReturnableQuantitiesByLineItemId(
   returnable: ShopifyReturnableFulfillmentsResponse,
-): Map<string, { fulfillmentLineItemId: string; returnableQuantity: number }> {
-  const returnableLineItems = new Map<
-    string,
-    { fulfillmentLineItemId: string; returnableQuantity: number }
-  >();
+): Map<string, number> {
+  const returnableQuantitiesByLineItemId = new Map<string, number>();
 
   for (const fulfillment of returnable.returnableFulfillments.nodes) {
     for (const lineItem of fulfillment.returnableFulfillmentLineItems.nodes) {
       const lineItemId = lineItem.fulfillmentLineItem?.lineItem?.id;
-      const fulfillmentLineItemId = lineItem.fulfillmentLineItem?.id;
 
-      if (!lineItemId || !fulfillmentLineItemId || lineItem.quantity <= 0) {
+      if (!lineItemId || lineItem.quantity <= 0) {
         continue;
       }
 
-      returnableLineItems.set(lineItemId, {
-        fulfillmentLineItemId,
-        returnableQuantity: lineItem.quantity,
-      });
+      returnableQuantitiesByLineItemId.set(lineItemId, lineItem.quantity);
     }
   }
 
-  return returnableLineItems;
+  return returnableQuantitiesByLineItemId;
 }
 
 function collectPendingRefundQuantitiesByLineItemId(
@@ -568,7 +560,8 @@ function mapAdminLineItemsToRefundContextLineItems(
   returnable: ShopifyReturnableFulfillmentsResponse,
   financialStatus: FinancialStatus,
 ): RefundContextLineItem[] {
-  const returnableLineItems = collectReturnableLineItems(returnable);
+  const returnableQuantitiesByLineItemId =
+    collectReturnableQuantitiesByLineItemId(returnable);
   const pendingRefundQuantitiesByLineItemId =
     collectPendingRefundQuantitiesByLineItemId(order);
   const orderFulfillmentStatus = mapFulfillmentStatus(
@@ -576,7 +569,7 @@ function mapAdminLineItemsToRefundContextLineItems(
   );
 
   return order.lineItems.nodes.map((lineItem) => {
-    const returnableLineItem = returnableLineItems.get(lineItem.id);
+    const returnableQuantity = returnableQuantitiesByLineItemId.get(lineItem.id);
     const pendingRefundQuantity = pendingRefundQuantitiesByLineItemId.get(
       lineItem.id,
     );
@@ -592,9 +585,6 @@ function mapAdminLineItemsToRefundContextLineItems(
 
     return {
       lineItemId: lineItem.id,
-      ...(returnableLineItem
-        ? { fulfillmentLineItemId: returnableLineItem.fulfillmentLineItemId }
-        : {}),
       ...(lineItem.title ? { title: lineItem.title } : {}),
       ...(sku ? { sku } : {}),
       ...(variantTitle ? { variantTitle } : {}),
@@ -602,11 +592,11 @@ function mapAdminLineItemsToRefundContextLineItems(
       ...(imageUrl ? { imageUrl } : {}),
       ...(imageAltText ? { imageAltText } : {}),
       ...(unitPrice ? { unitPrice } : {}),
-      returnableQuantity: returnableLineItem?.returnableQuantity ?? 0,
+      returnableQuantity: returnableQuantity ?? 0,
       ...(pendingRefundQuantity !== undefined ? { pendingRefundQuantity } : {}),
       category: lineItem.product?.category?.fullName ?? undefined,
       fulfillmentStatus: orderFulfillmentStatus,
-      hasReturnableFulfillment: returnableLineItem !== undefined,
+      hasReturnableFulfillment: returnableQuantity !== undefined,
       alreadyRefunded:
         pendingRefundQuantity !== undefined
           ? false

@@ -70,9 +70,6 @@ function mapLineItemToSnapshot(
     variantOptions: mapVariantOptionsToJson(lineItem),
     imageUrl: normalizeOptionalString(lineItem.imageUrl),
     imageAltText: normalizeOptionalString(lineItem.imageAltText),
-    fulfillmentLineItemId: normalizeOptionalString(
-      lineItem.fulfillmentLineItemId,
-    ),
     category: normalizeOptionalString(lineItem.category),
     fulfillmentStatus: lineItem.fulfillmentStatus,
     hasReturnableFulfillment: lineItem.hasReturnableFulfillment,

@@ -39,7 +39,6 @@ export interface OrderLineItemSnapshot {
   variantOptions?: SnapshotJson;
   imageUrl?: string;
   imageAltText?: string;
-  fulfillmentLineItemId?: string;
   category?: string;
   fulfillmentStatus?: string;
   hasReturnableFulfillment?: boolean;
@@ -186,7 +185,6 @@ function buildOrderLineItemData(
     variantOptions: nullableJson(input.lineItem.variantOptions),
     imageUrl: nullable(input.lineItem.imageUrl),
     imageAltText: nullable(input.lineItem.imageAltText),
-    fulfillmentLineItemId: nullable(input.lineItem.fulfillmentLineItemId),
     category: nullable(input.lineItem.category),
     fulfillmentStatus: nullable(input.lineItem.fulfillmentStatus),
     hasReturnableFulfillment: input.lineItem.hasReturnableFulfillment ?? false,

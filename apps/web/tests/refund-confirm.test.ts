@@ -43,8 +43,6 @@ function makeRefundContext(
     lineItems: [
       {
         lineItemId: eligibleLineItemId,
-        fulfillmentLineItemId:
-          "gid://shopify/FulfillmentLineItem/800000000092",
         title: "Returnable Shirt",
         returnableQuantity: 2,
         category: "apparel",
@@ -55,8 +53,6 @@ function makeRefundContext(
       },
       {
         lineItemId: ineligibleLineItemId,
-        fulfillmentLineItemId:
-          "gid://shopify/FulfillmentLineItem/800000000093",
         title: "Final Sale Hat",
         returnableQuantity: 1,
         category: "apparel",

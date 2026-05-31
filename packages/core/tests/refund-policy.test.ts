@@ -754,7 +754,6 @@ test("evaluates line items independently and rolls mixed item eligibility up to 
       lineItems: [
         {
           lineItemId: "gid://shopify/LineItem/1",
-          fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/1",
           title: "Dress",
           returnableQuantity: 1,
           category: "apparel",
@@ -765,7 +764,6 @@ test("evaluates line items independently and rolls mixed item eligibility up to 
         },
         {
           lineItemId: "gid://shopify/LineItem/2",
-          fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/2",
           title: "Phone Case",
           returnableQuantity: 1,
           category: "accessories",

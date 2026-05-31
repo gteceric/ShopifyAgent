@@ -136,7 +136,6 @@ function formatSmokeRefundItemEvaluations(
       returnableQuantity: evaluatedLineItem.returnableQuantity,
       pendingRefundQuantity: evaluatedLineItem.pendingRefundQuantity,
       hasReturnableFulfillment: evaluatedLineItem.hasReturnableFulfillment,
-      fulfillmentLineItemId: evaluatedLineItem.fulfillmentLineItemId,
       reasons: itemEvaluation.reasons.map((reason) => ({
         code: reason.code,
         message: reason.message,

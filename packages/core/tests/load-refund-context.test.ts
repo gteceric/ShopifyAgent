@@ -157,7 +157,6 @@ test("Shopify Admin adapter maps live Admin responses into RefundContext", async
                   {
                     quantity: 1,
                     fulfillmentLineItem: {
-                      id: "gid://shopify/FulfillmentLineItem/1",
                       lineItem: {
                         id: "gid://shopify/LineItem/1",
                       },
@@ -215,10 +214,6 @@ test("Shopify Admin adapter maps live Admin responses into RefundContext", async
   assert.equal(
     result.lineItems[0]?.fulfillmentStatus,
     FulfillmentStatus.Fulfilled,
-  );
-  assert.equal(
-    result.lineItems[0]?.fulfillmentLineItemId,
-    "gid://shopify/FulfillmentLineItem/1",
   );
   assert.equal(result.lineItems[0]?.hasReturnableFulfillment, true);
   assert.deepEqual(result.order.tags, ["vip-exception", "loyalty_recovery"]);
@@ -632,7 +627,6 @@ test("Shopify Admin adapter paginates separated refund context loaders", async (
                           {
                             quantity: 1,
                             fulfillmentLineItem: {
-                              id: "gid://shopify/FulfillmentLineItem/900000000309-1",
                               lineItem: {
                                 id: "gid://shopify/LineItem/900000000309-1",
                               },
@@ -654,7 +648,6 @@ test("Shopify Admin adapter paginates separated refund context loaders", async (
                           {
                             quantity: 1,
                             fulfillmentLineItem: {
-                              id: "gid://shopify/FulfillmentLineItem/900000000309-2",
                               lineItem: {
                                 id: "gid://shopify/LineItem/900000000309-2",
                               },
@@ -686,7 +679,6 @@ test("Shopify Admin adapter paginates separated refund context loaders", async (
                   {
                     quantity: 1,
                     fulfillmentLineItem: {
-                      id: "gid://shopify/FulfillmentLineItem/900000000309-3",
                       lineItem: {
                         id: "gid://shopify/LineItem/900000000309-3",
                       },
@@ -728,14 +720,6 @@ test("Shopify Admin adapter paginates separated refund context loaders", async (
   );
   assert.equal(result.lineItems[0]?.pendingRefundQuantity, 1);
   assert.equal(result.lineItems[1]?.pendingRefundQuantity, 2);
-  assert.equal(
-    result.lineItems[1]?.fulfillmentLineItemId,
-    "gid://shopify/FulfillmentLineItem/900000000309-2",
-  );
-  assert.equal(
-    result.lineItems[2]?.fulfillmentLineItemId,
-    "gid://shopify/FulfillmentLineItem/900000000309-3",
-  );
   assert.equal(
     fetchCalls.some(
       (call) =>
@@ -905,7 +889,6 @@ test("maps Shopify pending refund transactions as refund pending", () => {
                 {
                   quantity: 1,
                   fulfillmentLineItem: {
-                    id: "gid://shopify/FulfillmentLineItem/800000000305",
                     lineItem: {
                       id: "gid://shopify/LineItem/700000000305",
                     },
@@ -1003,7 +986,6 @@ test("maps pending refund line items without locking eligible siblings", () => {
                 {
                   quantity: 1,
                   fulfillmentLineItem: {
-                    id: "gid://shopify/FulfillmentLineItem/800000000307",
                     lineItem: {
                       id: "gid://shopify/LineItem/700000000307",
                     },
@@ -1012,7 +994,6 @@ test("maps pending refund line items without locking eligible siblings", () => {
                 {
                   quantity: 1,
                   fulfillmentLineItem: {
-                    id: "gid://shopify/FulfillmentLineItem/800000000308",
                     lineItem: {
                       id: "gid://shopify/LineItem/700000000308",
                     },
@@ -1147,7 +1128,6 @@ test("maps multi-item Admin orders with item-level returnable and refund state",
                 {
                   quantity: 2,
                   fulfillmentLineItem: {
-                    id: "gid://shopify/FulfillmentLineItem/800000000001",
                     lineItem: {
                       id: "gid://shopify/LineItem/700000000001",
                     },
@@ -1165,7 +1145,6 @@ test("maps multi-item Admin orders with item-level returnable and refund state",
   assert.deepEqual(result.lineItems, [
     {
       lineItemId: "gid://shopify/LineItem/700000000001",
-      fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/800000000001",
       title: "Returnable Jacket",
       returnableQuantity: 2,
       category: "Apparel & Accessories > Clothing > Outerwear",
@@ -1247,7 +1226,6 @@ test("maps Admin edge cases for unknown statuses, missing categories, and final-
                 {
                   quantity: 1,
                   fulfillmentLineItem: {
-                    id: "gid://shopify/FulfillmentLineItem/800000000004",
                     lineItem: {
                       id: "gid://shopify/LineItem/700000000004",
                     },
@@ -1256,7 +1234,6 @@ test("maps Admin edge cases for unknown statuses, missing categories, and final-
                 {
                   quantity: 0,
                   fulfillmentLineItem: {
-                    id: "gid://shopify/FulfillmentLineItem/800000000005",
                     lineItem: {
                       id: "gid://shopify/LineItem/700000000005",
                     },
@@ -1287,10 +1264,6 @@ test("maps Admin edge cases for unknown statuses, missing categories, and final-
     result.lineItems[0]?.lineItemId,
     "gid://shopify/LineItem/700000000004",
   );
-  assert.equal(
-    result.lineItems[0]?.fulfillmentLineItemId,
-    "gid://shopify/FulfillmentLineItem/800000000004",
-  );
   assert.equal(result.lineItems[0]?.returnableQuantity, 1);
   assert.equal(result.lineItems[0]?.category, undefined);
   assert.equal(result.lineItems[0]?.fulfillmentStatus, FulfillmentStatus.Unknown);
@@ -1302,7 +1275,6 @@ test("maps Admin edge cases for unknown statuses, missing categories, and final-
     result.lineItems[1]?.lineItemId,
     "gid://shopify/LineItem/700000000005",
   );
-  assert.equal(result.lineItems[1]?.fulfillmentLineItemId, undefined);
   assert.equal(result.lineItems[1]?.returnableQuantity, 0);
   assert.equal(result.lineItems[1]?.category, undefined);
   assert.equal(result.lineItems[1]?.fulfillmentStatus, FulfillmentStatus.Unknown);

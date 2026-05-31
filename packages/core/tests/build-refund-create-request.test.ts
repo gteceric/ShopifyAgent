@@ -19,7 +19,6 @@ const readyValidation = {
   matchedLineItems: [
     {
       lineItemId: "gid://shopify/LineItem/700000000070",
-      fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/800000000070",
       title: "Returnable Shirt",
       requestedQuantity: 1,
       returnableQuantity: 2,
@@ -34,7 +33,6 @@ const multiItemReadyValidation = {
     ...readyValidation.matchedLineItems,
     {
       lineItemId: "gid://shopify/LineItem/700000000071",
-      fulfillmentLineItemId: "gid://shopify/FulfillmentLineItem/800000000071",
       title: "Returnable Pants",
       requestedQuantity: 2,
       returnableQuantity: 3,
