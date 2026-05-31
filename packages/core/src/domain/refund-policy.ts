@@ -65,7 +65,7 @@ const REFUND_POLICY_REASON_COPY = {
     "Refund subject has already been refunded and requires manual review.",
   alreadyRefunded: "Refund subject has already been refunded.",
   refundPending:
-    "Refund has already been initiated in Shopify and is still pending.",
+    "Refund has already been initiated and is still pending.",
   finalSaleUnavailableForRefund: "Refund subject is marked final sale.",
   finalSaleUnfulfilledAllowed:
     "Refund subject is marked final sale, but merchant policy allows cancellation before shipment.",

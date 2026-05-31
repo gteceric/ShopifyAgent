@@ -383,7 +383,7 @@ test("allows eligible selected items when order review is only mixed item eligib
           {
             code: RefundReasonCode.RefundPending,
             message:
-              "Refund has already been initiated in Shopify and is still pending.",
+              "Refund has already been initiated and is still pending.",
           },
         ],
         itemEvaluations: [
@@ -394,7 +394,7 @@ test("allows eligible selected items when order review is only mixed item eligib
               {
                 code: RefundReasonCode.RefundPending,
                 message:
-                  "Refund has already been initiated in Shopify and is still pending.",
+                  "Refund has already been initiated and is still pending.",
               },
             ],
             evidence: {
