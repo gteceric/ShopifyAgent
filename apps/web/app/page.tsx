@@ -1,6 +1,6 @@
 import {
   checkRefundEligibility,
-  createRefundContextAdapter,
+  createShopifyRefundContextAdapter,
   loadOrders,
 } from "@shopify-agent/core";
 import { Dashboard } from "./dashboard";
@@ -29,7 +29,7 @@ export default async function Home({ searchParams }: HomeProps) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const now = new Date();
   const allowMockOrdersFallback = shouldAllowMockOrdersFallback();
-  const refundContextAdapter = createRefundContextAdapter();
+  const refundContextAdapter = createShopifyRefundContextAdapter();
   const merchantPolicyConfig = await loadMerchantRefundPolicyConfig();
   let orders: DashboardOrder[] = [];
   let ordersLoadError: string | null = null;

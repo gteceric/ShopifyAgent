@@ -6,7 +6,7 @@ import {
   FulfillmentStatus,
 } from "../src/domain/refund-policy.types.js";
 import {
-  createRefundContextAdapter,
+  createShopifyRefundContextAdapter,
   createMockShopifyRefundContextAdapter,
   createShopifyAdminRefundContextAdapter,
   loadShopifyOrderRefundSyncData,
@@ -14,7 +14,7 @@ import {
 } from "../src/platforms/shopify/load-refund-context.js";
 
 test("default Shopify adapter uses mock orders when Admin API env vars are missing", async () => {
-  const adapter = createRefundContextAdapter({
+  const adapter = createShopifyRefundContextAdapter({
     now: new Date("2026-03-30T00:00:00.000Z"),
     env: {},
   });
@@ -44,7 +44,7 @@ test("default Shopify adapter uses mock orders when Admin API env vars are missi
 });
 
 test("default Shopify adapter uses mock orders unless USE_REAL_SHOPIFY=true", async () => {
-  const adapter = createRefundContextAdapter({
+  const adapter = createShopifyRefundContextAdapter({
     now: new Date("2026-03-30T00:00:00.000Z"),
     env: {
       SHOPIFY_STORE_DOMAIN: "example.myshopify.com",

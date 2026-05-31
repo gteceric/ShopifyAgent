@@ -3,13 +3,13 @@ import { z } from "zod";
 
 import {
   createPolicyConfig,
-  createRefundContextAdapter,
+  createShopifyRefundContextAdapter,
 } from "@shopify-agent/core";
 import { createShopifyAgentMcpServer } from "./server.js";
 import { JsonRpcRequestSchema } from "./schemas.js";
 
 const server = createShopifyAgentMcpServer({
-  adapter: createRefundContextAdapter(),
+  adapter: createShopifyRefundContextAdapter(),
   config: createPolicyConfig(),
 });
 

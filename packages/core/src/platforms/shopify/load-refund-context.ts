@@ -1028,7 +1028,7 @@ export function createShopifyAdminRefundContextAdapter(
   };
 }
 
-export function createRefundContextAdapter(
+export function createShopifyRefundContextAdapter(
   dependencies: LoadShopifyRefundContextDependencies = {},
 ): RefundContextPlatformAdapter {
   return shouldUseRealShopify(dependencies.env)

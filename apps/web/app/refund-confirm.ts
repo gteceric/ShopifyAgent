@@ -1,5 +1,5 @@
 import {
-  createRefundContextAdapter,
+  createShopifyRefundContextAdapter,
   executeShopifyRefundAction,
   RefundActionValidationStatus,
   type ExecuteShopifyRefundActionDependencies,
@@ -125,7 +125,7 @@ export async function confirmRefundForDashboard(
 ): Promise<RefundConfirmResult> {
   const config = await loadMerchantRefundPolicyConfig();
   const dependencies: ConfirmRefundDependencies = {
-    adapter: createRefundContextAdapter(),
+    adapter: createShopifyRefundContextAdapter(),
     config,
   };
 

@@ -1,5 +1,5 @@
 import {
-  createRefundContextAdapter,
+  createShopifyRefundContextAdapter,
   previewShopifyRefund,
   RefundActionValidationStatus,
   type PreviewShopifyRefundDependencies,
@@ -94,7 +94,7 @@ export async function previewRefundForDashboard(
 ): Promise<RefundPreviewResult> {
   const config = await loadMerchantRefundPolicyConfig();
   const dependencies: PreviewRefundDependencies = {
-    adapter: createRefundContextAdapter(),
+    adapter: createShopifyRefundContextAdapter(),
     config,
   };
 

@@ -1,5 +1,5 @@
 import {
-  createRefundContextAdapter,
+  createShopifyRefundContextAdapter,
   createPolicyConfig,
 } from "@shopify-agent/core";
 import { createOllamaRefundResponder } from "./tools/generate-refund-response-with-ollama.js";
@@ -49,7 +49,7 @@ async function main(): Promise<void> {
     getOrderId(),
     "Can I refund this order?",
     {
-      adapter: createRefundContextAdapter(),
+      adapter: createShopifyRefundContextAdapter(),
       config: createPolicyConfig(),
       responder: createResponder(),
     },

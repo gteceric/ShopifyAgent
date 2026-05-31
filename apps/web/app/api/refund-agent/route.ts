@@ -1,4 +1,4 @@
-import { createRefundContextAdapter } from "@shopify-agent/core";
+import { createShopifyRefundContextAdapter } from "@shopify-agent/core";
 import { NextRequest, NextResponse } from "next/server";
 import { handleRefundAgentRequest } from "./refund-agent-route-handler";
 import { createRefundAgentResponder } from "./select-refund-agent-responder";
@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as RefundAgentRequestBody;
     const result = await handleRefundAgentRequest(body, {
-      adapter: createRefundContextAdapter(), // load context from platform
+      adapter: createShopifyRefundContextAdapter(), // load context from platform
       responder: createRefundAgentResponder(), // use model to create response based on refundPolicyInput
     });
 
