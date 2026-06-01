@@ -7,8 +7,8 @@ import {
   type ShopifyRefundSyncRecord,
 } from "@shopify-agent/core";
 import {
-  buildShopifyOrderSnapshotInput,
-  type BuildShopifyOrderSnapshotInput,
+  mapShopifyOrderSnapshotToPersistInput,
+  type ShopifyOrderSnapshotData,
 } from "../src/platforms/shopify/sync-order-snapshot.js";
 
 test("maps normalized Shopify refund context into a persistable order snapshot", () => {
@@ -89,20 +89,22 @@ test("maps normalized Shopify refund context into a persistable order snapshot",
       ],
     },
   ];
-  const buildSnapshotInput: BuildShopifyOrderSnapshotInput = {
+  const shopifyOrderSnapshotData: ShopifyOrderSnapshotData = {
     context,
     refunds,
     shopDomain: "demo-shop.myshopify.com",
     syncedAt,
   };
-  const snapshotInput = buildShopifyOrderSnapshotInput(buildSnapshotInput);
+  const persistOrderSnapshotInput = mapShopifyOrderSnapshotToPersistInput(
+    shopifyOrderSnapshotData,
+  );
 
-  assert.deepEqual(snapshotInput.platformAccount, {
+  assert.deepEqual(persistOrderSnapshotInput.platformAccount, {
     platform: "shopify",
     platformAccountId: "demo-shop.myshopify.com",
     shopDomain: "demo-shop.myshopify.com",
   });
-  assert.deepEqual(snapshotInput.order, {
+  assert.deepEqual(persistOrderSnapshotInput.order, {
     platformOrderId: "gid://shopify/Order/6609533698161",
     orderName: "#1001",
     createdAtPlatform: "2026-05-27T07:00:00.000Z",
@@ -110,7 +112,7 @@ test("maps normalized Shopify refund context into a persistable order snapshot",
     totalAmount: "150.97",
     syncedAt,
   });
-  assert.deepEqual(snapshotInput.lineItems, [
+  assert.deepEqual(persistOrderSnapshotInput.lineItems, [
     {
       platformLineItemId: "gid://shopify/LineItem/15870468554865",
       title: "Maui Jim MJ2113 Peahi 58mm Wide",
@@ -134,7 +136,7 @@ test("maps normalized Shopify refund context into a persistable order snapshot",
       pendingRefundQuantity: 1,
     },
   ]);
-  assert.deepEqual(snapshotInput.refunds, [
+  assert.deepEqual(persistOrderSnapshotInput.refunds, [
     {
       platformRefundId: "gid://shopify/Refund/983552032881",
       status: "pending",

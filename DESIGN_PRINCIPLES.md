@@ -107,6 +107,17 @@ meaningful object shapes.
 - Avoid noisy annotations for values where the type is already obvious, such as
   `const quantity = 1` or `const hasErrors = result.userErrors.length > 0`.
 
+## Name Variables After Their Types
+
+When a variable has an explicit type, keep its name close to the type's domain
+meaning.
+
+- Prefer a specific name such as `orderSnapshotInput` over a broader name such
+  as `syncInput`.
+- Preserve meaningful scope differences when adapting between layers, such as
+  `requestInput` and `providerRequestInput`.
+- Omit type prefixes or suffixes that add no useful distinction.
+
 ## Prefer Switches for Enum-Like States
 
 When branching on enum-like domain states, use `switch` instead of a chain of

@@ -43,7 +43,7 @@ async function main(): Promise<void> {
         {
           orderId,
           platformAccountId: result.platformAccountId,
-          localOrderId: result.orderId,
+          localOrderId: result.localOrderId,
           lineItemCount: result.lineItemIdsByPlatformLineItemId.size,
           refundCount: result.refundIdsByPlatformRefundId.size,
         },

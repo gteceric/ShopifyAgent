@@ -21,7 +21,7 @@ import type {
 } from "../../persistence/persist-order-snapshot.js";
 import { persistOrderSnapshot } from "../../persistence/persist-order-snapshot.js";
 
-export interface BuildShopifyOrderSnapshotInput {
+export interface ShopifyOrderSnapshotData {
   context: RefundContext;
   refunds?: ShopifyRefundSyncRecord[];
   shopDomain: string;
@@ -59,7 +59,7 @@ function mapVariantOptionsToJson(
   }));
 }
 
-function mapLineItemToSnapshot(
+function mapRefundContextLineItemToOrderLineItemSnapshot(
   lineItem: RefundContextLineItem,
 ): OrderLineItemSnapshot {
   return {
@@ -81,7 +81,7 @@ function mapLineItemToSnapshot(
   };
 }
 
-function mapRefundLineItemToSnapshot(
+function mapShopifyRefundLineItemToRefundLineItemSnapshot(
   lineItem: ShopifyRefundSyncLineItem,
 ): RefundLineItemSnapshot {
   return {
@@ -93,7 +93,7 @@ function mapRefundLineItemToSnapshot(
   };
 }
 
-function mapRefundTransactionToSnapshot(
+function mapShopifyRefundTransactionToRefundTransactionSnapshot(
   transaction: ShopifyRefundSyncTransaction,
 ): RefundTransactionSnapshot {
   return {
@@ -106,12 +106,16 @@ function mapRefundTransactionToSnapshot(
   };
 }
 
-function mapRefundToSnapshot(refund: ShopifyRefundSyncRecord): RefundSnapshot {
+function mapShopifyRefundToRefundSnapshot(
+  refund: ShopifyRefundSyncRecord,
+): RefundSnapshot {
   const lineItemSnapshots: RefundLineItemSnapshot[] = refund.lineItems.map(
-    mapRefundLineItemToSnapshot,
+    mapShopifyRefundLineItemToRefundLineItemSnapshot,
   );
   const transactionSnapshots: RefundTransactionSnapshot[] =
-    refund.transactions.map(mapRefundTransactionToSnapshot);
+    refund.transactions.map(
+      mapShopifyRefundTransactionToRefundTransactionSnapshot,
+    );
 
   return {
     platformRefundId: refund.refundId,
@@ -123,8 +127,8 @@ function mapRefundToSnapshot(refund: ShopifyRefundSyncRecord): RefundSnapshot {
   };
 }
 
-export function buildShopifyOrderSnapshotInput(
-  input: BuildShopifyOrderSnapshotInput,
+export function mapShopifyOrderSnapshotToPersistInput(
+  input: ShopifyOrderSnapshotData,
 ): PersistOrderSnapshotInput {
   const platformAccountSnapshot: PlatformAccountSnapshot = {
     platform: "shopify",
@@ -140,9 +144,11 @@ export function buildShopifyOrderSnapshotInput(
     syncedAt: input.syncedAt,
   };
   const lineItemSnapshots: OrderLineItemSnapshot[] =
-    input.context.lineItems.map(mapLineItemToSnapshot);
+    input.context.lineItems.map(
+      mapRefundContextLineItemToOrderLineItemSnapshot,
+    );
   const refundSnapshots: RefundSnapshot[] = (input.refunds ?? []).map(
-    mapRefundToSnapshot,
+    mapShopifyRefundToRefundSnapshot,
   );
 
   return {
@@ -157,18 +163,20 @@ export async function syncShopifyOrderSnapshot(
   input: SyncShopifyOrderSnapshotInput,
   dependencies: SyncShopifyOrderSnapshotDependencies,
 ): Promise<PersistOrderSnapshotResult> {
-  const loadSnapshotInput: RefundContextInput = {
+  const refundContextInput: RefundContextInput = {
     orderId: input.orderId,
   };
   const shopifyOrderRefundSyncData =
-    await loadShopifyOrderRefundSyncData(loadSnapshotInput);
-  const orderSnapshotInput: BuildShopifyOrderSnapshotInput = {
+    await loadShopifyOrderRefundSyncData(refundContextInput);
+  const shopifyOrderSnapshotData: ShopifyOrderSnapshotData = {
     context: shopifyOrderRefundSyncData.context,
     refunds: shopifyOrderRefundSyncData.refunds,
     shopDomain: input.shopDomain,
     syncedAt: input.syncedAt,
   };
-  const snapshotInput = buildShopifyOrderSnapshotInput(orderSnapshotInput);
+  const persistOrderSnapshotInput = mapShopifyOrderSnapshotToPersistInput(
+    shopifyOrderSnapshotData,
+  );
 
-  return persistOrderSnapshot(snapshotInput, dependencies.prisma);
+  return persistOrderSnapshot(persistOrderSnapshotInput, dependencies.prisma);
 }

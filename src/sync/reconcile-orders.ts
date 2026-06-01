@@ -32,7 +32,7 @@ export interface ReconcileOrdersLoadInput {
 }
 
 export interface ReconciledOrder {
-  orderId: string;
+  platformOrderId: string;
   localOrderId: string;
   lineItemCount: number;
   refundCount: number;
@@ -41,6 +41,18 @@ export interface ReconciledOrder {
 export interface FailedOrderReconciliation {
   orderId: string;
   message: string;
+}
+
+interface BuildReconciliationSummaryInput {
+  platform: string;
+  platformAccountId: string;
+  platformContext?: Prisma.InputJsonObject;
+  limit: number;
+  startedAt: Date;
+  finishedAt: Date;
+  candidateOrderCount: number;
+  syncedOrders: ReconciledOrder[];
+  failedOrders: FailedOrderReconciliation[];
 }
 
 export type ReconcileOrdersStatus = "succeeded" | "partial" | "failed";
@@ -78,7 +90,7 @@ export interface ReconcileOrderSnapshotInput {
 }
 
 export interface ReconcileOrderSnapshotResult {
-  orderId: string;
+  localOrderId: string; // local Postgres ID
   lineItemIdsByPlatformLineItemId: Map<string, string>;
   refundIdsByPlatformRefundId: Map<string, string>;
 }
@@ -126,20 +138,12 @@ function deriveReconciliationStatus(
   return "partial";
 }
 
-function buildSummary(input: {
-  platform: string;
-  platformAccountId: string;
-  platformContext?: Prisma.InputJsonObject;
-  limit: number;
-  startedAt: Date;
-  finishedAt: Date;
-  candidateOrderCount: number;
-  syncedOrders: ReconciledOrder[];
-  failedOrders: FailedOrderReconciliation[];
-}): Prisma.InputJsonObject {
+function buildSummary(
+  input: BuildReconciliationSummaryInput,
+): Prisma.InputJsonObject {
   const syncedOrders: Prisma.InputJsonArray = input.syncedOrders.map(
     (order) => ({
-      orderId: order.orderId,
+      platformOrderId: order.platformOrderId,
       localOrderId: order.localOrderId,
       lineItemCount: order.lineItemCount,
       refundCount: order.refundCount,
@@ -234,17 +238,18 @@ export async function reconcileOrders(
 
     for (const order of candidateOrders) {
       try {
-        const syncResult = await syncOrderFn({
+        const snapshotInput: ReconcileOrderSnapshotInput = {
           platform: input.platform,
           platformAccountId: input.platformAccountId,
           orderId: order.id,
           platformContext: input.platformContext,
           syncedAt: input.syncedAt,
-        });
+        };
+        const syncResult = await syncOrderFn(snapshotInput);
 
         syncedOrders.push({
-          orderId: order.id,
-          localOrderId: syncResult.orderId,
+          platformOrderId: order.id,
+          localOrderId: syncResult.localOrderId,
           lineItemCount: syncResult.lineItemIdsByPlatformLineItemId.size,
           refundCount: syncResult.refundIdsByPlatformRefundId.size,
         });
@@ -264,11 +269,11 @@ export async function reconcileOrders(
   }
 
   const finishedAt = input.finishedAt ?? new Date();
-  const status = deriveReconciliationStatus(
+  const status: ReconcileOrdersStatus = deriveReconciliationStatus(
     candidateOrderCount,
     failedOrders.length,
   );
-  const summary = buildSummary({
+  const summaryInput: BuildReconciliationSummaryInput = {
     platform: input.platform,
     platformAccountId: input.platformAccountId,
     platformContext: input.platformContext,
@@ -278,9 +283,10 @@ export async function reconcileOrders(
     candidateOrderCount,
     syncedOrders,
     failedOrders,
-  });
+  };
+  const summary = buildSummary(summaryInput);
 
-  await dependencies.prisma.syncRun.update({
+  const syncRunUpdateArgs: Prisma.SyncRunUpdateArgs = {
     where: {
       id: syncRun.id,
     },
@@ -289,7 +295,9 @@ export async function reconcileOrders(
       finishedAt,
       summary,
     },
-  });
+  };
+
+  await dependencies.prisma.syncRun.update(syncRunUpdateArgs);
 
   return {
     syncRunId: syncRun.id,

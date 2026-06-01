@@ -117,7 +117,7 @@ test("reconciles candidate orders and writes a succeeded SyncRun", async () => {
         assert.equal(input.syncedAt, syncedAt);
 
         return {
-          orderId: `local:${input.orderId}`,
+          localOrderId: `local:${input.orderId}`,
           lineItemIdsByPlatformLineItemId: new Map([["line-item", "local-line-item"]]),
           refundIdsByPlatformRefundId: new Map([["refund", "local-refund"]]),
         };
@@ -182,13 +182,13 @@ test("reconciles candidate orders and writes a succeeded SyncRun", async () => {
     failedCount: 0,
     syncedOrders: [
       {
-        orderId: "platform-order-1",
+        platformOrderId: "platform-order-1",
         localOrderId: "local:platform-order-1",
         lineItemCount: 1,
         refundCount: 1,
       },
       {
-        orderId: "platform-order-2",
+        platformOrderId: "platform-order-2",
         localOrderId: "local:platform-order-2",
         lineItemCount: 1,
         refundCount: 1,
@@ -220,7 +220,7 @@ test("records partial reconciliation when one candidate order fails", async () =
         }
 
         return {
-          orderId: "local-order-1",
+          localOrderId: "local-order-1",
           lineItemIdsByPlatformLineItemId: new Map(),
           refundIdsByPlatformRefundId: new Map(),
         };

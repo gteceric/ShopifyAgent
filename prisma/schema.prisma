@@ -26,6 +26,7 @@ model PlatformAccount {
 }
 
 model Order {
+  // id is our local database ID; platformOrderId is the commerce platform's ID.
   id                String   @id @default(cuid())
   platformAccountId String   @map("platform_account_id")
   platform          String   @db.VarChar(50)

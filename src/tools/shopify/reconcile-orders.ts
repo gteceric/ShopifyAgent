@@ -7,7 +7,11 @@ import {
   type ReconcileOrdersDependencies,
   type ReconcileOrdersInput,
 } from "../../sync/reconcile-orders.js";
-import { syncShopifyOrderSnapshot } from "../../platforms/shopify/sync-order-snapshot.js";
+import {
+  syncShopifyOrderSnapshot,
+  type SyncShopifyOrderSnapshotDependencies,
+  type SyncShopifyOrderSnapshotInput,
+} from "../../platforms/shopify/sync-order-snapshot.js";
 
 function readRequiredEnv(name: string): string {
   const value = process.env[name]?.trim();
@@ -76,7 +80,7 @@ async function loadPlatformReconciliationInput(
   }
 }
 
-function readShopDomainFromSyncInput(
+function readShopDomainFromSnapshotInput(
   input: ReconcileOrderSnapshotInput,
 ): string {
   const shopDomain = input.platformContext?.shopDomain;
@@ -103,20 +107,23 @@ async function main(): Promise<void> {
   const reconcileDependencies: ReconcileOrdersDependencies = {
     prisma,
     loadOrderCandidatesFn: async (loadInput) => loadOrders(loadInput),
-    syncOrderSnapshotFn: async (syncInput) => {
-      const shopDomain = readShopDomainFromSyncInput(syncInput);
-      const shopifySyncInput = {
-        orderId: syncInput.orderId,
+    syncOrderSnapshotFn: async (orderSnapshotInput) => {
+      const shopDomain = readShopDomainFromSnapshotInput(
+        orderSnapshotInput,
+      );
+      const shopifyOrderSnapshotInput: SyncShopifyOrderSnapshotInput = {
+        orderId: orderSnapshotInput.orderId,
         shopDomain,
-        syncedAt: syncInput.syncedAt,
+        syncedAt: orderSnapshotInput.syncedAt,
       };
-      const shopifySyncDependencies = {
-        prisma,
-      };
+      const shopifyOrderSnapshotDependencies:
+        SyncShopifyOrderSnapshotDependencies = {
+          prisma,
+        };
 
       return syncShopifyOrderSnapshot(
-        shopifySyncInput,
-        shopifySyncDependencies,
+        shopifyOrderSnapshotInput,
+        shopifyOrderSnapshotDependencies,
       );
     },
   };

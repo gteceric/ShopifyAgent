@@ -194,7 +194,7 @@ test("persists an order snapshot using platform-neutral unique keys", async () =
   );
 
   assert.equal(result.platformAccountId, "platform-account-1");
-  assert.equal(result.orderId, "order-1");
+  assert.equal(result.localOrderId, "order-1");
   assert.equal(
     result.lineItemIdsByPlatformLineItemId.get("gid://shopify/LineItem/1"),
     "line-item:gid://shopify/LineItem/1",
