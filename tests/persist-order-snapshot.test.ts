@@ -193,16 +193,10 @@ test("persists an order snapshot using platform-neutral unique keys", async () =
     client,
   );
 
-  assert.equal(result.platformAccountId, "platform-account-1");
+  assert.equal(result.localPlatformAccountId, "platform-account-1");
   assert.equal(result.localOrderId, "order-1");
-  assert.equal(
-    result.lineItemIdsByPlatformLineItemId.get("gid://shopify/LineItem/1"),
-    "line-item:gid://shopify/LineItem/1",
-  );
-  assert.equal(
-    result.refundIdsByPlatformRefundId.get("gid://shopify/Refund/1"),
-    "refund:gid://shopify/Refund/1",
-  );
+  assert.equal(result.lineItemCount, 1);
+  assert.equal(result.refundCount, 1);
 
   const platformAccountUpsert =
     findCall<Prisma.PlatformAccountUpsertArgs>(

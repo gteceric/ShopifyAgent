@@ -113,6 +113,7 @@ async function main(): Promise<void> {
       );
       const shopifyOrderSnapshotInput: SyncShopifyOrderSnapshotInput = {
         orderId: orderSnapshotInput.orderId,
+        platformAccountId: orderSnapshotInput.platformAccountId,
         shopDomain,
         syncedAt: orderSnapshotInput.syncedAt,
       };
@@ -135,8 +136,8 @@ async function main(): Promise<void> {
     console.log(
       JSON.stringify(
         {
-          syncRunId: result.syncRunId,
-          platformAccountId: result.platformAccountId,
+          localSyncRunId: result.localSyncRunId,
+          localPlatformAccountId: result.localPlatformAccountId,
           status: result.status,
           candidateOrderCount: result.candidateOrderCount,
           syncedCount: result.syncedOrders.length,

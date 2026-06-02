@@ -54,8 +54,8 @@ interface BuildReconciliationSummaryInput {
 export type ReconcileOrdersStatus = "succeeded" | "partial" | "failed";
 
 export interface ReconcileOrdersResult {
-  syncRunId: string;
-  platformAccountId: string;
+  localSyncRunId: string;
+  localPlatformAccountId: string;
   status: ReconcileOrdersStatus;
   candidateOrderCount: number;
   syncedOrders: ReconciledOrder[];
@@ -87,8 +87,8 @@ export interface ReconcileOrderSnapshotInput {
 
 export interface ReconcileOrderSnapshotResult {
   localOrderId: string; // local Postgres ID
-  lineItemIdsByPlatformLineItemId: Map<string, string>;
-  refundIdsByPlatformRefundId: Map<string, string>;
+  lineItemCount: number;
+  refundCount: number;
 }
 
 export interface ReconcileOrdersDependencies {
@@ -198,15 +198,15 @@ export async function reconcileOrders(
 ): Promise<ReconcileOrdersResult> {
   const limit = normalizeLimit(input.limit);
   const startedAt = input.startedAt ?? new Date();
-  const platformAccount = await upsertPlatformAccount(
+  const localPlatformAccount = await upsertPlatformAccount(
     input,
     dependencies.prisma,
   );
 
   // Prisma inserts a DB row and return the new row as js object
-  const syncRun = await dependencies.prisma.syncRun.create({
+  const localSyncRun = await dependencies.prisma.syncRun.create({
     data: {
-      platformAccountId: platformAccount.id,
+      platformAccountId: localPlatformAccount.id,
       platform: input.platform,
       syncType: ORDER_RECONCILIATION_SYNC_TYPE,
       status: "running",
@@ -246,8 +246,8 @@ export async function reconcileOrders(
         syncedOrders.push({
           platformOrderId: order.id,
           localOrderId: syncResult.localOrderId,
-          lineItemCount: syncResult.lineItemIdsByPlatformLineItemId.size,
-          refundCount: syncResult.refundIdsByPlatformRefundId.size,
+          lineItemCount: syncResult.lineItemCount,
+          refundCount: syncResult.refundCount,
         });
       } catch (error) {
         failedOrders.push({
@@ -284,7 +284,7 @@ export async function reconcileOrders(
 
   const syncRunUpdateArgs: Prisma.SyncRunUpdateArgs = {
     where: {
-      id: syncRun.id,
+      id: localSyncRun.id,
     },
     data: {
       status,
@@ -296,8 +296,8 @@ export async function reconcileOrders(
   await dependencies.prisma.syncRun.update(syncRunUpdateArgs);
 
   return {
-    syncRunId: syncRun.id,
-    platformAccountId: platformAccount.id,
+    localSyncRunId: localSyncRun.id,
+    localPlatformAccountId: localPlatformAccount.id,
     status,
     candidateOrderCount,
     syncedOrders,

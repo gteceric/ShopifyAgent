@@ -24,12 +24,14 @@ import { persistOrderSnapshot } from "../../persistence/persist-order-snapshot.j
 export interface ShopifyOrderSnapshotData {
   context: RefundContext;
   refunds?: ShopifyRefundSyncRecord[];
+  platformAccountId: string;
   shopDomain: string;
   syncedAt?: Date;
 }
 
 export interface SyncShopifyOrderSnapshotInput {
   orderId: string;
+  platformAccountId: string;
   shopDomain: string;
   syncedAt?: Date;
 }
@@ -132,7 +134,7 @@ export function mapShopifyOrderSnapshotToPersistInput(
 ): PersistOrderSnapshotInput {
   const platformAccountSnapshot: PlatformAccountSnapshot = {
     platform: "shopify",
-    platformAccountId: input.shopDomain,
+    platformAccountId: input.platformAccountId,
     shopDomain: input.shopDomain,
   };
   const orderSnapshot: OrderSnapshot = {
@@ -171,6 +173,7 @@ export async function syncShopifyOrderSnapshot(
   const shopifyOrderSnapshotData: ShopifyOrderSnapshotData = {
     context: shopifyOrderRefundSyncData.context,
     refunds: shopifyOrderRefundSyncData.refunds,
+    platformAccountId: input.platformAccountId,
     shopDomain: input.shopDomain,
     syncedAt: input.syncedAt,
   };

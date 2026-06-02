@@ -118,8 +118,8 @@ test("reconciles candidate orders and writes a succeeded SyncRun", async () => {
 
         return {
           localOrderId: `local:${input.orderId}`,
-          lineItemIdsByPlatformLineItemId: new Map([["line-item", "local-line-item"]]),
-          refundIdsByPlatformRefundId: new Map([["refund", "local-refund"]]),
+          lineItemCount: 1,
+          refundCount: 1,
         };
       },
     },
@@ -221,8 +221,8 @@ test("records partial reconciliation when one candidate order fails", async () =
 
         return {
           localOrderId: "local-order-1",
-          lineItemIdsByPlatformLineItemId: new Map(),
-          refundIdsByPlatformRefundId: new Map(),
+          lineItemCount: 0,
+          refundCount: 0,
         };
       },
     },

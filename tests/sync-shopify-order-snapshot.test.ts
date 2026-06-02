@@ -92,6 +92,7 @@ test("maps normalized Shopify refund context into a persistable order snapshot",
   const shopifyOrderSnapshotData: ShopifyOrderSnapshotData = {
     context,
     refunds,
+    platformAccountId: "gid://shopify/Shop/1",
     shopDomain: "demo-shop.myshopify.com",
     syncedAt,
   };
@@ -101,7 +102,7 @@ test("maps normalized Shopify refund context into a persistable order snapshot",
 
   assert.deepEqual(persistOrderSnapshotInput.platformAccount, {
     platform: "shopify",
-    platformAccountId: "demo-shop.myshopify.com",
+    platformAccountId: "gid://shopify/Shop/1",
     shopDomain: "demo-shop.myshopify.com",
   });
   assert.deepEqual(persistOrderSnapshotInput.order, {

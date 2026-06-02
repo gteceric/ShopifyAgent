@@ -88,10 +88,10 @@ export interface PersistOrderSnapshotInput {
 }
 
 export interface PersistOrderSnapshotResult {
-  platformAccountId: string;
+  localPlatformAccountId: string;
   localOrderId: string;
-  lineItemIdsByPlatformLineItemId: Map<string, string>;
-  refundIdsByPlatformRefundId: Map<string, string>;
+  lineItemCount: number;
+  refundCount: number;
 }
 
 export interface PersistOrderSnapshotTransaction {
@@ -129,26 +129,26 @@ export interface PersistOrderSnapshotClient {
 
 interface BuildOrderLineItemWriteDataInput {
   platform: string;
-  orderId: string;
+  localOrderId: string;
   lineItem: OrderLineItemSnapshot;
 }
 
 interface BuildRefundWriteDataInput {
   platform: string;
-  orderId: string;
+  localOrderId: string;
   refund: RefundSnapshot;
 }
 
 interface BuildRefundTransactionWriteDataInput {
   platform: string;
-  refundId: string;
+  localRefundId: string;
   transaction: RefundTransactionSnapshot;
 }
 
 interface BuildRefundLineItemWriteDataInput {
   platform: string;
-  refundId: string;
-  orderLineItemId: string | null;
+  localRefundId: string;
+  localOrderLineItemId: string | null;
   refundLineItem: RefundLineItemSnapshot;
 }
 
@@ -176,7 +176,7 @@ function buildOrderLineItemWriteData(
   input: BuildOrderLineItemWriteDataInput,
 ): Prisma.OrderLineItemUncheckedCreateInput {
   return {
-    orderId: input.orderId,
+    orderId: input.localOrderId,
     platform: input.platform,
     platformLineItemId: input.lineItem.platformLineItemId,
     title: nullable(input.lineItem.title),
@@ -202,7 +202,7 @@ function buildRefundWriteData(
   input: BuildRefundWriteDataInput,
 ): Prisma.RefundUncheckedCreateInput {
   return {
-    orderId: input.orderId,
+    orderId: input.localOrderId,
     platform: input.platform,
     platformRefundId: input.refund.platformRefundId,
     status: input.refund.status,
@@ -216,7 +216,7 @@ function buildRefundTransactionWriteData(
   input: BuildRefundTransactionWriteDataInput,
 ): Prisma.RefundTransactionUncheckedCreateInput {
   return {
-    refundId: input.refundId,
+    refundId: input.localRefundId,
     platform: input.platform,
     platformRefundTransactionId: input.transaction.platformRefundTransactionId,
     kind: nullable(input.transaction.kind),
@@ -232,8 +232,8 @@ function buildRefundLineItemWriteData(
   input: BuildRefundLineItemWriteDataInput,
 ): Prisma.RefundLineItemUncheckedCreateInput {
   return {
-    refundId: input.refundId,
-    orderLineItemId: input.orderLineItemId,
+    refundId: input.localRefundId,
+    orderLineItemId: input.localOrderLineItemId,
     platform: input.platform,
     platformRefundLineItemId: nullable(
       input.refundLineItem.platformRefundLineItemId,
@@ -270,12 +270,12 @@ export async function persistOrderSnapshot(
       update: platformAccountData,
     };
 
-    const platformAccount = await transaction.platformAccount.upsert(
+    const localPlatformAccount = await transaction.platformAccount.upsert(
       platformAccountUpsertArgs,
     );
 
     const orderData: Prisma.OrderUncheckedCreateInput = {
-      platformAccountId: platformAccount.id,
+      platformAccountId: localPlatformAccount.id,
       platform: input.platformAccount.platform,
       platformOrderId: input.order.platformOrderId,
       orderName: nullable(input.order.orderName),
@@ -295,7 +295,7 @@ export async function persistOrderSnapshot(
     };
     const orderWhere: Prisma.OrderWhereUniqueInput = {
       platformAccountId_platformOrderId: {
-        platformAccountId: platformAccount.id,
+        platformAccountId: localPlatformAccount.id,
         platformOrderId: input.order.platformOrderId,
       },
     };
@@ -304,14 +304,14 @@ export async function persistOrderSnapshot(
       create: orderData,
       update: orderData,
     };
-    const order = await transaction.order.upsert(orderUpsertArgs);
+    const localOrder = await transaction.order.upsert(orderUpsertArgs);
 
-    const lineItemIdsByPlatformLineItemId = new Map<string, string>();
+    const localOrderLineItemIdsByPlatformLineItemId = new Map<string, string>();
 
     for (const lineItem of input.lineItems ?? []) {
       const lineItemWriteDataInput: BuildOrderLineItemWriteDataInput = {
         platform: input.platformAccount.platform,
-        orderId: order.id,
+        localOrderId: localOrder.id,
         lineItem,
       };
       const lineItemWriteData = buildOrderLineItemWriteData(
@@ -319,7 +319,7 @@ export async function persistOrderSnapshot(
       );
       const lineItemWhere: Prisma.OrderLineItemWhereUniqueInput = {
         orderId_platformLineItemId: {
-          orderId: order.id,
+          orderId: localOrder.id,
           platformLineItemId: lineItem.platformLineItemId,
         },
       };
@@ -331,24 +331,24 @@ export async function persistOrderSnapshot(
       const localOrderLineItem =
         await transaction.orderLineItem.upsert(lineItemUpsertArgs);
 
-      lineItemIdsByPlatformLineItemId.set(
+      localOrderLineItemIdsByPlatformLineItemId.set(
         lineItem.platformLineItemId,
         localOrderLineItem.id,
       );
     }
 
-    const refundIdsByPlatformRefundId = new Map<string, string>();
+    let refundCount = 0;
 
     for (const refund of input.refunds ?? []) {
       const refundWriteDataInput: BuildRefundWriteDataInput = {
         platform: input.platformAccount.platform,
-        orderId: order.id,
+        localOrderId: localOrder.id,
         refund,
       };
       const refundWriteData = buildRefundWriteData(refundWriteDataInput);
       const refundWhere: Prisma.RefundWhereUniqueInput = {
         orderId_platformRefundId: {
-          orderId: order.id,
+          orderId: localOrder.id,
           platformRefundId: refund.platformRefundId,
         },
       };
@@ -357,12 +357,9 @@ export async function persistOrderSnapshot(
         create: refundWriteData,
         update: refundWriteData,
       };
-      const persistedRefund = await transaction.refund.upsert(refundUpsertArgs);
+      const localRefund = await transaction.refund.upsert(refundUpsertArgs);
 
-      refundIdsByPlatformRefundId.set(
-        refund.platformRefundId,
-        persistedRefund.id,
-      );
+      refundCount += 1;
 
       const refundLineItems = refund.lineItems ?? [];
       const shouldReplaceRefundLineItems =
@@ -382,7 +379,7 @@ export async function persistOrderSnapshot(
         const replaceRefundLineItemsArgs: Prisma.RefundLineItemDeleteManyArgs =
           {
             where: {
-              refundId: persistedRefund.id,
+              refundId: localRefund.id,
             },
           };
 
@@ -393,13 +390,13 @@ export async function persistOrderSnapshot(
 
       for (const refundLineItem of refundLineItems) {
         const localOrderLineItemId =
-          lineItemIdsByPlatformLineItemId.get(
+          localOrderLineItemIdsByPlatformLineItemId.get(
             refundLineItem.platformLineItemId,
           ) ?? null;
         const refundLineItemWriteDataInput: BuildRefundLineItemWriteDataInput = {
           platform: input.platformAccount.platform,
-          refundId: persistedRefund.id,
-          orderLineItemId: localOrderLineItemId,
+          localRefundId: localRefund.id,
+          localOrderLineItemId,
           refundLineItem,
         };
         const refundLineItemWriteData = buildRefundLineItemWriteData(
@@ -412,7 +409,7 @@ export async function persistOrderSnapshot(
         ) {
           const refundLineItemWhere: Prisma.RefundLineItemWhereUniqueInput = {
             refundId_platformRefundLineItemId: {
-              refundId: persistedRefund.id,
+              refundId: localRefund.id,
               platformRefundLineItemId: refundLineItem.platformRefundLineItemId,
             },
           };
@@ -436,7 +433,7 @@ export async function persistOrderSnapshot(
         const refundTransactionWriteDataInput: BuildRefundTransactionWriteDataInput =
           {
             platform: input.platformAccount.platform,
-            refundId: persistedRefund.id,
+            localRefundId: localRefund.id,
             transaction: refundTransaction,
           };
         const refundTransactionWriteData = buildRefundTransactionWriteData(
@@ -445,7 +442,7 @@ export async function persistOrderSnapshot(
         const refundTransactionWhere: Prisma.RefundTransactionWhereUniqueInput =
           {
             refundId_platformRefundTransactionId: {
-              refundId: persistedRefund.id,
+              refundId: localRefund.id,
               platformRefundTransactionId:
                 refundTransaction.platformRefundTransactionId,
             },
@@ -462,10 +459,10 @@ export async function persistOrderSnapshot(
     }
 
     return {
-      platformAccountId: platformAccount.id,
-      localOrderId: order.id,
-      lineItemIdsByPlatformLineItemId,
-      refundIdsByPlatformRefundId,
+      localPlatformAccountId: localPlatformAccount.id,
+      localOrderId: localOrder.id,
+      lineItemCount: localOrderLineItemIdsByPlatformLineItemId.size,
+      refundCount,
     };
   });
 }

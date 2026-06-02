@@ -116,6 +116,9 @@ meaning.
   as `syncInput`.
 - Preserve meaningful scope differences when adapting between layers, such as
   `requestInput` and `providerRequestInput`.
+- Prefix local database identifiers with `local` in application-level names
+  when platform identifiers also exist. Keep ORM field names aligned with the
+  schema, such as `orderId` for a foreign-key column.
 - Omit type prefixes or suffixes that add no useful distinction.
 
 ## Prefer Switches for Enum-Like States

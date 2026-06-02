@@ -1,3 +1,4 @@
+import { loadShopifyShopIdentity } from "@shopify-agent/core";
 import { createPrismaClient } from "../../persistence/prisma-client.js";
 import { syncShopifyOrderSnapshot } from "../../platforms/shopify/sync-order-snapshot.js";
 
@@ -23,14 +24,15 @@ async function main(): Promise<void> {
   requireRealShopifySyncFlag();
 
   const orderId = readRequiredEnv("SYNC_SHOPIFY_ORDER_ID");
-  const shopDomain = readRequiredEnv("SHOPIFY_STORE_DOMAIN");
+  const shopIdentity = await loadShopifyShopIdentity();
   const prisma = createPrismaClient();
 
   try {
     const result = await syncShopifyOrderSnapshot(
       {
         orderId,
-        shopDomain,
+        platformAccountId: shopIdentity.id,
+        shopDomain: shopIdentity.myshopifyDomain,
       },
       {
         prisma,
@@ -42,10 +44,10 @@ async function main(): Promise<void> {
       JSON.stringify(
         {
           orderId,
-          platformAccountId: result.platformAccountId,
+          localPlatformAccountId: result.localPlatformAccountId,
           localOrderId: result.localOrderId,
-          lineItemCount: result.lineItemIdsByPlatformLineItemId.size,
-          refundCount: result.refundIdsByPlatformRefundId.size,
+          lineItemCount: result.lineItemCount,
+          refundCount: result.refundCount,
         },
         null,
         2,
