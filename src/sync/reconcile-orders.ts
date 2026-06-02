@@ -20,7 +20,7 @@ export interface PlatformReconciliationInput {
 }
 
 export interface OrderReconciliationCandidate {
-  id: string;
+  platformOrderId: string;
 }
 
 export interface ReconcileOrdersLoadInput {
@@ -35,7 +35,7 @@ export interface ReconciledOrder {
 }
 
 export interface FailedOrderReconciliation {
-  orderId: string;
+  platformOrderId: string;
   message: string;
 }
 
@@ -80,7 +80,7 @@ export type ReconcilePlatformAccountData = Omit<
 export interface ReconcileOrderSnapshotInput {
   platform: string;
   platformAccountId: string;
-  orderId: string;
+  platformOrderId: string;
   platformContext?: Prisma.InputJsonObject;
   syncedAt?: Date;
 }
@@ -147,7 +147,7 @@ function buildSummary(
   );
   const failedOrders: Prisma.InputJsonArray = input.failedOrders.map(
     (order) => ({
-      orderId: order.orderId,
+      platformOrderId: order.platformOrderId,
       message: order.message,
     }),
   );
@@ -237,21 +237,21 @@ export async function reconcileOrders(
         const snapshotInput: ReconcileOrderSnapshotInput = {
           platform: input.platform,
           platformAccountId: input.platformAccountId,
-          orderId: order.id,
+          platformOrderId: order.platformOrderId,
           platformContext: input.platformContext,
           syncedAt: input.syncedAt,
         };
         const syncResult = await syncOrderFn(snapshotInput);
 
         syncedOrders.push({
-          platformOrderId: order.id,
+          platformOrderId: order.platformOrderId,
           localOrderId: syncResult.localOrderId,
           lineItemCount: syncResult.lineItemCount,
           refundCount: syncResult.refundCount,
         });
       } catch (error) {
         failedOrders.push({
-          orderId: order.id,
+          platformOrderId: order.platformOrderId,
           message: errorMessage(error),
         });
       }
@@ -259,7 +259,7 @@ export async function reconcileOrders(
   } catch (error) {
     candidateOrderCount = 1;
     failedOrders.push({
-      orderId: "*",
+      platformOrderId: "*",
       message: errorMessage(error),
     });
   }

@@ -23,14 +23,14 @@ function requireRealShopifySyncFlag(): void {
 async function main(): Promise<void> {
   requireRealShopifySyncFlag();
 
-  const orderId = readRequiredEnv("SYNC_SHOPIFY_ORDER_ID");
+  const platformOrderId = readRequiredEnv("SYNC_SHOPIFY_ORDER_ID");
   const shopIdentity = await loadShopifyShopIdentity();
   const prisma = createPrismaClient();
 
   try {
     const result = await syncShopifyOrderSnapshot(
       {
-        orderId,
+        platformOrderId,
         platformAccountId: shopIdentity.id,
         shopDomain: shopIdentity.myshopifyDomain,
       },
@@ -43,7 +43,7 @@ async function main(): Promise<void> {
     console.log(
       JSON.stringify(
         {
-          orderId,
+          platformOrderId,
           localPlatformAccountId: result.localPlatformAccountId,
           localOrderId: result.localOrderId,
           lineItemCount: result.lineItemCount,

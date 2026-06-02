@@ -67,8 +67,8 @@ class FakeReconcileOrdersClient
   };
 }
 
-function buildOrderCandidate(id: string): OrderReconciliationCandidate {
-  return { id };
+function buildOrderCandidate(platformOrderId: string): OrderReconciliationCandidate {
+  return { platformOrderId };
 }
 
 function findCall<TArgs>(calls: RecordedCall[], operation: string): TArgs {
@@ -108,7 +108,7 @@ test("reconciles candidate orders and writes a succeeded SyncRun", async () => {
         buildOrderCandidate("platform-order-2"),
       ],
       syncOrderSnapshotFn: async (input) => {
-        syncedOrderIds.push(input.orderId);
+        syncedOrderIds.push(input.platformOrderId);
         assert.equal(input.platform, "commerce_test");
         assert.equal(input.platformAccountId, "acct_1");
         assert.deepEqual(input.platformContext, {
@@ -117,7 +117,7 @@ test("reconciles candidate orders and writes a succeeded SyncRun", async () => {
         assert.equal(input.syncedAt, syncedAt);
 
         return {
-          localOrderId: `local:${input.orderId}`,
+          localOrderId: `local:${input.platformOrderId}`,
           lineItemCount: 1,
           refundCount: 1,
         };
@@ -215,7 +215,7 @@ test("records partial reconciliation when one candidate order fails", async () =
         buildOrderCandidate("platform-order-2"),
       ],
       syncOrderSnapshotFn: async (input) => {
-        if (input.orderId === "platform-order-2") {
+        if (input.platformOrderId === "platform-order-2") {
           throw new Error("Platform order was not found.");
         }
 
@@ -231,7 +231,7 @@ test("records partial reconciliation when one candidate order fails", async () =
   assert.equal(result.status, "partial");
   assert.deepEqual(result.failedOrders, [
     {
-      orderId: "platform-order-2",
+      platformOrderId: "platform-order-2",
       message: "Platform order was not found.",
     },
   ]);

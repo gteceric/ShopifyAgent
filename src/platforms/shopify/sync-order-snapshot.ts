@@ -30,7 +30,7 @@ export interface ShopifyOrderSnapshotData {
 }
 
 export interface SyncShopifyOrderSnapshotInput {
-  orderId: string;
+  platformOrderId: string;
   platformAccountId: string;
   shopDomain: string;
   syncedAt?: Date;
@@ -166,7 +166,7 @@ export async function syncShopifyOrderSnapshot(
   dependencies: SyncShopifyOrderSnapshotDependencies,
 ): Promise<PersistOrderSnapshotResult> {
   const refundContextInput: RefundContextInput = {
-    orderId: input.orderId,
+    orderId: input.platformOrderId,
   };
   const shopifyOrderRefundSyncData =
     await loadShopifyOrderRefundSyncData(refundContextInput);

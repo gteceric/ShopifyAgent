@@ -106,13 +106,19 @@ async function main(): Promise<void> {
   };
   const reconcileDependencies: ReconcileOrdersDependencies = {
     prisma,
-    loadOrderCandidatesFn: async (loadInput) => loadOrders(loadInput),
+    loadOrderCandidatesFn: async (loadInput) => {
+      const shopifyOrders = await loadOrders(loadInput);
+
+      return shopifyOrders.map((order) => ({
+        platformOrderId: order.id,
+      }));
+    },
     syncOrderSnapshotFn: async (orderSnapshotInput) => {
       const shopDomain = readShopDomainFromSnapshotInput(
         orderSnapshotInput,
       );
       const shopifyOrderSnapshotInput: SyncShopifyOrderSnapshotInput = {
-        orderId: orderSnapshotInput.orderId,
+        platformOrderId: orderSnapshotInput.platformOrderId,
         platformAccountId: orderSnapshotInput.platformAccountId,
         shopDomain,
         syncedAt: orderSnapshotInput.syncedAt,
