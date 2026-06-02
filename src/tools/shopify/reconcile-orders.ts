@@ -1,17 +1,13 @@
-import { loadOrders, loadShopifyShopIdentity } from "@shopify-agent/core";
 import { createPrismaClient } from "../../persistence/prisma-client.js";
+import {
+  createShopifyReconcileOrdersDependencies,
+  loadShopifyReconciliationInput,
+} from "../../platforms/shopify/reconcile-orders-adapter.js";
 import {
   reconcileOrders,
   type PlatformReconciliationInput,
-  type ReconcileOrderSnapshotInput,
-  type ReconcileOrdersDependencies,
   type ReconcileOrdersInput,
 } from "../../sync/reconcile-orders.js";
-import {
-  syncShopifyOrderSnapshot,
-  type SyncShopifyOrderSnapshotDependencies,
-  type SyncShopifyOrderSnapshotInput,
-} from "../../platforms/shopify/sync-order-snapshot.js";
 
 function readOptionalEnv(name: string): string | undefined {
   const value = process.env[name]?.trim();
@@ -35,27 +31,6 @@ function readOptionalPositiveIntegerEnv(name: string): number | undefined {
   return parsedValue;
 }
 
-async function loadShopifyReconciliationInput(): Promise<PlatformReconciliationInput> {
-  if (process.env.USE_REAL_SHOPIFY !== "true") {
-    throw new Error(
-      "Shopify order reconciliation requires USE_REAL_SHOPIFY=true.",
-    );
-  }
-
-  const shopIdentity = await loadShopifyShopIdentity();
-
-  return {
-    platformAccountId: shopIdentity.id,
-    platformAccountData: {
-      name: shopIdentity.name,
-      shopDomain: shopIdentity.myshopifyDomain,
-    },
-    platformContext: {
-      shopDomain: shopIdentity.myshopifyDomain,
-    },
-  };
-}
-
 async function loadPlatformReconciliationInput(
   platform: string,
 ): Promise<PlatformReconciliationInput> {
@@ -70,18 +45,6 @@ async function loadPlatformReconciliationInput(
   }
 }
 
-function readShopDomainFromSnapshotInput(
-  input: ReconcileOrderSnapshotInput,
-): string {
-  const shopDomain = input.platformContext?.shopDomain;
-
-  if (typeof shopDomain !== "string" || shopDomain.trim() === "") {
-    throw new Error("shopDomain is required to reconcile Shopify orders.");
-  }
-
-  return shopDomain;
-}
-
 async function main(): Promise<void> {
   const platform = readOptionalEnv("RECONCILE_PLATFORM") ?? "shopify";
   const limit = readOptionalPositiveIntegerEnv("RECONCILE_ORDER_LIMIT");
@@ -94,36 +57,8 @@ async function main(): Promise<void> {
     platformContext: platformInput.platformContext,
     limit,
   };
-  const reconcileDependencies: ReconcileOrdersDependencies = {
-    prisma,
-    loadOrderCandidatesFn: async (loadInput) => {
-      const shopifyOrders = await loadOrders(loadInput);
-
-      return shopifyOrders.map((order) => ({
-        platformOrderId: order.id,
-      }));
-    },
-    syncOrderSnapshotFn: async (orderSnapshotInput) => {
-      const shopDomain = readShopDomainFromSnapshotInput(
-        orderSnapshotInput,
-      );
-      const shopifyOrderSnapshotInput: SyncShopifyOrderSnapshotInput = {
-        platformOrderId: orderSnapshotInput.platformOrderId,
-        platformAccountId: orderSnapshotInput.platformAccountId,
-        shopDomain,
-        syncedAt: orderSnapshotInput.syncedAt,
-      };
-      const shopifyOrderSnapshotDependencies:
-        SyncShopifyOrderSnapshotDependencies = {
-          prisma,
-        };
-
-      return syncShopifyOrderSnapshot(
-        shopifyOrderSnapshotInput,
-        shopifyOrderSnapshotDependencies,
-      );
-    },
-  };
+  const reconcileDependencies =
+    createShopifyReconcileOrdersDependencies(prisma);
 
   try {
     const result = await reconcileOrders(reconcileInput, reconcileDependencies);
