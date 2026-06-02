@@ -13,16 +13,6 @@ import {
   type SyncShopifyOrderSnapshotInput,
 } from "../../platforms/shopify/sync-order-snapshot.js";
 
-function readRequiredEnv(name: string): string {
-  const value = process.env[name]?.trim();
-
-  if (!value) {
-    throw new Error(`${name} is required to reconcile Shopify orders.`);
-  }
-
-  return value;
-}
-
 function readOptionalEnv(name: string): string | undefined {
   const value = process.env[name]?.trim();
 

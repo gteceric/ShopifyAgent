@@ -368,12 +368,8 @@ export async function persistOrderSnapshot(
           (refundLineItem) => !refundLineItem.platformRefundLineItemId,
         );
 
-      //         Shopify gives no refund line items now
-      // Then we delete old children for this refund so stale rows don’t remain.
-
-      // Some refund line item has no platformRefundLineItemId
-      // Then we cannot uniquely match old row vs new row, so safest behavior is:
-      // delete this refund’s child rows, then recreate from latest snapshot.
+      // Replace child rows when Shopify returns none or omits stable IDs.
+      // Without stable IDs, existing rows cannot be matched safely for upsert.
 
       if (shouldReplaceRefundLineItems) {
         const replaceRefundLineItemsArgs: Prisma.RefundLineItemDeleteManyArgs =

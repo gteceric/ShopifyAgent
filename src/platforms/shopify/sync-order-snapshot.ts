@@ -129,7 +129,7 @@ function mapShopifyRefundToRefundSnapshot(
   };
 }
 
-export function mapShopifyOrderSnapshotToPersistInput(
+export function mapShopifyOrderSnapshotDataToPersistInput(
   input: ShopifyOrderSnapshotData,
 ): PersistOrderSnapshotInput {
   const platformAccountSnapshot: PlatformAccountSnapshot = {
@@ -177,7 +177,7 @@ export async function syncShopifyOrderSnapshot(
     shopDomain: input.shopDomain,
     syncedAt: input.syncedAt,
   };
-  const persistOrderSnapshotInput = mapShopifyOrderSnapshotToPersistInput(
+  const persistOrderSnapshotInput = mapShopifyOrderSnapshotDataToPersistInput(
     shopifyOrderSnapshotData,
   );
 

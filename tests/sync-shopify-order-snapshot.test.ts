@@ -7,7 +7,7 @@ import {
   type ShopifyRefundSyncRecord,
 } from "@shopify-agent/core";
 import {
-  mapShopifyOrderSnapshotToPersistInput,
+  mapShopifyOrderSnapshotDataToPersistInput,
   type ShopifyOrderSnapshotData,
 } from "../src/platforms/shopify/sync-order-snapshot.js";
 
@@ -96,7 +96,7 @@ test("maps normalized Shopify refund context into a persistable order snapshot",
     shopDomain: "demo-shop.myshopify.com",
     syncedAt,
   };
-  const persistOrderSnapshotInput = mapShopifyOrderSnapshotToPersistInput(
+  const persistOrderSnapshotInput = mapShopifyOrderSnapshotDataToPersistInput(
     shopifyOrderSnapshotData,
   );
 

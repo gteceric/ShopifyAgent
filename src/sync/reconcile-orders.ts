@@ -203,7 +203,6 @@ export async function reconcileOrders(
     dependencies.prisma,
   );
 
-  // Prisma inserts a DB row and return the new row as js object
   const localSyncRun = await dependencies.prisma.syncRun.create({
     data: {
       platformAccountId: localPlatformAccount.id,
@@ -221,33 +220,34 @@ export async function reconcileOrders(
       },
     },
   });
-  const loadCandidateOrdersFn = dependencies.loadOrderCandidatesFn;
-  const syncOrderFn = dependencies.syncOrderSnapshotFn;
+  const loadOrderCandidatesFn = dependencies.loadOrderCandidatesFn;
+  const syncOrderSnapshotFn = dependencies.syncOrderSnapshotFn;
   const syncedOrders: ReconciledOrder[] = [];
   const failedOrders: FailedOrderReconciliation[] = [];
 
   let candidateOrderCount = 0;
 
   try {
-    const candidateOrders = await loadCandidateOrdersFn({ limit });
+    const candidateOrders = await loadOrderCandidatesFn({ limit });
     candidateOrderCount = candidateOrders.length;
 
     for (const order of candidateOrders) {
       try {
-        const snapshotInput: ReconcileOrderSnapshotInput = {
+        const orderSnapshotInput: ReconcileOrderSnapshotInput = {
           platform: input.platform,
           platformAccountId: input.platformAccountId,
           platformOrderId: order.platformOrderId,
           platformContext: input.platformContext,
           syncedAt: input.syncedAt,
         };
-        const syncResult = await syncOrderFn(snapshotInput);
+        const orderSnapshotResult =
+          await syncOrderSnapshotFn(orderSnapshotInput);
 
         syncedOrders.push({
           platformOrderId: order.platformOrderId,
-          localOrderId: syncResult.localOrderId,
-          lineItemCount: syncResult.lineItemCount,
-          refundCount: syncResult.refundCount,
+          localOrderId: orderSnapshotResult.localOrderId,
+          lineItemCount: orderSnapshotResult.lineItemCount,
+          refundCount: orderSnapshotResult.refundCount,
         });
       } catch (error) {
         failedOrders.push({
