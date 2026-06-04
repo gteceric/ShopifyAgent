@@ -23,6 +23,8 @@
     "refund-preview:smoke": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/run-shopify-refund-preview-smoke-test.js",
     "reconciliation:smoke": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/run-reconciliation-smoke-test.js",
     "scenario-matrix": "npm run build && node --env-file=.env build/src/tools/run-refund-scenario-matrix.js",
+    "shopify-webhooks:process": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/process-webhook-events.js",
+    "shopify-webhooks:serve": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/run-webhook-server.js",
     "sync-shopify-order": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/sync-order.js",
     "reconcile-orders": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/reconcile-orders.js",
     "test": "npm run cleanbuild && node --test build/tests/**/*.test.js",
