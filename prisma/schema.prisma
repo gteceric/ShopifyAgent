@@ -16,14 +16,35 @@ model PlatformAccount {
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
-  orders         Order[]
-  platformEvents PlatformEvent[]
-  syncRuns       SyncRun[]
+  orders              Order[]
+  platformEvents      PlatformEvent[]
+  shopifyInstallation ShopifyInstallation?
+  syncRuns            SyncRun[]
 
   @@unique([platform, platformAccountId])
   @@unique([platform, shopDomain])
   @@index([platform])
   @@map("platform_accounts")
+}
+
+model ShopifyInstallation {
+  id                    String    @id @default(cuid())
+  platformAccountId     String    @unique @map("platform_account_id")
+  status                String    @default("active") @db.VarChar(64)
+  encryptedAccessToken  String?   @map("encrypted_access_token")
+  encryptedRefreshToken String?   @map("encrypted_refresh_token")
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
+  grantedScopes         String[]  @default([]) @map("granted_scopes")
+  installedAt           DateTime  @default(now()) @map("installed_at")
+  uninstalledAt         DateTime? @map("uninstalled_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  platformAccount PlatformAccount @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("shopify_installations")
 }
 
 model Order {

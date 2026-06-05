@@ -7,6 +7,7 @@ import type {
   RefundLineItem,
   RefundTransaction,
 } from "@prisma/client";
+import { normalizeRequiredDate } from "./normalize-persistence-value.js";
 
 export type SnapshotJson = Prisma.InputJsonValue;
 export type SnapshotMoneyAmount = string;
@@ -162,16 +163,6 @@ function nullableJson(
   return value ?? Prisma.JsonNull;
 }
 
-function normalizeDate(value: Date | string, fieldName: string): Date {
-  const date = value instanceof Date ? value : new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    throw new Error(`${fieldName} must be a valid date.`);
-  }
-
-  return date;
-}
-
 function buildOrderLineItemWriteData(
   input: BuildOrderLineItemWriteDataInput,
 ): Prisma.OrderLineItemUncheckedCreateInput {
@@ -279,7 +270,7 @@ export async function persistOrderSnapshot(
       platform: input.platformAccount.platform,
       platformOrderId: input.order.platformOrderId,
       orderName: nullable(input.order.orderName),
-      createdAtPlatform: normalizeDate(
+      createdAtPlatform: normalizeRequiredDate(
         input.order.createdAtPlatform,
         "order.createdAtPlatform",
       ),
@@ -288,7 +279,7 @@ export async function persistOrderSnapshot(
       totalAmount: nullable(input.order.totalAmount),
       currencyCode: nullable(input.order.currencyCode),
       rawPayload: nullableJson(input.order.rawPayload),
-      syncedAt: normalizeDate(
+      syncedAt: normalizeRequiredDate(
         input.order.syncedAt ?? new Date(),
         "order.syncedAt",
       ),
