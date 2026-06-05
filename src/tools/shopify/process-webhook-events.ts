@@ -1,4 +1,3 @@
-import { loadShopifyShopIdentity } from "@shopify-agent/core";
 import { createPrismaClient } from "../../persistence/prisma-client.js";
 import { syncShopifyOrderSnapshot } from "../../platforms/shopify/sync-order-snapshot.js";
 import {
@@ -33,7 +32,6 @@ async function main(): Promise<void> {
     };
     const dependencies: ProcessPendingShopifyWebhookEventsDependencies = {
       prisma,
-      loadShopifyShopIdentityFn: () => loadShopifyShopIdentity(),
       syncShopifyOrderSnapshotFn: (orderSnapshotInput) =>
         syncShopifyOrderSnapshot(orderSnapshotInput, {
           prisma,

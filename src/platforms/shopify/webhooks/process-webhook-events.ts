@@ -1,5 +1,4 @@
-import type { PlatformEvent, Prisma } from "@prisma/client";
-import type { ShopifyShopIdentity } from "@shopify-agent/core";
+import type { PlatformAccount, PlatformEvent, Prisma } from "@prisma/client";
 import type { PersistOrderSnapshotResult } from "../../../persistence/persist-order-snapshot.js";
 import type { SyncShopifyOrderSnapshotInput } from "../sync-order-snapshot.js";
 import { SUPPORTED_SHOPIFY_ORDER_WEBHOOK_TOPICS } from "./ingest-webhook.js";
@@ -8,6 +7,11 @@ const SHOPIFY_PLATFORM = "shopify";
 const DEFAULT_PROCESS_SHOPIFY_WEBHOOK_EVENT_LIMIT = 25;
 
 export interface ProcessShopifyWebhookEventsClient {
+  platformAccount: {
+    findUnique(
+      args: Prisma.PlatformAccountFindUniqueArgs,
+    ): Promise<PlatformAccount | null>;
+  };
   platformEvent: {
     findMany(args: Prisma.PlatformEventFindManyArgs): Promise<PlatformEvent[]>;
     update(args: Prisma.PlatformEventUpdateArgs): Promise<PlatformEvent>;
@@ -20,9 +24,9 @@ export interface ProcessPendingShopifyWebhookEventsInput {
 
 export interface ProcessPendingShopifyWebhookEventsDependencies {
   prisma: ProcessShopifyWebhookEventsClient;
-  loadShopifyShopIdentityFn: () => Promise<ShopifyShopIdentity>;
   syncShopifyOrderSnapshotFn: (
     input: SyncShopifyOrderSnapshotInput,
+    localPlatformAccount: PlatformAccount,
   ) => Promise<PersistOrderSnapshotResult>;
   nowFn?: () => Date;
 }
@@ -75,6 +79,9 @@ export async function processPendingShopifyWebhookEvents(
     resourceId: {
       not: null,
     },
+    platformAccountId: {
+      not: null,
+    },
     processedAt: null,
   };
 
@@ -96,24 +103,38 @@ export async function processPendingShopifyWebhookEvents(
     };
   }
 
-  const shopIdentity = await dependencies.loadShopifyShopIdentityFn();
-
   for (const localPlatformEvent of localPlatformEvents) {
     const platformOrderId = localPlatformEvent.resourceId;
+    const localPlatformAccountId = localPlatformEvent.platformAccountId;
 
-    if (!platformOrderId) {
+    if (!platformOrderId || !localPlatformAccountId) {
       continue;
     }
 
     try {
+      const localPlatformAccount =
+        await dependencies.prisma.platformAccount.findUnique({
+          where: {
+            id: localPlatformAccountId,
+          },
+        });
+
+      if (!localPlatformAccount?.shopDomain) {
+        throw new Error(
+          `Shopify platform account ${localPlatformAccountId} was not found or has no shop domain.`,
+        );
+      }
+
       const orderSnapshotInput: SyncShopifyOrderSnapshotInput = {
         platformOrderId,
-        platformAccountId: shopIdentity.id,
-        shopDomain: shopIdentity.myshopifyDomain,
+        platformAccountId: localPlatformAccount.platformAccountId,
+        shopDomain: localPlatformAccount.shopDomain,
       };
       // Fetch latest order data from Shopify and upsert it into Postgres.
-      const orderSnapshotResult =
-        await dependencies.syncShopifyOrderSnapshotFn(orderSnapshotInput);
+      const orderSnapshotResult = await dependencies.syncShopifyOrderSnapshotFn(
+        orderSnapshotInput,
+        localPlatformAccount,
+      );
       const processedAt = dependencies.nowFn?.() ?? new Date();
 
       // Mark this webhook event as processed

@@ -9,6 +9,7 @@ import {
   SHOPIFY_WEBHOOK_ID_HEADER,
   SHOPIFY_WEBHOOK_SHOP_DOMAIN_HEADER,
   SHOPIFY_WEBHOOK_TOPIC_HEADER,
+  normalizeShopifyShopDomain,
 } from "../../platforms/shopify/webhooks/ingest-webhook.js";
 import { SHOPIFY_WEBHOOK_HMAC_HEADER } from "../../platforms/shopify/webhooks/verify-webhook.js";
 
@@ -82,7 +83,6 @@ async function findAvailableTcpPort(): Promise<number> {
 
 function startShopifyWebhookServer(input: {
   smokeDatabaseUrl: string;
-  shopDomain: string;
   clientSecret: string;
   port: number;
 }): StartedShopifyWebhookServer {
@@ -92,7 +92,6 @@ function startShopifyWebhookServer(input: {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     DATABASE_URL: input.smokeDatabaseUrl,
-    SHOPIFY_STORE_DOMAIN: input.shopDomain,
     SHOPIFY_APP_CLIENT_SECRET: input.clientSecret,
     SHOPIFY_WEBHOOK_PORT: String(input.port),
   };
@@ -259,11 +258,45 @@ async function cleanupSyntheticPlatformEvent(
   return deleteResult.count;
 }
 
+async function ensureSyntheticPlatformAccount(
+  prisma: ReturnType<typeof createPrismaClient>,
+  shopDomain: string,
+): Promise<{ created: boolean; id: string }> {
+  const existingPlatformAccount = await prisma.platformAccount.findFirst({
+    where: {
+      platform: SHOPIFY_PLATFORM,
+      shopDomain,
+    },
+  });
+
+  if (existingPlatformAccount) {
+    return {
+      created: false,
+      id: existingPlatformAccount.id,
+    };
+  }
+
+  const platformAccount = await prisma.platformAccount.create({
+    data: {
+      platform: SHOPIFY_PLATFORM,
+      platformAccountId: `smoke:shop:${randomUUID()}`,
+      name: "Synthetic Shopify webhook smoke shop",
+      shopDomain,
+    },
+  });
+
+  return {
+    created: true,
+    id: platformAccount.id,
+  };
+}
+
 async function main(): Promise<void> {
   const smokeDatabaseUrl = readRequiredEnv("DATABASE_URL_SMOKE");
-  const shopDomain =
+  const shopDomain = normalizeShopifyShopDomain(
     readOptionalEnv("SHOPIFY_STORE_DOMAIN") ??
-    DEFAULT_SHOPIFY_WEBHOOK_SMOKE_SHOP_DOMAIN;
+      DEFAULT_SHOPIFY_WEBHOOK_SMOKE_SHOP_DOMAIN,
+  );
   const clientSecret =
     readOptionalEnv("SHOPIFY_APP_CLIENT_SECRET") ??
     DEFAULT_SHOPIFY_WEBHOOK_SMOKE_CLIENT_SECRET;
@@ -273,15 +306,21 @@ async function main(): Promise<void> {
   });
   let startedShopifyWebhookServer: StartedShopifyWebhookServer | undefined;
   let localPlatformEventId: string | undefined;
+  let syntheticPlatformAccount:
+    | Awaited<ReturnType<typeof ensureSyntheticPlatformAccount>>
+    | undefined;
   let cleanupDeletedCount = 0;
   let smokeError: unknown;
 
   try {
     const port = await findAvailableTcpPort();
+    syntheticPlatformAccount = await ensureSyntheticPlatformAccount(
+      prisma,
+      shopDomain,
+    );
 
     startedShopifyWebhookServer = startShopifyWebhookServer({
       smokeDatabaseUrl,
-      shopDomain,
       clientSecret,
       port,
     });
@@ -331,6 +370,10 @@ async function main(): Promise<void> {
     });
 
     assert.ok(localPlatformEvent, "Persisted PlatformEvent was not found.");
+    assert.equal(
+      localPlatformEvent.platformAccountId,
+      syntheticPlatformAccount.id,
+    );
     assert.equal(localPlatformEvent.platform, SHOPIFY_PLATFORM);
     assert.equal(localPlatformEvent.eventType, SHOPIFY_WEBHOOK_SMOKE_TOPIC);
     assert.equal(localPlatformEvent.resourceType, "order");
@@ -381,6 +424,14 @@ async function main(): Promise<void> {
         });
 
       assert.equal(remainingSyntheticPlatformEventCount, 0);
+
+      if (syntheticPlatformAccount?.created) {
+        await prisma.platformAccount.delete({
+          where: {
+            id: syntheticPlatformAccount.id,
+          },
+        });
+      }
     } catch (cleanupError) {
       if (!smokeError) {
         throw cleanupError;

@@ -21,6 +21,7 @@ model PlatformAccount {
   syncRuns       SyncRun[]
 
   @@unique([platform, platformAccountId])
+  @@unique([platform, shopDomain])
   @@index([platform])
   @@map("platform_accounts")
 }

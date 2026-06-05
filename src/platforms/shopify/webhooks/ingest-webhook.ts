@@ -105,7 +105,7 @@ function readShopifyAppClientSecret(env: NodeJS.ProcessEnv): string {
   return clientSecret;
 }
 
-function normalizeShopDomain(value: string): string {
+export function normalizeShopifyShopDomain(value: string): string {
   const normalizedValue = value
     .trim()
     .toLowerCase()
@@ -117,18 +117,6 @@ function normalizeShopDomain(value: string): string {
   }
 
   return normalizedValue;
-}
-
-function readConfiguredShopDomain(env: NodeJS.ProcessEnv): string {
-  const shopDomain = env.SHOPIFY_STORE_DOMAIN?.trim();
-
-  if (!shopDomain) {
-    throw new Error(
-      "SHOPIFY_STORE_DOMAIN is required to receive Shopify webhooks.",
-    );
-  }
-
-  return normalizeShopDomain(shopDomain);
 }
 
 function parseWebhookPayload(rawBody: Buffer): unknown {
@@ -205,7 +193,7 @@ async function findExistingPlatformEvent(
 async function createPlatformEvent(
   prisma: IngestShopifyWebhookClient,
   input: {
-    localPlatformAccountId?: string;
+    localPlatformAccountId: string;
     platformEventId: string;
     platformOrderId: string;
     topic: SupportedShopifyOrderWebhookTopic;
@@ -253,14 +241,20 @@ export async function ingestShopifyWebhook(
   const topic = parseSupportedTopic(
     readRequiredHeader(input.headers, SHOPIFY_WEBHOOK_TOPIC_HEADER),
   );
-  const receivedShopDomain = normalizeShopDomain(
+  const receivedShopDomain = normalizeShopifyShopDomain(
     readRequiredHeader(input.headers, SHOPIFY_WEBHOOK_SHOP_DOMAIN_HEADER),
   );
-  const configuredShopDomain = readConfiguredShopDomain(env);
+  const localPlatformAccount =
+    await dependencies.prisma.platformAccount.findFirst({
+      where: {
+        platform: SHOPIFY_PLATFORM,
+        shopDomain: receivedShopDomain,
+      },
+    });
 
-  if (receivedShopDomain !== configuredShopDomain) {
+  if (!localPlatformAccount) {
     throw new ShopifyWebhookRequestError(
-      "Shopify webhook shop domain does not match the configured store.",
+      "Shopify webhook shop is not installed.",
       403,
     );
   }
@@ -290,17 +284,9 @@ export async function ingestShopifyWebhook(
     };
   }
 
-  const localPlatformAccount =
-    await dependencies.prisma.platformAccount.findFirst({
-      where: {
-        platform: SHOPIFY_PLATFORM,
-        shopDomain: configuredShopDomain,
-      },
-    });
-
   try {
     const localPlatformEvent = await createPlatformEvent(dependencies.prisma, {
-      localPlatformAccountId: localPlatformAccount?.id,
+      localPlatformAccountId: localPlatformAccount.id,
       platformEventId,
       platformOrderId,
       topic,

@@ -61,7 +61,20 @@ class FakeIngestShopifyWebhookClient implements IngestShopifyWebhookClient {
   ) {}
 
   readonly platformAccount = {
-    findFirst: async () => this.localPlatformAccount,
+    findFirst: async (args: Prisma.PlatformAccountFindFirstArgs) => {
+      const where = args.where;
+      const localPlatformAccount = this.localPlatformAccount;
+
+      if (
+        localPlatformAccount &&
+        localPlatformAccount.platform === where?.platform &&
+        localPlatformAccount.shopDomain === where?.shopDomain
+      ) {
+        return localPlatformAccount;
+      }
+
+      return null;
+    },
   };
 
   readonly platformEvent = {
@@ -97,7 +110,6 @@ function makeSignedWebhookInput(
 
 const env = {
   SHOPIFY_APP_CLIENT_SECRET: CLIENT_SECRET,
-  SHOPIFY_STORE_DOMAIN: SHOP_DOMAIN,
 };
 
 test("verifies Shopify webhook HMAC using the raw request body", () => {
@@ -151,7 +163,7 @@ test("receives a signed order webhook and stores a minimal inbox event", async (
 });
 
 test("maps a refund webhook order ID to a Shopify order GID", async () => {
-  const client = new FakeIngestShopifyWebhookClient(null);
+  const client = new FakeIngestShopifyWebhookClient();
   const result = await ingestShopifyWebhook(
     makeSignedWebhookInput("refunds/create", {
       id: 456,
@@ -166,7 +178,7 @@ test("maps a refund webhook order ID to a Shopify order GID", async () => {
   assert.equal(result.platformOrderId, "gid://shopify/Order/123");
   assert.equal(
     client.createdPlatformEventData[0]?.platformAccountId,
-    undefined,
+    "local-platform-account-1",
   );
 });
 
@@ -220,7 +232,7 @@ test("rejects a webhook with an invalid HMAC", async () => {
   assert.deepEqual(client.createdPlatformEventData, []);
 });
 
-test("rejects a signed webhook from another shop domain", async () => {
+test("rejects a signed webhook from a shop that is not installed", async () => {
   const client = new FakeIngestShopifyWebhookClient();
 
   await assert.rejects(
@@ -241,7 +253,8 @@ test("rejects a signed webhook from another shop domain", async () => {
     ),
     (error: unknown) =>
       error instanceof ShopifyWebhookRequestError &&
-      error.httpStatusCode === 403,
+      error.httpStatusCode === 403 &&
+      error.message === "Shopify webhook shop is not installed.",
   );
   assert.deepEqual(client.createdPlatformEventData, []);
 });
