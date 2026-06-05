@@ -2,7 +2,7 @@ import type { PlatformEvent, Prisma } from "@prisma/client";
 import type { ShopifyShopIdentity } from "@shopify-agent/core";
 import type { PersistOrderSnapshotResult } from "../../../persistence/persist-order-snapshot.js";
 import type { SyncShopifyOrderSnapshotInput } from "../sync-order-snapshot.js";
-import { SUPPORTED_SHOPIFY_ORDER_WEBHOOK_TOPICS } from "./receive-webhook.js";
+import { SUPPORTED_SHOPIFY_ORDER_WEBHOOK_TOPICS } from "./ingest-webhook.js";
 
 const SHOPIFY_PLATFORM = "shopify";
 const DEFAULT_PROCESS_SHOPIFY_WEBHOOK_EVENT_LIMIT = 25;

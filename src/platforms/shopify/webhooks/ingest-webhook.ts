@@ -40,7 +40,7 @@ const ShopifyOrderChildWebhookPayloadSchema = z.looseObject({
   order_id: z.union([z.number().int().positive(), z.string().regex(/^\d+$/)]),
 });
 
-export interface ReceiveShopifyWebhookClient {
+export interface IngestShopifyWebhookClient {
   platformAccount: {
     findFirst(
       args: Prisma.PlatformAccountFindFirstArgs,
@@ -54,17 +54,17 @@ export interface ReceiveShopifyWebhookClient {
   };
 }
 
-export interface ReceiveShopifyWebhookInput {
+export interface IngestShopifyWebhookInput {
   rawBody: Buffer;
   headers: ShopifyWebhookHeaders;
 }
 
-export interface ReceiveShopifyWebhookDependencies {
-  prisma: ReceiveShopifyWebhookClient;
+export interface IngestShopifyWebhookDependencies {
+  prisma: IngestShopifyWebhookClient;
   env?: NodeJS.ProcessEnv;
 }
 
-export interface ReceiveShopifyWebhookResult {
+export interface IngestShopifyWebhookResult {
   duplicate: boolean;
   localPlatformEventId: string;
   platformOrderId: string;
@@ -189,7 +189,7 @@ function isUniqueConstraintViolation(error: unknown): boolean {
 }
 
 async function findExistingPlatformEvent(
-  prisma: ReceiveShopifyWebhookClient,
+  prisma: IngestShopifyWebhookClient,
   platformEventId: string,
 ): Promise<PlatformEvent | null> {
   return prisma.platformEvent.findUnique({
@@ -203,7 +203,7 @@ async function findExistingPlatformEvent(
 }
 
 async function createPlatformEvent(
-  prisma: ReceiveShopifyWebhookClient,
+  prisma: IngestShopifyWebhookClient,
   input: {
     localPlatformAccountId?: string;
     platformEventId: string;
@@ -228,10 +228,10 @@ async function createPlatformEvent(
   });
 }
 
-export async function receiveShopifyWebhook(
-  input: ReceiveShopifyWebhookInput,
-  dependencies: ReceiveShopifyWebhookDependencies,
-): Promise<ReceiveShopifyWebhookResult> {
+export async function ingestShopifyWebhook(
+  input: IngestShopifyWebhookInput,
+  dependencies: IngestShopifyWebhookDependencies,
+): Promise<IngestShopifyWebhookResult> {
   const env = dependencies.env ?? process.env;
   const clientSecret = readShopifyAppClientSecret(env);
   const providedHmac = readShopifyWebhookHeader(

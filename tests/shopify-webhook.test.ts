@@ -3,10 +3,10 @@ import { createHmac } from "node:crypto";
 import test from "node:test";
 import type { PlatformAccount, PlatformEvent, Prisma } from "@prisma/client";
 import {
-  receiveShopifyWebhook,
+  ingestShopifyWebhook,
   ShopifyWebhookRequestError,
-  type ReceiveShopifyWebhookClient,
-} from "../src/platforms/shopify/webhooks/receive-webhook.js";
+  type IngestShopifyWebhookClient,
+} from "../src/platforms/shopify/webhooks/ingest-webhook.js";
 import {
   verifyShopifyWebhookHmac,
 } from "../src/platforms/shopify/webhooks/verify-webhook.js";
@@ -51,7 +51,7 @@ function makePlatformEvent(
   };
 }
 
-class FakeReceiveShopifyWebhookClient implements ReceiveShopifyWebhookClient {
+class FakeIngestShopifyWebhookClient implements IngestShopifyWebhookClient {
   readonly createdPlatformEventData: Prisma.PlatformEventUncheckedCreateInput[] =
     [];
 
@@ -118,8 +118,8 @@ test("verifies Shopify webhook HMAC using the raw request body", () => {
 });
 
 test("receives a signed order webhook and stores a minimal inbox event", async () => {
-  const client = new FakeReceiveShopifyWebhookClient();
-  const result = await receiveShopifyWebhook(
+  const client = new FakeIngestShopifyWebhookClient();
+  const result = await ingestShopifyWebhook(
     makeSignedWebhookInput("orders/updated", {
       admin_graphql_api_id: "gid://shopify/Order/123",
       email: "customer@example.test",
@@ -151,8 +151,8 @@ test("receives a signed order webhook and stores a minimal inbox event", async (
 });
 
 test("maps a refund webhook order ID to a Shopify order GID", async () => {
-  const client = new FakeReceiveShopifyWebhookClient(null);
-  const result = await receiveShopifyWebhook(
+  const client = new FakeIngestShopifyWebhookClient(null);
+  const result = await ingestShopifyWebhook(
     makeSignedWebhookInput("refunds/create", {
       id: 456,
       order_id: 123,
@@ -181,11 +181,11 @@ test("accepts a duplicate signed webhook without inserting another inbox event",
       platformOrderId: "gid://shopify/Order/123",
     },
   });
-  const client = new FakeReceiveShopifyWebhookClient(
+  const client = new FakeIngestShopifyWebhookClient(
     makePlatformAccount(),
     existingPlatformEvent,
   );
-  const result = await receiveShopifyWebhook(
+  const result = await ingestShopifyWebhook(
     makeSignedWebhookInput("orders/updated", {
       admin_graphql_api_id: "gid://shopify/Order/123",
     }),
@@ -201,7 +201,7 @@ test("accepts a duplicate signed webhook without inserting another inbox event",
 });
 
 test("rejects a webhook with an invalid HMAC", async () => {
-  const client = new FakeReceiveShopifyWebhookClient();
+  const client = new FakeIngestShopifyWebhookClient();
   const input = makeSignedWebhookInput("orders/updated", {
     admin_graphql_api_id: "gid://shopify/Order/123",
   });
@@ -209,7 +209,7 @@ test("rejects a webhook with an invalid HMAC", async () => {
   input.headers["x-shopify-hmac-sha256"] = "invalid";
 
   await assert.rejects(
-    receiveShopifyWebhook(input, {
+    ingestShopifyWebhook(input, {
       prisma: client,
       env,
     }),
@@ -221,10 +221,10 @@ test("rejects a webhook with an invalid HMAC", async () => {
 });
 
 test("rejects a signed webhook from another shop domain", async () => {
-  const client = new FakeReceiveShopifyWebhookClient();
+  const client = new FakeIngestShopifyWebhookClient();
 
   await assert.rejects(
-    receiveShopifyWebhook(
+    ingestShopifyWebhook(
       makeSignedWebhookInput(
         "orders/updated",
         {
@@ -247,10 +247,10 @@ test("rejects a signed webhook from another shop domain", async () => {
 });
 
 test("rejects a signed webhook topic that is not supported by V1", async () => {
-  const client = new FakeReceiveShopifyWebhookClient();
+  const client = new FakeIngestShopifyWebhookClient();
 
   await assert.rejects(
-    receiveShopifyWebhook(
+    ingestShopifyWebhook(
       makeSignedWebhookInput("products/update", {
         admin_graphql_api_id: "gid://shopify/Product/123",
       }),

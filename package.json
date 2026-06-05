@@ -24,6 +24,7 @@
     "reconciliation:smoke": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/run-reconciliation-smoke-test.js",
     "scenario-matrix": "npm run build && node --env-file=.env build/src/tools/run-refund-scenario-matrix.js",
     "shopify-webhooks:process": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/process-webhook-events.js",
+    "shopify-webhooks:smoke:synthetic": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/run-webhook-smoke-test.js",
     "shopify-webhooks:serve": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/run-webhook-server.js",
     "sync-shopify-order": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/sync-order.js",
     "reconcile-orders": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/reconcile-orders.js",

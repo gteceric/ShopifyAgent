@@ -1,12 +1,16 @@
 import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createPrismaClient } from "../../persistence/prisma-client.js";
+import type {
+  ErrorResponse,
+  ShopifyWebhookAcceptedResponse,
+} from "./webhook-server-response.js";
 import {
-  receiveShopifyWebhook,
+  ingestShopifyWebhook,
   ShopifyWebhookRequestError,
-  type ReceiveShopifyWebhookDependencies,
-  type ReceiveShopifyWebhookInput,
-} from "../../platforms/shopify/webhooks/receive-webhook.js";
+  type IngestShopifyWebhookDependencies,
+  type IngestShopifyWebhookInput,
+} from "../../platforms/shopify/webhooks/ingest-webhook.js";
 
 const DEFAULT_SHOPIFY_WEBHOOK_PORT = 3001;
 const MAX_SHOPIFY_WEBHOOK_BODY_BYTES = 256 * 1024;
@@ -30,10 +34,10 @@ function readShopifyWebhookPort(): number {
   return port;
 }
 
-function writeJson(
+function writeJson<TBody extends object>(
   response: ServerResponse,
   statusCode: number,
-  body: Record<string, unknown>,
+  body: TBody,
 ): void {
   response.writeHead(statusCode, {
     "Content-Type": "application/json",
@@ -68,51 +72,61 @@ async function main(): Promise<void> {
       const path = new URL(request.url ?? "/", "http://localhost").pathname;
 
       if (request.method !== "POST" || path !== SHOPIFY_WEBHOOK_PATH) {
-        writeJson(response, 404, {
+        const responseBody: ErrorResponse = {
           error: "Not found.",
-        });
+        };
+
+        writeJson(response, 404, responseBody);
         return;
       }
 
       try {
         const rawBody = await readRawBody(request);
-        const receiveShopifyWebhookInput: ReceiveShopifyWebhookInput = {
+        const ingestShopifyWebhookInput: IngestShopifyWebhookInput = {
           rawBody,
           headers: request.headers,
         };
-        const receiveShopifyWebhookDependencies:
-          ReceiveShopifyWebhookDependencies = {
+        const ingestShopifyWebhookDependencies:
+          IngestShopifyWebhookDependencies = {
             prisma,
           };
-        const result = await receiveShopifyWebhook(
-          receiveShopifyWebhookInput,
-          receiveShopifyWebhookDependencies,
+        const result = await ingestShopifyWebhook(
+          ingestShopifyWebhookInput,
+          ingestShopifyWebhookDependencies,
         );
 
-        writeJson(response, 200, {
+        const responseBody: ShopifyWebhookAcceptedResponse = {
           accepted: true,
           duplicate: result.duplicate,
-        });
+        };
+
+        writeJson(response, 200, responseBody);
       } catch (error) {
         if (error instanceof ShopifyWebhookRequestError) {
-          writeJson(response, error.httpStatusCode, {
+          const responseBody: ErrorResponse = {
             error: error.message,
-          });
+          };
+
+          writeJson(response, error.httpStatusCode, responseBody);
           return;
         }
 
         if (error instanceof RequestBodyTooLargeError) {
-          writeJson(response, 413, {
+          const responseBody: ErrorResponse = {
             error: "Shopify webhook body is too large.",
-          });
+          };
+
+          writeJson(response, 413, responseBody);
           return;
         }
 
         console.error("Failed to receive Shopify webhook.");
         console.error(error);
-        writeJson(response, 500, {
+        const responseBody: ErrorResponse = {
           error: "Failed to receive Shopify webhook.",
-        });
+        };
+
+        writeJson(response, 500, responseBody);
       }
     })();
   });
