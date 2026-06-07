@@ -5,10 +5,7 @@ import {
 import { hasPendingShopifyOrderRefundTransaction } from "./refund-processing-status.js";
 import { MOCK_SHOPIFY_ORDERS } from "./mock-shopify-orders.js";
 import type { ShopifyOrderRecord } from "./mock-shopify-orders.js";
-import {
-  hasShopifyAdminConfig,
-  shopifyAdminFetch,
-} from "./shopify-admin.js";
+import type { ShopifyAdminClient } from "./shopify-admin.js";
 import { SHOPIFY_ORDERS_LIST_QUERY } from "./shopify-queries.js";
 
 export interface ShopifyOrderSummary {
@@ -27,7 +24,7 @@ export interface LoadShopifyOrdersInput {
 
 export interface LoadShopifyOrdersDependencies {
   env?: NodeJS.ProcessEnv;
-  fetchImpl?: typeof fetch;
+  shopifyAdminClient?: ShopifyAdminClient;
 }
 
 interface ShopifyOrdersListResponse {
@@ -133,15 +130,11 @@ export function mapAdminOrderToShopifyOrderSummary(
 
 async function loadOrdersFromShopify(
   input: LoadShopifyOrdersInput,
-  dependencies: LoadShopifyOrdersDependencies,
+  shopifyAdminClient: ShopifyAdminClient,
 ): Promise<ShopifyOrderSummary[]> {
-  const response = await shopifyAdminFetch<ShopifyOrdersListResponse>(
+  const response = await shopifyAdminClient.fetch<ShopifyOrdersListResponse>(
     SHOPIFY_ORDERS_LIST_QUERY,
     { first: input.limit ?? DEFAULT_ORDERS_LIMIT },
-    {
-      env: dependencies.env,
-      fetchImpl: dependencies.fetchImpl,
-    },
   );
 
   return response.orders.nodes.map(mapAdminOrderToShopifyOrderSummary);
@@ -152,13 +145,11 @@ export async function loadOrders(
   dependencies: LoadShopifyOrdersDependencies = {},
 ): Promise<ShopifyOrderSummary[]> {
   if (shouldUseRealShopify(dependencies.env)) {
-    if (!hasShopifyAdminConfig(dependencies.env)) {
-      throw new Error(
-        "USE_REAL_SHOPIFY=true requires SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_TOKEN.",
-      );
+    if (!dependencies.shopifyAdminClient) {
+      throw new Error("Real Shopify order listing requires ShopifyAdminClient.");
     }
 
-    return loadOrdersFromShopify(input, dependencies);
+    return loadOrdersFromShopify(input, dependencies.shopifyAdminClient);
   }
 
   const limit = input.limit ?? DEFAULT_ORDERS_LIMIT;

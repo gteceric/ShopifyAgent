@@ -13,11 +13,7 @@ import {
   type PreviewShopifyRefundDependencies,
   type PreviewShopifyRefundInput,
 } from "./preview-refund.js";
-import {
-  hasShopifyAdminConfig,
-  shopifyAdminFetch,
-} from "./shopify-admin.js";
-import type { ShopifyAdminFetchOptions } from "./shopify-admin.js";
+import type { ShopifyAdminClient } from "./shopify-admin.js";
 
 export const ShopifyRefundActionExecutionStatus = {
   Succeeded: "succeeded",
@@ -36,7 +32,7 @@ export interface ExecuteShopifyRefundActionInput {
 
 export interface ExecuteShopifyRefundActionDependencies {
   env?: NodeJS.ProcessEnv;
-  fetchImpl?: typeof fetch;
+  shopifyAdminClient?: ShopifyAdminClient;
 }
 
 export interface ShopifyRefundActionExecutedLineItem {
@@ -245,7 +241,7 @@ function mapShopifyRefundActionResult(
 
 async function executeRealShopifyRefundAction(
   input: ExecuteShopifyRefundActionInput,
-  dependencies: ExecuteShopifyRefundActionDependencies,
+  shopifyAdminClient: ShopifyAdminClient,
 ): Promise<ShopifyRefundActionResult> {
   const refundPreviewInput: PreviewShopifyRefundInput = {
     orderId: input.validation.orderId,
@@ -255,8 +251,7 @@ async function executeRealShopifyRefundAction(
     })),
   };
   const refundPreviewDependencies: PreviewShopifyRefundDependencies = {
-    env: dependencies.env,
-    fetchImpl: dependencies.fetchImpl,
+    shopifyAdminClient,
   };
   const refundPreview = await previewShopifyRefund(
     refundPreviewInput,
@@ -273,14 +268,9 @@ async function executeRealShopifyRefundAction(
     refundTransactionInputs,
     note: input.note,
   });
-  const shopifyAdminOptions: ShopifyAdminFetchOptions = {
-    env: dependencies.env,
-    fetchImpl: dependencies.fetchImpl,
-  };
-  const response = await shopifyAdminFetch<ShopifyRefundCreateResponse>(
+  const response = await shopifyAdminClient.fetch<ShopifyRefundCreateResponse>(
     request.query,
     request.variables,
-    shopifyAdminOptions,
   );
 
   return mapShopifyRefundActionResult(input, response);
@@ -291,9 +281,9 @@ export async function executeShopifyRefundAction(
   dependencies: ExecuteShopifyRefundActionDependencies = {},
 ): Promise<ShopifyRefundActionResult> {
   if (shouldUseRealShopify(dependencies.env)) {
-    if (!hasShopifyAdminConfig(dependencies.env)) {
+    if (!dependencies.shopifyAdminClient) {
       throw new Error(
-        "USE_REAL_SHOPIFY=true requires SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_TOKEN.",
+        "Real Shopify refund execution requires ShopifyAdminClient.",
       );
     }
 
@@ -303,7 +293,10 @@ export async function executeShopifyRefundAction(
       );
     }
 
-    return executeRealShopifyRefundAction(input, dependencies);
+    return executeRealShopifyRefundAction(
+      input,
+      dependencies.shopifyAdminClient,
+    );
   }
 
   return executeMockShopifyRefundAction(input);

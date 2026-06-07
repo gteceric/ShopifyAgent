@@ -12,6 +12,7 @@ import type {
   PreviewShopifyRefundInput,
   RefundPolicyLineItemEvaluation,
 } from "@shopify-agent/core";
+import { createShopifyAdminClientFromEnv } from "../platforms/shopify/auth/env-admin-client.js";
 
 function readRequiredEnv(name: string): string {
   const value = process.env[name]?.trim();
@@ -219,7 +220,10 @@ async function main(): Promise<void> {
   const orderId = readRequiredEnv("SMOKE_REFUND_ORDER_ID");
   const selectedLineItemIds = readSmokeRefundLineItemIds();
   const quantities = readSmokeRefundQuantities(selectedLineItemIds.length);
-  const adapter = createShopifyAdminRefundContextAdapter();
+  const shopifyAdminClient = createShopifyAdminClientFromEnv();
+  const adapter = createShopifyAdminRefundContextAdapter({
+    shopifyAdminClient,
+  });
   const eligibilityInput: CheckRefundEligibilityInput = { orderId };
   const eligibilityDependencies: CheckRefundEligibilityDependencies = {
     config: createPolicyConfig(),
@@ -241,7 +245,9 @@ async function main(): Promise<void> {
       quantity: quantities[index]!,
     })),
   };
-  const refundPreviewDependencies: PreviewShopifyRefundDependencies = {};
+  const refundPreviewDependencies: PreviewShopifyRefundDependencies = {
+    shopifyAdminClient,
+  };
   const refundPreview = await previewShopifyRefund(
     refundPreviewInput,
     refundPreviewDependencies,

@@ -9,6 +9,7 @@ import {
   loadOrders,
   mapAdminOrderToShopifyOrderSummary,
 } from "../src/platforms/shopify/load-orders.js";
+import { createTestShopifyAdminClient } from "./test-shopify-admin-client.js";
 
 test("uses mock Shopify orders for order listing when real Shopify is disabled", async () => {
   const result = await loadOrders(
@@ -80,10 +81,8 @@ test("loads a recent order page from Shopify Admin when USE_REAL_SHOPIFY=true", 
     {
       env: {
         USE_REAL_SHOPIFY: "true",
-        SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
-        SHOPIFY_ADMIN_TOKEN: "shpat_test",
       },
-      fetchImpl,
+      shopifyAdminClient: createTestShopifyAdminClient(fetchImpl),
     },
   );
 
@@ -102,7 +101,7 @@ test("loads a recent order page from Shopify Admin when USE_REAL_SHOPIFY=true", 
   assert.equal(result[1]?.fulfillmentStatus, FulfillmentStatus.Fulfilled);
 });
 
-test("throws when real Shopify order listing is requested without admin config", async () => {
+test("throws when real Shopify order listing is requested without an Admin client", async () => {
   await assert.rejects(
     () =>
       loadOrders(
@@ -113,7 +112,7 @@ test("throws when real Shopify order listing is requested without admin config",
           },
         },
       ),
-    /USE_REAL_SHOPIFY=true requires SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_TOKEN\./,
+    /requires ShopifyAdminClient\./,
   );
 });
 

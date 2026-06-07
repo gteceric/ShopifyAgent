@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { loadShopifyShopIdentity } from "../src/platforms/shopify/load-shop-identity.js";
+import { createTestShopifyAdminClient } from "./test-shopify-admin-client.js";
 
 test("loads Shopify shop identity from Admin GraphQL", async () => {
   const requestedBodies: unknown[] = [];
@@ -27,13 +28,9 @@ test("loads Shopify shop identity from Admin GraphQL", async () => {
     );
   };
 
-  const identity = await loadShopifyShopIdentity({
-    env: {
-      SHOPIFY_STORE_DOMAIN: "demo-shop.myshopify.com",
-      SHOPIFY_ADMIN_TOKEN: "test-token",
-    },
-    fetchImpl,
-  });
+  const identity = await loadShopifyShopIdentity(
+    createTestShopifyAdminClient(fetchImpl),
+  );
 
   assert.deepEqual(identity, {
     id: "gid://shopify/Shop/1",
@@ -67,13 +64,7 @@ test("throws when Shopify shop identity is missing its platform id", async () =>
     );
 
   await assert.rejects(
-    loadShopifyShopIdentity({
-      env: {
-        SHOPIFY_STORE_DOMAIN: "demo-shop.myshopify.com",
-        SHOPIFY_ADMIN_TOKEN: "test-token",
-      },
-      fetchImpl,
-    }),
-    /missing shop\.id/,
+    loadShopifyShopIdentity(createTestShopifyAdminClient(fetchImpl)),
+    /shop\.id is required\./,
   );
 });

@@ -6,6 +6,7 @@ import {
   type PreviewShopifyRefundDependencies,
   type PreviewShopifyRefundInput,
 } from "../src/index.js";
+import { createTestShopifyAdminClient } from "./test-shopify-admin-client.js";
 
 test("loads Shopify refund preview for selected line items", async () => {
   let capturedRequestBody: unknown;
@@ -147,11 +148,7 @@ test("loads Shopify refund preview for selected line items", async () => {
     ],
   };
   const dependencies: PreviewShopifyRefundDependencies = {
-    env: {
-      SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
-      SHOPIFY_ADMIN_TOKEN: "shpat_test",
-    },
-    fetchImpl,
+    shopifyAdminClient: createTestShopifyAdminClient(fetchImpl),
   };
 
   const refundPreview = await previewShopifyRefund(input, dependencies);
@@ -301,11 +298,7 @@ test("throws when Shopify refund preview response has no order", async () => {
     ],
   };
   const dependencies: PreviewShopifyRefundDependencies = {
-    env: {
-      SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
-      SHOPIFY_ADMIN_TOKEN: "shpat_test",
-    },
-    fetchImpl,
+    shopifyAdminClient: createTestShopifyAdminClient(fetchImpl),
   };
 
   await assert.rejects(
@@ -340,11 +333,7 @@ test("throws when Shopify order does not return a refund preview", async () => {
     ],
   };
   const dependencies: PreviewShopifyRefundDependencies = {
-    env: {
-      SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
-      SHOPIFY_ADMIN_TOKEN: "shpat_test",
-    },
-    fetchImpl,
+    shopifyAdminClient: createTestShopifyAdminClient(fetchImpl),
   };
 
   await assert.rejects(

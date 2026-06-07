@@ -1,5 +1,4 @@
-import { shopifyAdminFetch } from "./shopify-admin.js";
-import type { ShopifyAdminFetchOptions } from "./shopify-admin.js";
+import type { ShopifyAdminClient } from "./shopify-admin.js";
 import { SHOPIFY_REFUND_PREVIEW_QUERY } from "./shopify-queries.js";
 
 export interface RefundPreviewLineItemInput {
@@ -13,8 +12,7 @@ export interface PreviewShopifyRefundInput {
 }
 
 export interface PreviewShopifyRefundDependencies {
-  env?: NodeJS.ProcessEnv;
-  fetchImpl?: typeof fetch;
+  shopifyAdminClient: ShopifyAdminClient;
 }
 
 export interface RefundPreviewMoney {
@@ -174,21 +172,17 @@ function mapRefundPreview(
 
 export async function previewShopifyRefund(
   input: PreviewShopifyRefundInput,
-  dependencies: PreviewShopifyRefundDependencies = {},
+  dependencies: PreviewShopifyRefundDependencies,
 ): Promise<ShopifyRefundPreview> {
   const variables: ShopifyRefundPreviewVariables = {
     orderId: input.orderId,
     refundLineItems: input.refundLineItems,
   };
-  const shopifyAdminOptions: ShopifyAdminFetchOptions = {
-    env: dependencies.env,
-    fetchImpl: dependencies.fetchImpl,
-  };
-  const response = await shopifyAdminFetch<ShopifyRefundPreviewResponse>(
-    SHOPIFY_REFUND_PREVIEW_QUERY,
-    variables,
-    shopifyAdminOptions,
-  );
+  const response =
+    await dependencies.shopifyAdminClient.fetch<ShopifyRefundPreviewResponse>(
+      SHOPIFY_REFUND_PREVIEW_QUERY,
+      variables,
+    );
 
   if (!response.order) {
     throw new Error(`Shopify order ${input.orderId} was not found.`);

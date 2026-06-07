@@ -1,4 +1,6 @@
 import { createPrismaClient } from "../../persistence/prisma-client.js";
+import { loadMerchantShopifyAdminClient } from "../../platforms/shopify/auth/merchant-admin-client.js";
+import { readShopifyTokenEncryptionKey } from "../../platforms/shopify/auth/token-encryption.js";
 import { syncShopifyOrderSnapshot } from "../../platforms/shopify/sync-order-snapshot.js";
 import {
   processPendingShopifyWebhookEvents,
@@ -25,6 +27,7 @@ function readOptionalPositiveIntegerEnv(name: string): number | undefined {
 async function main(): Promise<void> {
   const limit = readOptionalPositiveIntegerEnv("SHOPIFY_WEBHOOK_PROCESS_LIMIT");
   const prisma = createPrismaClient();
+  const encryptionKey = readShopifyTokenEncryptionKey();
 
   try {
     const eventsInput: ProcessPendingShopifyWebhookEventsInput = {
@@ -32,10 +35,24 @@ async function main(): Promise<void> {
     };
     const dependencies: ProcessPendingShopifyWebhookEventsDependencies = {
       prisma,
-      syncShopifyOrderSnapshotFn: (orderSnapshotInput) =>
-        syncShopifyOrderSnapshot(orderSnapshotInput, {
+      syncShopifyOrderSnapshotFn: async (
+        orderSnapshotInput,
+        localPlatformAccount,
+      ) => {
+        const shopifyAdminClient = await loadMerchantShopifyAdminClient(
+          localPlatformAccount,
+          {
+            prisma,
+            encryptionKey,
+            apiVersion: process.env.SHOPIFY_API_VERSION,
+          },
+        );
+
+        return syncShopifyOrderSnapshot(orderSnapshotInput, {
           prisma,
-        }),
+          shopifyAdminClient,
+        });
+      },
     };
     const result = await processPendingShopifyWebhookEvents(
       eventsInput,

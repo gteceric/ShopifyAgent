@@ -3,6 +3,7 @@ import {
   type RefundContext,
   type RefundContextInput,
   type RefundContextLineItem,
+  type ShopifyAdminClient,
   type ShopifyRefundSyncLineItem,
   type ShopifyRefundSyncRecord,
   type ShopifyRefundSyncTransaction,
@@ -38,6 +39,7 @@ export interface SyncShopifyOrderSnapshotInput {
 
 export interface SyncShopifyOrderSnapshotDependencies {
   prisma: PrismaClient;
+  shopifyAdminClient: ShopifyAdminClient;
 }
 
 function normalizeOptionalString(
@@ -169,7 +171,9 @@ export async function syncShopifyOrderSnapshot(
     orderId: input.platformOrderId,
   };
   const shopifyOrderRefundSyncData =
-    await loadShopifyOrderRefundSyncData(refundContextInput);
+    await loadShopifyOrderRefundSyncData(refundContextInput, {
+      shopifyAdminClient: dependencies.shopifyAdminClient,
+    });
   const shopifyOrderSnapshotData: ShopifyOrderSnapshotData = {
     context: shopifyOrderRefundSyncData.context,
     refunds: shopifyOrderRefundSyncData.refunds,

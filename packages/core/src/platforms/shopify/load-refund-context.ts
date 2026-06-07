@@ -29,15 +29,19 @@ import {
   REFUND_TRANSACTIONS_QUERY,
 } from "./shopify-queries.js";
 import {
-  hasShopifyAdminConfig,
-  shopifyAdminFetch,
-  type ShopifyAdminFetchOptions,
+  type ShopifyAdminClient,
 } from "./shopify-admin.js";
+import { normalizeOptionalString } from "../../shared/normalize-value.js";
 
 export interface LoadShopifyRefundContextDependencies {
+  shopifyAdminClient?: ShopifyAdminClient;
   env?: NodeJS.ProcessEnv;
-  fetchImpl?: typeof fetch;
   now?: Date;
+}
+
+export interface ShopifyAdminRefundContextDependencies
+  extends LoadShopifyRefundContextDependencies {
+  shopifyAdminClient: ShopifyAdminClient;
 }
 
 function shouldUseRealShopify(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -335,12 +339,6 @@ function normalizeStringArray(
   ];
 }
 
-function normalizeOptionalString(value?: string | null): string | undefined {
-  const normalizedValue = value?.trim();
-
-  return normalizedValue ? normalizedValue : undefined;
-}
-
 function normalizeVariantOptions(
   selectedOptions?: Array<{
     name?: string | null;
@@ -626,13 +624,13 @@ function getNextPageCursor<T>(
 
 async function loadShopifyOrderSummaryForRefund(
   orderId: string,
-  shopifyAdminOptions: ShopifyAdminFetchOptions,
+  shopifyAdminClient: ShopifyAdminClient,
 ): Promise<ShopifyAdminOrderSummary> {
-  const response = await shopifyAdminFetch<ShopifyRefundOrderSummaryResponse>(
-    REFUND_ORDER_SUMMARY_QUERY,
-    { id: orderId },
-    shopifyAdminOptions,
-  );
+  const response =
+    await shopifyAdminClient.fetch<ShopifyRefundOrderSummaryResponse>(
+      REFUND_ORDER_SUMMARY_QUERY,
+      { id: orderId },
+    );
 
   if (!response.order) {
     throw new Error(`No Shopify order exists for ${orderId}.`);
@@ -643,17 +641,17 @@ async function loadShopifyOrderSummaryForRefund(
 
 async function loadShopifyOrderLineItems(
   orderId: string,
-  shopifyAdminOptions: ShopifyAdminFetchOptions,
+  shopifyAdminClient: ShopifyAdminClient,
 ): Promise<ShopifyAdminLineItem[]> {
   const lineItems: ShopifyAdminLineItem[] = [];
   let cursor: string | undefined;
 
   do {
-    const response = await shopifyAdminFetch<ShopifyOrderLineItemsResponse>(
-      REFUND_ORDER_LINE_ITEMS_QUERY,
-      { id: orderId, after: cursor },
-      shopifyAdminOptions,
-    );
+    const response =
+      await shopifyAdminClient.fetch<ShopifyOrderLineItemsResponse>(
+        REFUND_ORDER_LINE_ITEMS_QUERY,
+        { id: orderId, after: cursor },
+      );
 
     if (!response.order) {
       throw new Error(`No Shopify order exists for ${orderId}.`);
@@ -672,17 +670,17 @@ async function loadShopifyRefundLineItems(
     | ShopifyNodeConnection<ShopifyRefundLineItemNode>
     | undefined
     | null,
-  shopifyAdminOptions: ShopifyAdminFetchOptions,
+  shopifyAdminClient: ShopifyAdminClient,
 ): Promise<ShopifyNodeConnection<ShopifyRefundLineItemNode>> {
   const nodes = [...(firstPage?.nodes ?? [])];
   let cursor = getNextPageCursor(firstPage);
 
   while (cursor) {
-    const response = await shopifyAdminFetch<ShopifyRefundLineItemsResponse>(
-      REFUND_REFUND_LINE_ITEMS_QUERY,
-      { id: refundId, after: cursor },
-      shopifyAdminOptions,
-    );
+    const response =
+      await shopifyAdminClient.fetch<ShopifyRefundLineItemsResponse>(
+        REFUND_REFUND_LINE_ITEMS_QUERY,
+        { id: refundId, after: cursor },
+      );
 
     if (!response.node) {
       throw new Error(`No Shopify refund exists for ${refundId}.`);
@@ -701,17 +699,17 @@ async function loadShopifyRefundTransactions(
     | ShopifyEdgeConnection<ShopifyRefundTransactionNode>
     | undefined
     | null,
-  shopifyAdminOptions: ShopifyAdminFetchOptions,
+  shopifyAdminClient: ShopifyAdminClient,
 ): Promise<ShopifyEdgeConnection<ShopifyRefundTransactionNode>> {
   const edges = [...(firstPage?.edges ?? [])];
   let cursor = getNextPageCursor(firstPage);
 
   while (cursor) {
-    const response = await shopifyAdminFetch<ShopifyRefundTransactionsResponse>(
-      REFUND_TRANSACTIONS_QUERY,
-      { id: refundId, after: cursor },
-      shopifyAdminOptions,
-    );
+    const response =
+      await shopifyAdminClient.fetch<ShopifyRefundTransactionsResponse>(
+        REFUND_TRANSACTIONS_QUERY,
+        { id: refundId, after: cursor },
+      );
 
     if (!response.node) {
       throw new Error(`No Shopify refund exists for ${refundId}.`);
@@ -726,13 +724,13 @@ async function loadShopifyRefundTransactions(
 
 async function loadShopifyOrderRefunds(
   orderId: string,
-  shopifyAdminOptions: ShopifyAdminFetchOptions,
+  shopifyAdminClient: ShopifyAdminClient,
 ): Promise<ShopifyAdminRefund[]> {
-  const response = await shopifyAdminFetch<ShopifyOrderRefundsResponse>(
-    REFUND_ORDER_REFUNDS_QUERY,
-    { id: orderId },
-    shopifyAdminOptions,
-  );
+  const response =
+    await shopifyAdminClient.fetch<ShopifyOrderRefundsResponse>(
+      REFUND_ORDER_REFUNDS_QUERY,
+      { id: orderId },
+    );
 
   if (!response.order) {
     throw new Error(`No Shopify order exists for ${orderId}.`);
@@ -744,12 +742,12 @@ async function loadShopifyOrderRefunds(
     const refundLineItems = await loadShopifyRefundLineItems(
       refund.id,
       refund.refundLineItems,
-      shopifyAdminOptions,
+      shopifyAdminClient,
     );
     const transactions = await loadShopifyRefundTransactions(
       refund.id,
       refund.transactions,
-      shopifyAdminOptions,
+      shopifyAdminClient,
     );
 
     refunds.push({
@@ -768,17 +766,16 @@ async function loadShopifyReturnableFulfillmentLineItems(
     | ShopifyNodeConnection<ShopifyReturnableFulfillmentLineItemNode>
     | undefined
     | null,
-  shopifyAdminOptions: ShopifyAdminFetchOptions,
+  shopifyAdminClient: ShopifyAdminClient,
 ): Promise<ShopifyNodeConnection<ShopifyReturnableFulfillmentLineItemNode>> {
   const nodes = [...(firstPage?.nodes ?? [])];
   let cursor = getNextPageCursor(firstPage);
 
   while (cursor) {
     const response =
-      await shopifyAdminFetch<ShopifyReturnableFulfillmentLineItemsResponse>(
+      await shopifyAdminClient.fetch<ShopifyReturnableFulfillmentLineItemsResponse>(
         REFUND_RETURNABLE_FULFILLMENT_LINE_ITEMS_QUERY,
         { id: fulfillmentId, after: cursor },
-        shopifyAdminOptions,
       );
 
     if (!response.node) {
@@ -796,17 +793,16 @@ async function loadShopifyReturnableFulfillmentLineItems(
 
 async function loadShopifyReturnableFulfillments(
   orderId: string,
-  shopifyAdminOptions: ShopifyAdminFetchOptions,
+  shopifyAdminClient: ShopifyAdminClient,
 ): Promise<ShopifyReturnableFulfillmentsResponse> {
   const fulfillments: ShopifyReturnableFulfillmentNode[] = [];
   let cursor: string | undefined;
 
   do {
     const response =
-      await shopifyAdminFetch<ShopifyReturnableFulfillmentsResponse>(
+      await shopifyAdminClient.fetch<ShopifyReturnableFulfillmentsResponse>(
         REFUND_RETURNABLE_FULFILLMENTS_QUERY,
         { orderId, after: cursor },
-        shopifyAdminOptions,
       );
 
     for (const fulfillment of response.returnableFulfillments.nodes) {
@@ -814,7 +810,7 @@ async function loadShopifyReturnableFulfillments(
         await loadShopifyReturnableFulfillmentLineItems(
           fulfillment.id,
           fulfillment.returnableFulfillmentLineItems,
-          shopifyAdminOptions,
+          shopifyAdminClient,
         );
 
       fulfillments.push({
@@ -853,7 +849,7 @@ function combineShopifyRefundContextParts(
 
 interface LoadShopifyRefundContextPartsInput {
   orderId: string;
-  shopifyAdminOptions: ShopifyAdminFetchOptions;
+  shopifyAdminClient: ShopifyAdminClient;
 }
 
 interface ShopifyRefundContextParts {
@@ -866,19 +862,19 @@ async function loadShopifyRefundContextParts(
 ): Promise<ShopifyRefundContextParts> {
   const orderSummary = await loadShopifyOrderSummaryForRefund(
     input.orderId,
-    input.shopifyAdminOptions,
+    input.shopifyAdminClient,
   );
   const lineItems = await loadShopifyOrderLineItems(
     input.orderId,
-    input.shopifyAdminOptions,
+    input.shopifyAdminClient,
   );
   const refunds = await loadShopifyOrderRefunds(
     input.orderId,
-    input.shopifyAdminOptions,
+    input.shopifyAdminClient,
   );
   const returnableFulfillments = await loadShopifyReturnableFulfillments(
     input.orderId,
-    input.shopifyAdminOptions,
+    input.shopifyAdminClient,
   );
   const combineContextPartsInput: CombineShopifyRefundContextPartsInput = {
     orderSummary,
@@ -928,15 +924,11 @@ export function mapAdminOrderToRefundContext(
 
 async function loadRefundContextFromShopify(
   input: RefundContextInput,
-  dependencies: LoadShopifyRefundContextDependencies,
+  dependencies: ShopifyAdminRefundContextDependencies,
 ): Promise<RefundContext> {
-  const shopifyAdminOptions: ShopifyAdminFetchOptions = {
-    env: dependencies.env,
-    fetchImpl: dependencies.fetchImpl,
-  };
   const contextPartsInput: LoadShopifyRefundContextPartsInput = {
     orderId: input.orderId,
-    shopifyAdminOptions,
+    shopifyAdminClient: dependencies.shopifyAdminClient,
   };
   const contextParts = await loadShopifyRefundContextParts(contextPartsInput);
 
@@ -949,21 +941,11 @@ async function loadRefundContextFromShopify(
 
 export async function loadShopifyOrderRefundSyncData(
   input: RefundContextInput,
-  dependencies: LoadShopifyRefundContextDependencies = {},
+  dependencies: ShopifyAdminRefundContextDependencies,
 ): Promise<ShopifyOrderRefundSyncData> {
-  if (!hasShopifyAdminConfig(dependencies.env)) {
-    throw new Error(
-      "USE_REAL_SHOPIFY=true requires SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_TOKEN.",
-    );
-  }
-
-  const shopifyAdminOptions: ShopifyAdminFetchOptions = {
-    env: dependencies.env,
-    fetchImpl: dependencies.fetchImpl,
-  };
   const contextPartsInput: LoadShopifyRefundContextPartsInput = {
     orderId: input.orderId,
-    shopifyAdminOptions,
+    shopifyAdminClient: dependencies.shopifyAdminClient,
   };
   const contextParts = await loadShopifyRefundContextParts(contextPartsInput);
   const context = mapAdminOrderToRefundContext(
@@ -1012,17 +994,11 @@ export function createMockShopifyRefundContextAdapter(
 }
 
 export function createShopifyAdminRefundContextAdapter(
-  dependencies: LoadShopifyRefundContextDependencies = {},
+  dependencies: ShopifyAdminRefundContextDependencies,
 ): RefundContextPlatformAdapter {
   return {
     platform: "shopify-admin",
     loadRefundContext(input) {
-      if (!hasShopifyAdminConfig(dependencies.env)) {
-        throw new Error(
-          "USE_REAL_SHOPIFY=true requires SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_TOKEN.",
-        );
-      }
-
       return loadRefundContextFromShopify(input, dependencies);
     },
   };
@@ -1031,7 +1007,16 @@ export function createShopifyAdminRefundContextAdapter(
 export function createShopifyRefundContextAdapter(
   dependencies: LoadShopifyRefundContextDependencies = {},
 ): RefundContextPlatformAdapter {
-  return shouldUseRealShopify(dependencies.env)
-    ? createShopifyAdminRefundContextAdapter(dependencies)
-    : createMockShopifyRefundContextAdapter(dependencies);
+  if (!shouldUseRealShopify(dependencies.env)) {
+    return createMockShopifyRefundContextAdapter(dependencies);
+  }
+
+  if (!dependencies.shopifyAdminClient) {
+    throw new Error("Real Shopify refund context requires ShopifyAdminClient.");
+  }
+
+  return createShopifyAdminRefundContextAdapter({
+    ...dependencies,
+    shopifyAdminClient: dependencies.shopifyAdminClient,
+  });
 }

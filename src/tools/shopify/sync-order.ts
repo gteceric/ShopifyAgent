@@ -1,5 +1,6 @@
 import { loadShopifyShopIdentity } from "@shopify-agent/core";
 import { createPrismaClient } from "../../persistence/prisma-client.js";
+import { createShopifyAdminClientFromEnv } from "../../platforms/shopify/auth/env-admin-client.js";
 import { syncShopifyOrderSnapshot } from "../../platforms/shopify/sync-order-snapshot.js";
 
 function readRequiredEnv(name: string): string {
@@ -24,7 +25,8 @@ async function main(): Promise<void> {
   requireRealShopifySyncFlag();
 
   const platformOrderId = readRequiredEnv("SYNC_SHOPIFY_ORDER_ID");
-  const shopIdentity = await loadShopifyShopIdentity();
+  const shopifyAdminClient = createShopifyAdminClientFromEnv();
+  const shopIdentity = await loadShopifyShopIdentity(shopifyAdminClient);
   const prisma = createPrismaClient();
 
   try {
@@ -36,6 +38,7 @@ async function main(): Promise<void> {
       },
       {
         prisma,
+        shopifyAdminClient,
       },
     );
 

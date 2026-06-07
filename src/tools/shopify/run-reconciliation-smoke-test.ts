@@ -13,6 +13,7 @@ import {
   createShopifyReconcileOrdersDependencies,
   loadShopifyReconciliationInput,
 } from "../../platforms/shopify/reconcile-orders-adapter.js";
+import { createShopifyAdminClientFromEnv } from "../../platforms/shopify/auth/env-admin-client.js";
 import {
   ORDER_RECONCILIATION_SYNC_TYPE,
   reconcileOrders,
@@ -442,7 +443,10 @@ async function main(): Promise<void> {
     assertSmokeDatabaseIsEmpty(baselineCounts);
     smokeDatabaseWasEmpty = true;
 
-    const platformInput = await loadShopifyReconciliationInput();
+    const shopifyAdminClient = createShopifyAdminClientFromEnv();
+    const platformInput = await loadShopifyReconciliationInput(
+      shopifyAdminClient,
+    );
     const shopDomain = readShopDomain(platformInput.platformContext);
 
     platformAccountId = platformInput.platformAccountId;
@@ -456,7 +460,7 @@ async function main(): Promise<void> {
     };
     const reconcileResult = await reconcileOrders(
       reconcileInput,
-      createShopifyReconcileOrdersDependencies(prisma),
+      createShopifyReconcileOrdersDependencies(prisma, shopifyAdminClient),
     );
 
     localPlatformAccountId = reconcileResult.localPlatformAccountId;
@@ -471,9 +475,14 @@ async function main(): Promise<void> {
     assert.equal(reconcileResult.failedOrders.length, 0);
 
     const syncedOrder = reconcileResult.syncedOrders[0]!;
-    const shopifyOrderRefundSyncData = await loadShopifyOrderRefundSyncData({
-      orderId: syncedOrder.platformOrderId,
-    });
+    const shopifyOrderRefundSyncData = await loadShopifyOrderRefundSyncData(
+      {
+        orderId: syncedOrder.platformOrderId,
+      },
+      {
+        shopifyAdminClient,
+      },
+    );
 
     await verifyPersistedSnapshot(prisma, {
       localOrderId: syncedOrder.localOrderId,

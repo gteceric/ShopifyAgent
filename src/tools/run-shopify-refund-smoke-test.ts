@@ -16,6 +16,7 @@ import type {
   RefundActionRequest,
   RefundPolicyLineItemEvaluation,
 } from "@shopify-agent/core";
+import { createShopifyAdminClientFromEnv } from "../platforms/shopify/auth/env-admin-client.js";
 
 function readRequiredEnv(name: string): string {
   const value = process.env[name]?.trim();
@@ -233,7 +234,10 @@ async function main(): Promise<void> {
   const quantities = readSmokeRefundQuantities(selectedLineItemIds.length);
   const idempotencyKey = createSmokeRefundIdempotencyKey(orderId);
   const note = process.env.SMOKE_REFUND_NOTE?.trim();
-  const adapter = createShopifyAdminRefundContextAdapter();
+  const shopifyAdminClient = createShopifyAdminClientFromEnv();
+  const adapter = createShopifyAdminRefundContextAdapter({
+    shopifyAdminClient,
+  });
   const eligibilityInput: CheckRefundEligibilityInput = { orderId };
   const eligibilityDependencies: CheckRefundEligibilityDependencies = {
     config: createPolicyConfig(),
@@ -299,7 +303,10 @@ async function main(): Promise<void> {
     idempotencyKey,
     ...(note ? { note } : {}),
   };
-  const result = await executeShopifyRefundAction(executionInput);
+  const result = await executeShopifyRefundAction(executionInput, {
+    env: process.env,
+    shopifyAdminClient,
+  });
 
   console.log("Refund smoke test execution result");
   console.log(JSON.stringify(result, null, 2));

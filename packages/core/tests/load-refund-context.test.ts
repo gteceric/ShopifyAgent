@@ -12,6 +12,7 @@ import {
   loadShopifyOrderRefundSyncData,
   mapAdminOrderToRefundContext,
 } from "../src/platforms/shopify/load-refund-context.js";
+import { createTestShopifyAdminClient } from "./test-shopify-admin-client.js";
 
 test("default Shopify adapter uses mock orders when Admin API env vars are missing", async () => {
   const adapter = createShopifyRefundContextAdapter({
@@ -46,10 +47,7 @@ test("default Shopify adapter uses mock orders when Admin API env vars are missi
 test("default Shopify adapter uses mock orders unless USE_REAL_SHOPIFY=true", async () => {
   const adapter = createShopifyRefundContextAdapter({
     now: new Date("2026-03-30T00:00:00.000Z"),
-    env: {
-      SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
-      SHOPIFY_ADMIN_TOKEN: "shpat_test",
-    },
+    env: {},
   });
   const result = await adapter.loadRefundContext({
     orderId: "gid://shopify/Order/1001",
@@ -179,12 +177,7 @@ test("Shopify Admin adapter maps live Admin responses into RefundContext", async
 
   const adapter = createShopifyAdminRefundContextAdapter({
     now: new Date("2026-03-30T00:00:00.000Z"),
-    env: {
-      USE_REAL_SHOPIFY: "true",
-      SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
-      SHOPIFY_ADMIN_TOKEN: "shpat_test",
-    },
-    fetchImpl,
+    shopifyAdminClient: createTestShopifyAdminClient(fetchImpl),
   });
   const result = await adapter.loadRefundContext({
     orderId: "gid://shopify/Order/900000000301",
@@ -362,12 +355,7 @@ test("Shopify order sync snapshot includes refund records", async () => {
     },
     {
       now: new Date("2026-03-30T00:00:00.000Z"),
-      env: {
-        USE_REAL_SHOPIFY: "true",
-        SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
-        SHOPIFY_ADMIN_TOKEN: "shpat_test",
-      },
-      fetchImpl,
+      shopifyAdminClient: createTestShopifyAdminClient(fetchImpl),
     },
   );
 
@@ -698,12 +686,7 @@ test("Shopify Admin adapter paginates separated refund context loaders", async (
 
   const adapter = createShopifyAdminRefundContextAdapter({
     now: new Date("2026-03-30T00:00:00.000Z"),
-    env: {
-      USE_REAL_SHOPIFY: "true",
-      SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
-      SHOPIFY_ADMIN_TOKEN: "shpat_test",
-    },
-    fetchImpl,
+    shopifyAdminClient: createTestShopifyAdminClient(fetchImpl),
   });
   const result = await adapter.loadRefundContext({
     orderId: "gid://shopify/Order/900000000309",
@@ -752,17 +735,15 @@ test("Shopify Admin adapter paginates separated refund context loaders", async (
   );
 });
 
-test("Shopify Admin adapter throws when Admin env vars are incomplete", async () => {
+test("default Shopify adapter requires an Admin client for real Shopify", () => {
   assert.throws(
     () =>
-      createShopifyAdminRefundContextAdapter({
+      createShopifyRefundContextAdapter({
         env: {
           USE_REAL_SHOPIFY: "true",
         },
-      }).loadRefundContext({
-        orderId: "gid://shopify/Order/1001",
       }),
-    /USE_REAL_SHOPIFY=true requires SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_TOKEN\./,
+    /requires ShopifyAdminClient\./,
   );
 });
 

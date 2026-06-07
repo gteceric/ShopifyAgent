@@ -1,4 +1,5 @@
 import { createPrismaClient } from "../../persistence/prisma-client.js";
+import { createShopifyAdminClientFromEnv } from "../../platforms/shopify/auth/env-admin-client.js";
 import {
   createShopifyReconcileOrdersDependencies,
   loadShopifyReconciliationInput,
@@ -33,10 +34,11 @@ function readOptionalPositiveIntegerEnv(name: string): number | undefined {
 
 async function loadPlatformReconciliationInput(
   platform: string,
+  shopifyAdminClient: ReturnType<typeof createShopifyAdminClientFromEnv>,
 ): Promise<PlatformReconciliationInput> {
   switch (platform) {
     case "shopify":
-      return loadShopifyReconciliationInput();
+      return loadShopifyReconciliationInput(shopifyAdminClient);
 
     default:
       throw new Error(
@@ -48,7 +50,11 @@ async function loadPlatformReconciliationInput(
 async function main(): Promise<void> {
   const platform = readOptionalEnv("RECONCILE_PLATFORM") ?? "shopify";
   const limit = readOptionalPositiveIntegerEnv("RECONCILE_ORDER_LIMIT");
-  const platformInput = await loadPlatformReconciliationInput(platform);
+  const shopifyAdminClient = createShopifyAdminClientFromEnv();
+  const platformInput = await loadPlatformReconciliationInput(
+    platform,
+    shopifyAdminClient,
+  );
   const prisma = createPrismaClient();
   const reconcileInput: ReconcileOrdersInput = {
     platform,
@@ -58,7 +64,7 @@ async function main(): Promise<void> {
     limit,
   };
   const reconcileDependencies =
-    createShopifyReconcileOrdersDependencies(prisma);
+    createShopifyReconcileOrdersDependencies(prisma, shopifyAdminClient);
 
   try {
     const result = await reconcileOrders(reconcileInput, reconcileDependencies);

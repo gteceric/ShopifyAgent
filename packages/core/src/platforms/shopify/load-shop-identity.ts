@@ -1,8 +1,8 @@
+import type { ShopifyAdminClient } from "./shopify-admin.js";
 import {
-  hasShopifyAdminConfig,
-  shopifyAdminFetch,
-  type ShopifyAdminFetchOptions,
-} from "./shopify-admin.js";
+  normalizeOptionalString,
+  normalizeRequiredString,
+} from "../../shared/normalize-value.js";
 
 const SHOPIFY_SHOP_IDENTITY_QUERY = /* GraphQL */ `
   query ShopifyShopIdentity {
@@ -28,35 +28,12 @@ interface ShopifyShopIdentityResponse {
   };
 }
 
-function normalizeRequiredString(value: string | null | undefined, name: string) {
-  const normalizedValue = value?.trim();
-
-  if (!normalizedValue) {
-    throw new Error(`Shopify shop identity response missing ${name}.`);
-  }
-
-  return normalizedValue;
-}
-
-function normalizeOptionalString(value?: string | null): string | undefined {
-  const normalizedValue = value?.trim();
-
-  return normalizedValue ? normalizedValue : undefined;
-}
-
 export async function loadShopifyShopIdentity(
-  dependencies: ShopifyAdminFetchOptions = {},
+  shopifyAdminClient: ShopifyAdminClient,
 ): Promise<ShopifyShopIdentity> {
-  if (!hasShopifyAdminConfig(dependencies.env)) {
-    throw new Error(
-      "Shopify shop identity requires SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_TOKEN.",
-    );
-  }
-
-  const response = await shopifyAdminFetch<ShopifyShopIdentityResponse>(
+  const response = await shopifyAdminClient.fetch<ShopifyShopIdentityResponse>(
     SHOPIFY_SHOP_IDENTITY_QUERY,
     {},
-    dependencies,
   );
 
   return {

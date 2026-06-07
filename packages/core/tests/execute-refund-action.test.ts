@@ -9,6 +9,7 @@ import {
   type ExecuteShopifyRefundActionInput,
 } from "../src/index.js";
 import { RefundDecision } from "../src/domain/refund-policy.types.js";
+import { createTestShopifyAdminClient } from "./test-shopify-admin-client.js";
 
 const readyValidation = {
   orderId: "gid://shopify/Order/910000000070",
@@ -50,7 +51,7 @@ test("uses mock Shopify refund execution when real Shopify is disabled", async (
   };
   const dependencies: ExecuteShopifyRefundActionDependencies = {
     env: {},
-    fetchImpl,
+    shopifyAdminClient: createTestShopifyAdminClient(fetchImpl),
   };
 
   const result = await executeShopifyRefundAction(input, dependencies);
@@ -82,7 +83,7 @@ test("uses mock Shopify refund execution for multiple line items", async () => {
   };
   const dependencies: ExecuteShopifyRefundActionDependencies = {
     env: {},
-    fetchImpl,
+    shopifyAdminClient: createTestShopifyAdminClient(fetchImpl),
   };
 
   const result = await executeShopifyRefundAction(input, dependencies);
@@ -273,10 +274,8 @@ test("executes Shopify refundCreate from Shopify refund preview", async () => {
     env: {
       USE_REAL_SHOPIFY: "true",
       ENABLE_REAL_REFUND_EXECUTION: "true",
-      SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
-      SHOPIFY_ADMIN_TOKEN: "shpat_test",
     },
-    fetchImpl,
+    shopifyAdminClient: createTestShopifyAdminClient(fetchImpl),
   };
 
   const result = await executeShopifyRefundAction(input, dependencies);
@@ -500,10 +499,8 @@ test("returns pending when Shopify refund transaction is pending", async () => {
     env: {
       USE_REAL_SHOPIFY: "true",
       ENABLE_REAL_REFUND_EXECUTION: "true",
-      SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
-      SHOPIFY_ADMIN_TOKEN: "shpat_test",
     },
-    fetchImpl,
+    shopifyAdminClient: createTestShopifyAdminClient(fetchImpl),
   };
 
   const result = await executeShopifyRefundAction(input, dependencies);
@@ -523,7 +520,7 @@ test("returns pending when Shopify refund transaction is pending", async () => {
   ]);
 });
 
-test("throws when real Shopify refund execution is requested without admin config", async () => {
+test("throws when real Shopify refund execution is requested without an Admin client", async () => {
   const input: ExecuteShopifyRefundActionInput = {
     validation: readyValidation,
     idempotencyKey: "refund-action-910000000070-700000000070",
@@ -536,7 +533,7 @@ test("throws when real Shopify refund execution is requested without admin confi
 
   await assert.rejects(
     () => executeShopifyRefundAction(input, dependencies),
-    /USE_REAL_SHOPIFY=true requires SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_TOKEN\./,
+    /requires ShopifyAdminClient\./,
   );
 });
 
@@ -551,10 +548,8 @@ test("throws when real Shopify refund execution is not explicitly enabled", asyn
   const dependencies: ExecuteShopifyRefundActionDependencies = {
     env: {
       USE_REAL_SHOPIFY: "true",
-      SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
-      SHOPIFY_ADMIN_TOKEN: "shpat_test",
     },
-    fetchImpl,
+    shopifyAdminClient: createTestShopifyAdminClient(fetchImpl),
   };
 
   await assert.rejects(
