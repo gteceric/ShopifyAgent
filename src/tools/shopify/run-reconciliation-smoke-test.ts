@@ -12,8 +12,8 @@ import { createPrismaClient } from "../../persistence/prisma-client.js";
 import {
   createShopifyReconcileOrdersDependencies,
   loadShopifyReconciliationInput,
-} from "../../platforms/shopify/reconcile-orders-adapter.js";
-import { createShopifyAdminClientFromEnv } from "../../platforms/shopify/auth/env-admin-client.js";
+} from "../../platforms/shopify/sync/reconcile-orders-adapter.js";
+import { createShopifyAdminClientFromEnv } from "../../platforms/shopify/admin-client/env-admin-client.js";
 import {
   ORDER_RECONCILIATION_SYNC_TYPE,
   reconcileOrders,

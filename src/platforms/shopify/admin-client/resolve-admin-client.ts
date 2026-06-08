@@ -7,22 +7,22 @@ import {
   findShopifyInstallation,
   SHOPIFY_INSTALLATION_ACTIVE_STATUS,
   type ShopifyInstallationClient,
-} from "../../../persistence/shopify-installation.js";
-import { decryptShopifyToken } from "./token-encryption.js";
+} from "../persistence/installation.js";
+import { decryptCredential } from "../../../security/credential-encryption.js";
 
 const SHOPIFY_PLATFORM = "shopify";
 
-export interface LoadMerchantShopifyAdminClientDependencies {
+export interface ResolveShopifyAdminClientDependencies {
   prisma: ShopifyInstallationClient;
-  encryptionKey: Buffer;
+  credentialEncryptionKey: Buffer;
   apiVersion?: string;
   fetchImpl?: typeof fetch;
   nowFn?: () => Date;
 }
 
-export async function loadMerchantShopifyAdminClient(
+export async function resolveShopifyAdminClient(
   localPlatformAccount: PlatformAccount,
-  dependencies: LoadMerchantShopifyAdminClientDependencies,
+  dependencies: ResolveShopifyAdminClientDependencies,
 ): Promise<ShopifyAdminClient> {
   if (localPlatformAccount.platform !== SHOPIFY_PLATFORM) {
     throw new Error(
@@ -66,9 +66,9 @@ export async function loadMerchantShopifyAdminClient(
     );
   }
 
-  const accessToken = decryptShopifyToken(
+  const accessToken = decryptCredential(
     installation.encryptedAccessToken,
-    dependencies.encryptionKey,
+    dependencies.credentialEncryptionKey,
   );
 
   return createShopifyAdminClient({

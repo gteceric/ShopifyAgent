@@ -3,7 +3,7 @@ import {
   normalizeOptionalDate,
   normalizeRequiredDate,
   normalizeRequiredString,
-} from "./normalize-persistence-value.js";
+} from "../../../persistence/normalize-persistence-value.js";
 
 export const SHOPIFY_INSTALLATION_ACTIVE_STATUS = "active";
 export const SHOPIFY_INSTALLATION_INACTIVE_STATUS = "inactive";

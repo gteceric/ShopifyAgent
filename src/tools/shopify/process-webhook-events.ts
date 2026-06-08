@@ -1,12 +1,13 @@
 import { createPrismaClient } from "../../persistence/prisma-client.js";
-import { loadMerchantShopifyAdminClient } from "../../platforms/shopify/auth/merchant-admin-client.js";
-import { readShopifyTokenEncryptionKey } from "../../platforms/shopify/auth/token-encryption.js";
-import { syncShopifyOrderSnapshot } from "../../platforms/shopify/sync-order-snapshot.js";
+import { syncShopifyOrderSnapshot } from "../../platforms/shopify/sync/order-snapshot.js";
+import { createShopifyWebhookWorkerDependencies } from "../../platforms/shopify/webhooks/create-worker-dependencies.js";
+import { readCredentialEncryptionKey } from "../../security/credential-encryption.js";
 import {
   processPendingShopifyWebhookEvents,
-  type ProcessPendingShopifyWebhookEventsDependencies,
   type ProcessPendingShopifyWebhookEventsInput,
 } from "../../platforms/shopify/webhooks/process-webhook-events.js";
+
+const SHOPIFY_TOKEN_ENCRYPTION_KEY_ENV = "SHOPIFY_TOKEN_ENCRYPTION_KEY";
 
 function readOptionalPositiveIntegerEnv(name: string): number | undefined {
   const value = process.env[name]?.trim();
@@ -27,33 +28,24 @@ function readOptionalPositiveIntegerEnv(name: string): number | undefined {
 async function main(): Promise<void> {
   const limit = readOptionalPositiveIntegerEnv("SHOPIFY_WEBHOOK_PROCESS_LIMIT");
   const prisma = createPrismaClient();
-  const encryptionKey = readShopifyTokenEncryptionKey();
+  const credentialEncryptionKey = readCredentialEncryptionKey(
+    SHOPIFY_TOKEN_ENCRYPTION_KEY_ENV,
+  );
 
   try {
     const eventsInput: ProcessPendingShopifyWebhookEventsInput = {
       limit,
     };
-    const dependencies: ProcessPendingShopifyWebhookEventsDependencies = {
+    const dependencies = createShopifyWebhookWorkerDependencies({
       prisma,
-      syncShopifyOrderSnapshotFn: async (
-        orderSnapshotInput,
-        localPlatformAccount,
-      ) => {
-        const shopifyAdminClient = await loadMerchantShopifyAdminClient(
-          localPlatformAccount,
-          {
-            prisma,
-            encryptionKey,
-            apiVersion: process.env.SHOPIFY_API_VERSION,
-          },
-        );
-
-        return syncShopifyOrderSnapshot(orderSnapshotInput, {
+      credentialEncryptionKey,
+      apiVersion: process.env.SHOPIFY_API_VERSION,
+      syncShopifyOrderSnapshotFn: (orderSnapshotInput, shopifyAdminClient) =>
+        syncShopifyOrderSnapshot(orderSnapshotInput, {
           prisma,
           shopifyAdminClient,
-        });
-      },
-    };
+        }),
+    });
     const result = await processPendingShopifyWebhookEvents(
       eventsInput,
       dependencies,

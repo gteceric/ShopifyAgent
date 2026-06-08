@@ -8,7 +8,7 @@ import {
   SHOPIFY_INSTALLATION_ACTIVE_STATUS,
   SHOPIFY_INSTALLATION_INACTIVE_STATUS,
   type ShopifyInstallationClient,
-} from "../src/persistence/shopify-installation.js";
+} from "../src/platforms/shopify/persistence/installation.js";
 
 interface RecordedCall {
   operation: string;

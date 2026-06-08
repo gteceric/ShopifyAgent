@@ -9,9 +9,9 @@ import {
   SHOPIFY_INSTALLATION_ACTIVE_STATUS,
   SHOPIFY_INSTALLATION_INACTIVE_STATUS,
   type ShopifyInstallationClient,
-} from "../src/persistence/shopify-installation.js";
-import { loadMerchantShopifyAdminClient } from "../src/platforms/shopify/auth/merchant-admin-client.js";
-import { encryptShopifyToken } from "../src/platforms/shopify/auth/token-encryption.js";
+} from "../src/platforms/shopify/persistence/installation.js";
+import { resolveShopifyAdminClient } from "../src/platforms/shopify/admin-client/resolve-admin-client.js";
+import { encryptCredential } from "../src/security/credential-encryption.js";
 
 const ENCRYPTION_KEY = Buffer.alloc(32, 7);
 
@@ -35,7 +35,7 @@ function makeInstallation(
     id: "shopify-installation-1",
     platformAccountId: "local-platform-account-1",
     status: SHOPIFY_INSTALLATION_ACTIVE_STATUS,
-    encryptedAccessToken: encryptShopifyToken(
+    encryptedAccessToken: encryptCredential(
       "merchant-access-token",
       ENCRYPTION_KEY,
     ),
@@ -70,9 +70,9 @@ class FakeShopifyInstallationClient implements ShopifyInstallationClient {
 
 test("loads a Shopify Admin client using the merchant installation token", async () => {
   const requests: Array<{ input: string; init?: RequestInit }> = [];
-  const client = await loadMerchantShopifyAdminClient(makePlatformAccount(), {
+  const client = await resolveShopifyAdminClient(makePlatformAccount(), {
     prisma: new FakeShopifyInstallationClient(makeInstallation()),
-    encryptionKey: ENCRYPTION_KEY,
+    credentialEncryptionKey: ENCRYPTION_KEY,
     apiVersion: "2026-01",
     nowFn: () => new Date("2026-06-07T01:00:00.000Z"),
     fetchImpl: async (input, init) => {
@@ -103,24 +103,24 @@ test("rejects inactive and expired Shopify installations", async () => {
   const localPlatformAccount = makePlatformAccount();
 
   await assert.rejects(
-    loadMerchantShopifyAdminClient(localPlatformAccount, {
+    resolveShopifyAdminClient(localPlatformAccount, {
       prisma: new FakeShopifyInstallationClient(
         makeInstallation({
           status: SHOPIFY_INSTALLATION_INACTIVE_STATUS,
         }),
       ),
-      encryptionKey: ENCRYPTION_KEY,
+      credentialEncryptionKey: ENCRYPTION_KEY,
     }),
     /is not active\./,
   );
   await assert.rejects(
-    loadMerchantShopifyAdminClient(localPlatformAccount, {
+    resolveShopifyAdminClient(localPlatformAccount, {
       prisma: new FakeShopifyInstallationClient(
         makeInstallation({
           accessTokenExpiresAt: new Date("2026-06-06T00:00:00.000Z"),
         }),
       ),
-      encryptionKey: ENCRYPTION_KEY,
+      credentialEncryptionKey: ENCRYPTION_KEY,
       nowFn: () => new Date("2026-06-07T00:00:00.000Z"),
     }),
     /has expired\./,

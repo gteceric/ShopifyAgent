@@ -1,6 +1,6 @@
 import type { PlatformAccount, PlatformEvent, Prisma } from "@prisma/client";
 import type { PersistOrderSnapshotResult } from "../../../persistence/persist-order-snapshot.js";
-import type { SyncShopifyOrderSnapshotInput } from "../sync-order-snapshot.js";
+import type { SyncShopifyOrderSnapshotInput } from "../sync/order-snapshot.js";
 import { SUPPORTED_SHOPIFY_ORDER_WEBHOOK_TOPICS } from "./ingest-webhook.js";
 
 const SHOPIFY_PLATFORM = "shopify";

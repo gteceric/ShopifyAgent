@@ -1,7 +1,7 @@
 import { loadShopifyShopIdentity } from "@shopify-agent/core";
 import { createPrismaClient } from "../../persistence/prisma-client.js";
-import { createShopifyAdminClientFromEnv } from "../../platforms/shopify/auth/env-admin-client.js";
-import { syncShopifyOrderSnapshot } from "../../platforms/shopify/sync-order-snapshot.js";
+import { createShopifyAdminClientFromEnv } from "../../platforms/shopify/admin-client/env-admin-client.js";
+import { syncShopifyOrderSnapshot } from "../../platforms/shopify/sync/order-snapshot.js";
 
 function readRequiredEnv(name: string): string {
   const value = process.env[name]?.trim();

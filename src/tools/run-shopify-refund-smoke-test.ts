@@ -16,7 +16,7 @@ import type {
   RefundActionRequest,
   RefundPolicyLineItemEvaluation,
 } from "@shopify-agent/core";
-import { createShopifyAdminClientFromEnv } from "../platforms/shopify/auth/env-admin-client.js";
+import { createShopifyAdminClientFromEnv } from "../platforms/shopify/admin-client/env-admin-client.js";
 
 function readRequiredEnv(name: string): string {
   const value = process.env[name]?.trim();

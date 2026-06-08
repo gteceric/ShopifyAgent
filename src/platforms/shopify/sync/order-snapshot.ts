@@ -19,8 +19,8 @@ import type {
   RefundTransactionSnapshot,
   OrderSnapshot,
   SnapshotJson,
-} from "../../persistence/persist-order-snapshot.js";
-import { persistOrderSnapshot } from "../../persistence/persist-order-snapshot.js";
+} from "../../../persistence/persist-order-snapshot.js";
+import { persistOrderSnapshot } from "../../../persistence/persist-order-snapshot.js";
 
 export interface ShopifyOrderSnapshotData {
   context: RefundContext;

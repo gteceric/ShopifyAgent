@@ -8,12 +8,12 @@ import type {
   PlatformReconciliationInput,
   ReconcileOrderSnapshotInput,
   ReconcileOrdersDependencies,
-} from "../../sync/reconcile-orders.js";
+} from "../../../sync/reconcile-orders.js";
 import {
   syncShopifyOrderSnapshot,
   type SyncShopifyOrderSnapshotDependencies,
   type SyncShopifyOrderSnapshotInput,
-} from "./sync-order-snapshot.js";
+} from "./order-snapshot.js";
 
 export async function loadShopifyReconciliationInput(
   shopifyAdminClient: ShopifyAdminClient,
