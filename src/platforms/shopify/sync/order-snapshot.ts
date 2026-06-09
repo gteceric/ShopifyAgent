@@ -1,5 +1,6 @@
 import {
   loadShopifyOrderRefundSyncData,
+  normalizeOptionalString,
   type RefundContext,
   type RefundContextInput,
   type RefundContextLineItem,
@@ -40,14 +41,6 @@ export interface SyncShopifyOrderSnapshotInput {
 export interface SyncShopifyOrderSnapshotDependencies {
   prisma: PrismaClient;
   shopifyAdminClient: ShopifyAdminClient;
-}
-
-function normalizeOptionalString(
-  value: string | undefined,
-): string | undefined {
-  const normalizedValue = value?.trim();
-
-  return normalizedValue ? normalizedValue : undefined;
 }
 
 function mapVariantOptionsToJson(

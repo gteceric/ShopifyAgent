@@ -47,6 +47,21 @@ Shared orchestration functions must support multiple commerce platforms.
 - Avoid hidden Shopify defaults inside generic functions. If the generic
   function needs platform behavior, require the caller to provide it.
 
+## Put Shared Platform-Independent Helpers In Core
+
+When a function is platform-independent, dependency-light, and genuinely
+reusable across application or platform modules, put it in
+`packages/core/src/shared/` and export it through `@shopify-agent/core`.
+
+- Prefer core shared helpers for stable concepts such as value normalization
+  and validation of untrusted external values.
+- Keep platform-specific errors, payload mapping, and orchestration at the
+  platform integration call site.
+- Do not move infrastructure, persistence, security, or transport code into
+  core merely because it does not contain a platform name.
+- Extract shared code when callers share the same meaning and behavior, not
+  only because their implementations look similar.
+
 ## Name Function Dependencies With Fn
 
 When a dependency object accepts an injected function, suffix the field name with

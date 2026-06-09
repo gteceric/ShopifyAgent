@@ -18,3 +18,14 @@ export function normalizeOptionalString(
 
   return normalizedValue || undefined;
 }
+
+export function normalizePositiveInteger(
+  value: number,
+  fieldName: string,
+): number {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${fieldName} must be a positive integer.`);
+  }
+
+  return value;
+}

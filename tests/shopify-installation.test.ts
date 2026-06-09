@@ -8,6 +8,7 @@ import {
   SHOPIFY_INSTALLATION_ACTIVE_STATUS,
   SHOPIFY_INSTALLATION_INACTIVE_STATUS,
   type ShopifyInstallationClient,
+  updateShopifyInstallationTokens,
 } from "../src/platforms/shopify/persistence/installation.js";
 
 interface RecordedCall {
@@ -127,6 +128,40 @@ test("loads a Shopify installation by local platform account ID", async () => {
       args: {
         where: {
           platformAccountId: "platform-account-1",
+        },
+      },
+    },
+  ]);
+});
+
+test("updates rotated Shopify installation tokens together", async () => {
+  const client = new FakeShopifyInstallationClient();
+
+  await updateShopifyInstallationTokens(
+    {
+      localPlatformAccountId: " platform-account-1 ",
+      encryptedAccessToken: "encrypted-rotated-access-token",
+      encryptedRefreshToken: "encrypted-rotated-refresh-token",
+      accessTokenExpiresAt: "2026-06-06T02:00:00.000Z",
+      refreshTokenExpiresAt: "2026-09-04T01:00:00.000Z",
+      grantedScopes: ["write_orders", " read_orders ", "read_orders"],
+    },
+    client,
+  );
+
+  assert.deepEqual(client.calls, [
+    {
+      operation: "shopifyInstallation.update",
+      args: {
+        where: {
+          platformAccountId: "platform-account-1",
+        },
+        data: {
+          encryptedAccessToken: "encrypted-rotated-access-token",
+          encryptedRefreshToken: "encrypted-rotated-refresh-token",
+          accessTokenExpiresAt: new Date("2026-06-06T02:00:00.000Z"),
+          refreshTokenExpiresAt: new Date("2026-09-04T01:00:00.000Z"),
+          grantedScopes: ["read_orders", "write_orders"],
         },
       },
     },

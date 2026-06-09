@@ -1,3 +1,4 @@
+import { getErrorMessage, normalizePositiveInteger } from "@shopify-agent/core";
 import type { PlatformAccount, Prisma, SyncRun } from "@prisma/client";
 
 export const ORDER_RECONCILIATION_SYNC_TYPE = "order_reconciliation";
@@ -103,22 +104,6 @@ export interface ReconcileOrdersDependencies {
 
 const DEFAULT_RECONCILE_ORDER_LIMIT = 25;
 
-function normalizeLimit(limit?: number): number {
-  if (limit === undefined) {
-    return DEFAULT_RECONCILE_ORDER_LIMIT;
-  }
-
-  if (!Number.isInteger(limit) || limit <= 0) {
-    throw new Error("limit must be a positive integer.");
-  }
-
-  return limit;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 function deriveReconciliationStatus(
   candidateOrderCount: number,
   failedOrderCount: number,
@@ -196,7 +181,10 @@ export async function reconcileOrders(
   input: ReconcileOrdersInput,
   dependencies: ReconcileOrdersDependencies,
 ): Promise<ReconcileOrdersResult> {
-  const limit = normalizeLimit(input.limit);
+  const limit = normalizePositiveInteger(
+    input.limit ?? DEFAULT_RECONCILE_ORDER_LIMIT,
+    "limit",
+  );
   const startedAt = input.startedAt ?? new Date();
   const localPlatformAccount = await upsertPlatformAccount(
     input,
@@ -252,7 +240,7 @@ export async function reconcileOrders(
       } catch (error) {
         failedOrders.push({
           platformOrderId: order.platformOrderId,
-          message: errorMessage(error),
+          message: getErrorMessage(error),
         });
       }
     }
@@ -260,7 +248,7 @@ export async function reconcileOrders(
     candidateOrderCount = 1;
     failedOrders.push({
       platformOrderId: "*",
-      message: errorMessage(error),
+        message: getErrorMessage(error),
     });
   }
 

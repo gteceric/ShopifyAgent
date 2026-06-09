@@ -12,43 +12,52 @@ export interface ShopifyWebhookWorkerClient
   extends ProcessShopifyWebhookEventsClient,
     ShopifyInstallationClient {}
 
+type SyncShopifyOrderSnapshotWithClient = (
+  input: SyncShopifyOrderSnapshotInput,
+  shopifyAdminClient: ShopifyAdminClient,
+) => Promise<PersistOrderSnapshotResult>;
+
+type SyncShopifyOrderSnapshotForAccount =
+  ProcessPendingShopifyWebhookEventsDependencies["syncShopifyOrderSnapshotForAccountFn"];
+
 export interface CreateShopifyWebhookWorkerDependenciesInput {
   prisma: ShopifyWebhookWorkerClient;
   credentialEncryptionKey: Buffer;
+  appClientId?: string;
+  appClientSecret?: string;
   apiVersion?: string;
   fetchImpl?: typeof fetch;
   nowFn?: () => Date;
-  syncShopifyOrderSnapshotFn: (
-    input: SyncShopifyOrderSnapshotInput,
-    shopifyAdminClient: ShopifyAdminClient,
-  ) => Promise<PersistOrderSnapshotResult>;
+  syncShopifyOrderSnapshotWithClientFn: SyncShopifyOrderSnapshotWithClient;
 }
 
 export function createShopifyWebhookWorkerDependencies(
   input: CreateShopifyWebhookWorkerDependenciesInput,
 ): ProcessPendingShopifyWebhookEventsDependencies {
-  return {
-    prisma: input.prisma,
-    nowFn: input.nowFn,
-    syncShopifyOrderSnapshotFn: async (
-      orderSnapshotInput,
-      localPlatformAccount,
-    ) => {
+  const syncShopifyOrderSnapshotForAccount: SyncShopifyOrderSnapshotForAccount =
+    async (orderSnapshotInput, localPlatformAccount) => {
       const shopifyAdminClient = await resolveShopifyAdminClient(
         localPlatformAccount,
         {
           prisma: input.prisma,
           credentialEncryptionKey: input.credentialEncryptionKey,
+          appClientId: input.appClientId,
+          appClientSecret: input.appClientSecret,
           apiVersion: input.apiVersion,
           fetchImpl: input.fetchImpl,
           nowFn: input.nowFn,
         },
       );
 
-      return input.syncShopifyOrderSnapshotFn(
+      return input.syncShopifyOrderSnapshotWithClientFn(
         orderSnapshotInput,
         shopifyAdminClient,
       );
-    },
+    };
+
+  return {
+    prisma: input.prisma,
+    nowFn: input.nowFn,
+    syncShopifyOrderSnapshotForAccountFn: syncShopifyOrderSnapshotForAccount,
   };
 }

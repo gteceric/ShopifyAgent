@@ -1,3 +1,4 @@
+import { normalizePositiveInteger } from "@shopify-agent/core";
 import { createPrismaClient } from "../../persistence/prisma-client.js";
 import { syncShopifyOrderSnapshot } from "../../platforms/shopify/sync/order-snapshot.js";
 import { createShopifyWebhookWorkerDependencies } from "../../platforms/shopify/webhooks/create-worker-dependencies.js";
@@ -16,13 +17,7 @@ function readOptionalPositiveIntegerEnv(name: string): number | undefined {
     return undefined;
   }
 
-  const parsedValue = Number(value);
-
-  if (!Number.isInteger(parsedValue) || parsedValue <= 0) {
-    throw new Error(`${name} must be a positive integer.`);
-  }
-
-  return parsedValue;
+  return normalizePositiveInteger(Number(value), name);
 }
 
 async function main(): Promise<void> {
@@ -39,8 +34,13 @@ async function main(): Promise<void> {
     const dependencies = createShopifyWebhookWorkerDependencies({
       prisma,
       credentialEncryptionKey,
+      appClientId: process.env.SHOPIFY_APP_CLIENT_ID,
+      appClientSecret: process.env.SHOPIFY_APP_CLIENT_SECRET,
       apiVersion: process.env.SHOPIFY_API_VERSION,
-      syncShopifyOrderSnapshotFn: (orderSnapshotInput, shopifyAdminClient) =>
+      syncShopifyOrderSnapshotWithClientFn: (
+        orderSnapshotInput,
+        shopifyAdminClient,
+      ) =>
         syncShopifyOrderSnapshot(orderSnapshotInput, {
           prisma,
           shopifyAdminClient,

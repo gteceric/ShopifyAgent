@@ -96,7 +96,10 @@ test("processes a pending Shopify webhook event by syncing its order snapshot", 
     },
     {
       prisma: client,
-      syncShopifyOrderSnapshotFn: async (input, localPlatformAccount) => {
+      syncShopifyOrderSnapshotForAccountFn: async (
+        input,
+        localPlatformAccount,
+      ) => {
         snapshotInputs.push({ input, localPlatformAccount });
 
         return {
@@ -156,7 +159,7 @@ test("leaves a failed Shopify webhook event pending for a later retry", async ()
     {},
     {
       prisma: client,
-      syncShopifyOrderSnapshotFn: async () => {
+      syncShopifyOrderSnapshotForAccountFn: async () => {
         throw new Error("Shopify Admin API unavailable.");
       },
     },
@@ -206,7 +209,10 @@ test("routes each pending webhook event through its own merchant account", async
     },
     {
       prisma: client,
-      syncShopifyOrderSnapshotFn: async (input, localPlatformAccount) => {
+      syncShopifyOrderSnapshotForAccountFn: async (
+        input,
+        localPlatformAccount,
+      ) => {
         routedShopDomains.push(localPlatformAccount.shopDomain ?? "");
 
         return {

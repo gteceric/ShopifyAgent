@@ -29,6 +29,15 @@ export interface DeactivateShopifyInstallationInput {
   uninstalledAt: Date | string;
 }
 
+export interface UpdateShopifyInstallationTokensInput {
+  localPlatformAccountId: string;
+  encryptedAccessToken: string;
+  encryptedRefreshToken: string;
+  accessTokenExpiresAt: Date | string;
+  refreshTokenExpiresAt: Date | string;
+  grantedScopes: readonly string[];
+}
+
 export interface ShopifyInstallationClient {
   shopifyInstallation: {
     findUnique(
@@ -113,6 +122,41 @@ export async function findShopifyInstallation(
         localPlatformAccountId,
         "localPlatformAccountId",
       ),
+    },
+  });
+}
+
+export async function updateShopifyInstallationTokens(
+  input: UpdateShopifyInstallationTokensInput,
+  client: ShopifyInstallationClient,
+): Promise<ShopifyInstallation> {
+  const localPlatformAccountId = normalizeRequiredString(
+    input.localPlatformAccountId,
+    "localPlatformAccountId",
+  );
+
+  return client.shopifyInstallation.update({
+    where: {
+      platformAccountId: localPlatformAccountId,
+    },
+    data: {
+      encryptedAccessToken: normalizeRequiredString(
+        input.encryptedAccessToken,
+        "encryptedAccessToken",
+      ),
+      encryptedRefreshToken: normalizeRequiredString(
+        input.encryptedRefreshToken,
+        "encryptedRefreshToken",
+      ),
+      accessTokenExpiresAt: normalizeRequiredDate(
+        input.accessTokenExpiresAt,
+        "accessTokenExpiresAt",
+      ),
+      refreshTokenExpiresAt: normalizeRequiredDate(
+        input.refreshTokenExpiresAt,
+        "refreshTokenExpiresAt",
+      ),
+      grantedScopes: normalizeGrantedScopes(input.grantedScopes),
     },
   });
 }

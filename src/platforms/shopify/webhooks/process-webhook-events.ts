@@ -1,3 +1,4 @@
+import { getErrorMessage, normalizePositiveInteger } from "@shopify-agent/core";
 import type { PlatformAccount, PlatformEvent, Prisma } from "@prisma/client";
 import type { PersistOrderSnapshotResult } from "../../../persistence/persist-order-snapshot.js";
 import type { SyncShopifyOrderSnapshotInput } from "../sync/order-snapshot.js";
@@ -24,7 +25,7 @@ export interface ProcessPendingShopifyWebhookEventsInput {
 
 export interface ProcessPendingShopifyWebhookEventsDependencies {
   prisma: ProcessShopifyWebhookEventsClient;
-  syncShopifyOrderSnapshotFn: (
+  syncShopifyOrderSnapshotForAccountFn: (
     input: SyncShopifyOrderSnapshotInput,
     localPlatformAccount: PlatformAccount,
   ) => Promise<PersistOrderSnapshotResult>;
@@ -49,27 +50,14 @@ export interface ProcessPendingShopifyWebhookEventsResult {
   failedEvents: FailedShopifyWebhookEvent[];
 }
 
-function normalizeLimit(limit?: number): number {
-  if (limit === undefined) {
-    return DEFAULT_PROCESS_SHOPIFY_WEBHOOK_EVENT_LIMIT;
-  }
-
-  if (!Number.isInteger(limit) || limit <= 0) {
-    throw new Error("limit must be a positive integer.");
-  }
-
-  return limit;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 export async function processPendingShopifyWebhookEvents(
   input: ProcessPendingShopifyWebhookEventsInput,
   dependencies: ProcessPendingShopifyWebhookEventsDependencies,
 ): Promise<ProcessPendingShopifyWebhookEventsResult> {
-  const limit = normalizeLimit(input.limit);
+  const limit = normalizePositiveInteger(
+    input.limit ?? DEFAULT_PROCESS_SHOPIFY_WEBHOOK_EVENT_LIMIT,
+    "limit",
+  );
   const pendingShopifyOrderWebhookEventWhere: Prisma.PlatformEventWhereInput = {
     platform: SHOPIFY_PLATFORM,
     eventType: {
@@ -131,10 +119,11 @@ export async function processPendingShopifyWebhookEvents(
         shopDomain: localPlatformAccount.shopDomain,
       };
       // Fetch latest order data from Shopify and upsert it into Postgres.
-      const orderSnapshotResult = await dependencies.syncShopifyOrderSnapshotFn(
-        orderSnapshotInput,
-        localPlatformAccount,
-      );
+      const orderSnapshotResult =
+        await dependencies.syncShopifyOrderSnapshotForAccountFn(
+          orderSnapshotInput,
+          localPlatformAccount,
+        );
       const processedAt = dependencies.nowFn?.() ?? new Date();
 
       // Mark this webhook event as processed
@@ -156,7 +145,7 @@ export async function processPendingShopifyWebhookEvents(
     } catch (error) {
       failedEvents.push({
         localPlatformEventId: localPlatformEvent.id,
-        message: errorMessage(error),
+        message: getErrorMessage(error),
         platformOrderId,
       });
     }

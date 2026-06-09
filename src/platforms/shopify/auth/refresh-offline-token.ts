@@ -1,0 +1,100 @@
+import {
+  normalizeRequiredString,
+  requireExternalPositiveInteger,
+  requireExternalString,
+} from "@shopify-agent/core";
+
+const SHOPIFY_REFRESH_TOKEN_GRANT_TYPE = "refresh_token";
+
+export interface RefreshShopifyOfflineTokenInput {
+  shopDomain: string;
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
+}
+
+export interface RefreshedShopifyOfflineToken {
+  accessToken: string;
+  accessTokenExpiresInSeconds: number;
+  refreshToken: string;
+  refreshTokenExpiresInSeconds: number;
+  grantedScopes: string[];
+}
+
+interface ShopifyOfflineTokenRefreshResponse {
+  access_token?: unknown;
+  expires_in?: unknown;
+  refresh_token?: unknown;
+  refresh_token_expires_in?: unknown;
+  scope?: unknown;
+}
+
+function missingRefreshResponseValueError(name: string): Error {
+  return new Error(`Shopify token refresh response did not include ${name}.`);
+}
+
+function invalidRefreshResponseValueError(name: string): Error {
+  return new Error(
+    `Shopify token refresh response did not include a valid ${name}.`,
+  );
+}
+
+function readGrantedScopes(value: unknown): string[] {
+  if (typeof value !== "string") {
+    throw new Error("Shopify token refresh response did not include scope.");
+  }
+
+  return value
+    .split(",")
+    .map((scope) => scope.trim())
+    .filter((scope) => scope.length > 0);
+}
+
+export async function refreshShopifyOfflineToken(
+  input: RefreshShopifyOfflineTokenInput,
+  fetchImpl: typeof fetch = fetch,
+): Promise<RefreshedShopifyOfflineToken> {
+  const shopDomain = normalizeRequiredString(input.shopDomain, "shopDomain");
+  const body = new URLSearchParams({
+    client_id: normalizeRequiredString(input.clientId, "clientId"),
+    client_secret: normalizeRequiredString(input.clientSecret, "clientSecret"),
+    grant_type: SHOPIFY_REFRESH_TOKEN_GRANT_TYPE,
+    refresh_token: normalizeRequiredString(input.refreshToken, "refreshToken"),
+  });
+  const response = await fetchImpl(
+    `https://${shopDomain}/admin/oauth/access_token`,
+    {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body,
+    },
+  );
+  const payload = (await response.json()) as ShopifyOfflineTokenRefreshResponse;
+
+  if (!response.ok) {
+    throw new Error(
+      `Shopify offline token refresh failed with status ${response.status}: ${JSON.stringify(payload)}`,
+    );
+  }
+
+  return {
+    accessToken: requireExternalString(payload.access_token, () =>
+      missingRefreshResponseValueError("access_token"),
+    ),
+    accessTokenExpiresInSeconds: requireExternalPositiveInteger(
+      payload.expires_in,
+      () => invalidRefreshResponseValueError("expires_in"),
+    ),
+    refreshToken: requireExternalString(payload.refresh_token, () =>
+      missingRefreshResponseValueError("refresh_token"),
+    ),
+    refreshTokenExpiresInSeconds: requireExternalPositiveInteger(
+      payload.refresh_token_expires_in,
+      () => invalidRefreshResponseValueError("refresh_token_expires_in"),
+    ),
+    grantedScopes: readGrantedScopes(payload.scope),
+  };
+}

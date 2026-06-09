@@ -1,3 +1,4 @@
+import { normalizePositiveInteger } from "@shopify-agent/core";
 import { createPrismaClient } from "../../persistence/prisma-client.js";
 import { createShopifyAdminClientFromEnv } from "../../platforms/shopify/admin-client/env-admin-client.js";
 import {
@@ -23,13 +24,7 @@ function readOptionalPositiveIntegerEnv(name: string): number | undefined {
     return undefined;
   }
 
-  const parsedValue = Number(value);
-
-  if (!Number.isInteger(parsedValue) || parsedValue <= 0) {
-    throw new Error(`${name} must be a positive integer.`);
-  }
-
-  return parsedValue;
+  return normalizePositiveInteger(Number(value), name);
 }
 
 async function loadPlatformReconciliationInput(

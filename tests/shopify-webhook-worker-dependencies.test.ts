@@ -147,7 +147,7 @@ test("processes each webhook event with its merchant installation credentials", 
         },
       });
     },
-    syncShopifyOrderSnapshotFn: async (input, shopifyAdminClient) => {
+    syncShopifyOrderSnapshotWithClientFn: async (input, shopifyAdminClient) => {
       await shopifyAdminClient.fetch("query Shop { shop { id } }", {});
 
       return {
