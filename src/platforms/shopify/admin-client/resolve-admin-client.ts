@@ -1,5 +1,6 @@
 import {
   createShopifyAdminClient,
+  isExpired,
   type ShopifyAdminClient,
 } from "@shopify-agent/core";
 import type { PlatformAccount } from "@prisma/client";
@@ -7,14 +8,9 @@ import {
   findShopifyInstallation,
   SHOPIFY_INSTALLATION_ACTIVE_STATUS,
   type ShopifyInstallationClient,
-  type UpdateShopifyInstallationTokensInput,
-  updateShopifyInstallationTokens,
 } from "../persistence/installation.js";
-import {
-  decryptCredential,
-  encryptCredential,
-} from "../../../security/credential-encryption.js";
-import { refreshShopifyOfflineToken } from "../auth/refresh-offline-token.js";
+import { decryptCredential } from "../../../security/credential-encryption.js";
+import { refreshShopifyInstallationTokens } from "../auth/refresh-installation-tokens.js";
 
 const SHOPIFY_PLATFORM = "shopify";
 
@@ -60,11 +56,8 @@ export async function resolveShopifyAdminClient(
     );
   }
 
-  // check if token is expired
   const now = dependencies.nowFn?.() ?? new Date();
-  const accessTokenExpired =
-    installation.accessTokenExpiresAt &&
-    installation.accessTokenExpiresAt <= now;
+  const accessTokenExpired = isExpired(installation.accessTokenExpiresAt, now);
   let accessToken: string;
 
   if (accessTokenExpired) {
@@ -74,55 +67,24 @@ export async function resolveShopifyAdminClient(
       );
     }
 
-    const refreshTokenExpired =
-      installation.refreshTokenExpiresAt &&
-      installation.refreshTokenExpiresAt < now;
-
-    if (refreshTokenExpired) {
-      throw new Error(
-        `Shopify refresh token for platform account ${localPlatformAccount.id} has expired.`,
-      );
-    }
-
-    const refreshToken = decryptCredential(
-      installation.encryptedRefreshToken,
-      dependencies.credentialEncryptionKey,
-    );
-    const refreshedToken = await refreshShopifyOfflineToken(
-      {
-        shopDomain,
-        clientId: dependencies.appClientId ?? "",
-        clientSecret: dependencies.appClientSecret ?? "",
-        refreshToken,
-      },
-      dependencies.fetchImpl,
-    );
-    const updateShopifyInstallationTokensInput: UpdateShopifyInstallationTokensInput =
+    const refreshResult = await refreshShopifyInstallationTokens(
       {
         localPlatformAccountId: localPlatformAccount.id,
-        encryptedAccessToken: encryptCredential(
-          refreshedToken.accessToken,
-          dependencies.credentialEncryptionKey,
-        ),
-        encryptedRefreshToken: encryptCredential(
-          refreshedToken.refreshToken,
-          dependencies.credentialEncryptionKey,
-        ),
-        accessTokenExpiresAt: new Date(
-          now.getTime() + refreshedToken.accessTokenExpiresInSeconds * 1_000,
-        ),
-        refreshTokenExpiresAt: new Date(
-          now.getTime() + refreshedToken.refreshTokenExpiresInSeconds * 1_000,
-        ),
-        grantedScopes: refreshedToken.grantedScopes,
-      };
-
-    await updateShopifyInstallationTokens(
-      updateShopifyInstallationTokensInput,
-      dependencies.prisma,
+        shopDomain,
+        encryptedRefreshToken: installation.encryptedRefreshToken,
+        refreshTokenExpiresAt: installation.refreshTokenExpiresAt,
+      },
+      {
+        prisma: dependencies.prisma,
+        credentialEncryptionKey: dependencies.credentialEncryptionKey,
+        appClientId: dependencies.appClientId ?? "",
+        appClientSecret: dependencies.appClientSecret ?? "",
+        fetchImpl: dependencies.fetchImpl,
+        nowFn: () => now,
+      },
     );
 
-    accessToken = refreshedToken.accessToken;
+    accessToken = refreshResult.accessToken;
   } else if (installation.encryptedAccessToken) {
     accessToken = decryptCredential(
       installation.encryptedAccessToken,
