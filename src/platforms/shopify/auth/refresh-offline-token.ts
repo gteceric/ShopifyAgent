@@ -1,4 +1,5 @@
 import {
+  fetchWithTimeout,
   normalizeRequiredString,
   requireExternalPositiveInteger,
   requireExternalString,
@@ -52,7 +53,8 @@ function readGrantedScopes(value: unknown): string[] {
 
 export async function refreshShopifyOfflineToken(
   input: RefreshShopifyOfflineTokenInput,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: typeof fetch,
+  timeoutMs?: number,
 ): Promise<RefreshedShopifyOfflineToken> {
   const shopDomain = normalizeRequiredString(input.shopDomain, "shopDomain");
   const body = new URLSearchParams({
@@ -61,15 +63,20 @@ export async function refreshShopifyOfflineToken(
     grant_type: SHOPIFY_REFRESH_TOKEN_GRANT_TYPE,
     refresh_token: normalizeRequiredString(input.refreshToken, "refreshToken"),
   });
-  const response = await fetchImpl(
+  const tokenRefreshRequest: RequestInit = {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  };
+  const response = await fetchWithTimeout(
     `https://${shopDomain}/admin/oauth/access_token`,
+    tokenRefreshRequest,
     {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body,
+      fetchImpl,
+      timeoutMs,
     },
   );
   const payload = (await response.json()) as ShopifyOfflineTokenRefreshResponse;

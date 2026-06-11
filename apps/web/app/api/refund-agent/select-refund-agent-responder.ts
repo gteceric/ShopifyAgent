@@ -12,7 +12,9 @@ export interface RefundAgentResponder {
   generateResponse: RefundAgentResponseGenerator;
 }
 
-export function createRefundAgentResponder():
+export function createRefundAgentResponder(
+  fetchImpl: typeof fetch,
+):
   | RefundAgentResponder
   | undefined {
   // Precedence:
@@ -28,26 +30,30 @@ export function createRefundAgentResponder():
   if (process.env.RESPONSE_MODEL_PROVIDER === "ollama") {
     return {
       provider: "ollama",
-      generateResponse: generateRefundAgentResponseWithOllama,
+      generateResponse: (context) =>
+        generateRefundAgentResponseWithOllama(context, { fetchImpl }),
     };
   }
 
   if (process.env.RESPONSE_MODEL_PROVIDER === "openai") {
     return {
       provider: "openai",
-      generateResponse: generateRefundAgentResponseWithOpenAI,
+      generateResponse: (context) =>
+        generateRefundAgentResponseWithOpenAI(context, { fetchImpl }),
     };
   }
 
   if (process.env.OLLAMA_MODEL || process.env.OLLAMA_ENDPOINT) {
     return {
       provider: "ollama",
-      generateResponse: generateRefundAgentResponseWithOllama,
+      generateResponse: (context) =>
+        generateRefundAgentResponseWithOllama(context, { fetchImpl }),
     };
   }
 
   return {
     provider: "openai",
-    generateResponse: generateRefundAgentResponseWithOpenAI,
+    generateResponse: (context) =>
+      generateRefundAgentResponseWithOpenAI(context, { fetchImpl }),
   };
 }

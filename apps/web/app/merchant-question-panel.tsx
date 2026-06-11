@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  fetchWithTimeout,
+  isRequestTimeoutError,
+} from "@shopify-agent/core";
+import type { FetchWithTimeoutOptions } from "@shopify-agent/core";
 import { useState } from "react";
 import type { RefundDecision } from "./mock-orders";
 import { getDecisionLabel } from "./dashboard-helpers";
@@ -14,6 +19,8 @@ interface MerchantQuestionPanelProps {
   orderId: string;
   decision: RefundDecision;
 }
+
+const REFUND_AGENT_REQUEST_TIMEOUT_MS = 30_000;
 
 const STARTER_QUESTIONS = [
   "Can I refund this order?",
@@ -57,13 +64,22 @@ export function MerchantQuestionPanel({
         orderId,
         question: trimmedQuestion,
       };
-      const response = await fetch("/api/refund-agent", {
+      const refundAgentRequest: RequestInit = {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(requestBody),
-      });
+      };
+      const refundAgentRequestOptions: FetchWithTimeoutOptions = {
+        fetchImpl: fetch,
+        timeoutMs: REFUND_AGENT_REQUEST_TIMEOUT_MS,
+      };
+      const response = await fetchWithTimeout(
+        "/api/refund-agent",
+        refundAgentRequest,
+        refundAgentRequestOptions,
+      );
       const payload = (await response.json()) as
         | RefundAgentResponse
         | RefundAgentErrorResponse;
@@ -80,7 +96,11 @@ export function MerchantQuestionPanel({
     } catch (error) {
       setReply(null);
       setErrorMessage(
-        error instanceof Error ? error.message : "Refund agent request failed.",
+        isRequestTimeoutError(error)
+          ? "Refund agent request timed out."
+          : error instanceof Error
+            ? error.message
+            : "Refund agent request failed.",
       );
     } finally {
       setIsLoading(false);

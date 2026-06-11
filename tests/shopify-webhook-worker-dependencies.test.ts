@@ -129,24 +129,32 @@ test("processes each webhook event with its merchant installation credentials", 
     },
   };
   const requests: Array<{ accessToken: string; url: string }> = [];
+  const fetchImpl: typeof fetch = async (input, init) => {
+    const headers = new Headers(init?.headers);
+
+    requests.push({
+      accessToken: headers.get("X-Shopify-Access-Token") ?? "",
+      url: String(input),
+    });
+
+    return Response.json(
+      {
+        data: {
+          shop: {
+            id: "shop",
+          },
+        },
+      },
+      {
+        status: 200,
+      },
+    );
+  };
   const dependencies = createShopifyWebhookWorkerDependencies({
     prisma,
     credentialEncryptionKey: ENCRYPTION_KEY,
     apiVersion: "2026-01",
-    fetchImpl: async (input, init) => {
-      const headers = init?.headers as Record<string, string>;
-      requests.push({
-        accessToken: headers["X-Shopify-Access-Token"] ?? "",
-        url: String(input),
-      });
-
-      return new Response(JSON.stringify({ data: { shop: { id: "shop" } } }), {
-        status: 200,
-        headers: {
-          "content-type": "application/json",
-        },
-      });
-    },
+    fetchImpl,
     syncShopifyOrderSnapshotWithClientFn: async (input, shopifyAdminClient) => {
       await shopifyAdminClient.fetch("query Shop { shop { id } }", {});
 

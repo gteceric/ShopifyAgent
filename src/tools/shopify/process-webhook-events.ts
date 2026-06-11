@@ -1,4 +1,4 @@
-import { normalizePositiveInteger } from "@shopify-agent/core";
+import { readOptionalPositiveIntegerEnv } from "@shopify-agent/core";
 import { createPrismaClient } from "../../persistence/prisma-client.js";
 import { syncShopifyOrderSnapshot } from "../../platforms/shopify/sync/order-snapshot.js";
 import { createShopifyWebhookWorkerDependencies } from "../../platforms/shopify/webhooks/create-worker-dependencies.js";
@@ -9,16 +9,6 @@ import {
 } from "../../platforms/shopify/webhooks/process-webhook-events.js";
 
 const SHOPIFY_TOKEN_ENCRYPTION_KEY_ENV = "SHOPIFY_TOKEN_ENCRYPTION_KEY";
-
-function readOptionalPositiveIntegerEnv(name: string): number | undefined {
-  const value = process.env[name]?.trim();
-
-  if (!value) {
-    return undefined;
-  }
-
-  return normalizePositiveInteger(Number(value), name);
-}
 
 async function main(): Promise<void> {
   const limit = readOptionalPositiveIntegerEnv("SHOPIFY_WEBHOOK_PROCESS_LIMIT");
@@ -37,6 +27,7 @@ async function main(): Promise<void> {
       appClientId: process.env.SHOPIFY_APP_CLIENT_ID,
       appClientSecret: process.env.SHOPIFY_APP_CLIENT_SECRET,
       apiVersion: process.env.SHOPIFY_API_VERSION,
+      fetchImpl: fetch,
       syncShopifyOrderSnapshotWithClientFn: (
         orderSnapshotInput,
         shopifyAdminClient,

@@ -1,10 +1,13 @@
-import { loadShopifyShopIdentity } from "@shopify-agent/core";
+import {
+  loadShopifyShopIdentity,
+  readOptionalStringEnv,
+} from "@shopify-agent/core";
 import { createPrismaClient } from "../../persistence/prisma-client.js";
 import { createShopifyAdminClientFromEnv } from "../../platforms/shopify/admin-client/env-admin-client.js";
 import { syncShopifyOrderSnapshot } from "../../platforms/shopify/sync/order-snapshot.js";
 
 function readRequiredEnv(name: string): string {
-  const value = process.env[name]?.trim();
+  const value = readOptionalStringEnv(name);
 
   if (!value) {
     throw new Error(`${name} is required to sync a Shopify order snapshot.`);
@@ -25,7 +28,7 @@ async function main(): Promise<void> {
   requireRealShopifySyncFlag();
 
   const platformOrderId = readRequiredEnv("SYNC_SHOPIFY_ORDER_ID");
-  const shopifyAdminClient = createShopifyAdminClientFromEnv();
+  const shopifyAdminClient = createShopifyAdminClientFromEnv(fetch);
   const shopIdentity = await loadShopifyShopIdentity(shopifyAdminClient);
   const prisma = createPrismaClient();
 

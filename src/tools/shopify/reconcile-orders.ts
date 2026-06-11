@@ -1,4 +1,7 @@
-import { normalizePositiveInteger } from "@shopify-agent/core";
+import {
+  readOptionalPositiveIntegerEnv,
+  readOptionalStringEnv,
+} from "@shopify-agent/core";
 import { createPrismaClient } from "../../persistence/prisma-client.js";
 import { createShopifyAdminClientFromEnv } from "../../platforms/shopify/admin-client/env-admin-client.js";
 import {
@@ -10,22 +13,6 @@ import {
   type PlatformReconciliationInput,
   type ReconcileOrdersInput,
 } from "../../sync/reconcile-orders.js";
-
-function readOptionalEnv(name: string): string | undefined {
-  const value = process.env[name]?.trim();
-
-  return value ? value : undefined;
-}
-
-function readOptionalPositiveIntegerEnv(name: string): number | undefined {
-  const value = process.env[name]?.trim();
-
-  if (!value) {
-    return undefined;
-  }
-
-  return normalizePositiveInteger(Number(value), name);
-}
 
 async function loadPlatformReconciliationInput(
   platform: string,
@@ -43,9 +30,9 @@ async function loadPlatformReconciliationInput(
 }
 
 async function main(): Promise<void> {
-  const platform = readOptionalEnv("RECONCILE_PLATFORM") ?? "shopify";
+  const platform = readOptionalStringEnv("RECONCILE_PLATFORM") ?? "shopify";
   const limit = readOptionalPositiveIntegerEnv("RECONCILE_ORDER_LIMIT");
-  const shopifyAdminClient = createShopifyAdminClientFromEnv();
+  const shopifyAdminClient = createShopifyAdminClientFromEnv(fetch);
   const platformInput = await loadPlatformReconciliationInput(
     platform,
     shopifyAdminClient,

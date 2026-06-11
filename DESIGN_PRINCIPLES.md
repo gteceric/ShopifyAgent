@@ -80,12 +80,25 @@ When a dependency object accepts an injected function, suffix the field name wit
 
 Tests can still stay isolated while following the same architecture as production.
 
+- Keep the code path inside the function under test the same in production and
+  tests. Production should inject the real dependency at the application edge;
+  tests should inject a fake implementing the same required contract.
+- Do not make a dependency optional only to make unit tests convenient. An
+  optional dependency creates a hidden fallback branch, so production and tests
+  can accidentally exercise different paths.
+- Resolve defaults explicitly at the application edge instead of inside shared
+  or core functions. For example, production can pass native `fetch`, while a
+  test passes a fake `fetchImpl`; the function under test should always call the
+  required `fetchImpl`.
 - Prefer fake adapters over overriding higher-level business functions.
 - Prefer fake providers over bypassing the real orchestration flow.
 - Use production-shaped values in mocks and fixtures, especially external IDs,
   enum strings, and payload structure. Mock data should be fake in content, not
   fake in format.
 - If a test seam makes the production API look misleading, the seam is probably at the wrong level.
+
+Make a dependency optional only when absence is a genuine supported production
+behavior, not merely a testing technique.
 
 ## Preserve Intentional Comments
 

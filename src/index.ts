@@ -1,6 +1,7 @@
 import {
   createShopifyRefundContextAdapter,
   createPolicyConfig,
+  readOptionalStringEnv,
 } from "@shopify-agent/core";
 import { createOllamaRefundResponder } from "./tools/generate-refund-response-with-ollama.js";
 import { createOpenAIRefundResponder } from "./tools/generate-refund-response-with-openai.js";
@@ -14,23 +15,23 @@ function createResponder() {
   }
 
   if (process.env.RESPONSE_MODEL_PROVIDER === "ollama") {
-    return createOllamaRefundResponder();
+    return createOllamaRefundResponder({ fetchImpl: fetch });
   }
 
   if (process.env.RESPONSE_MODEL_PROVIDER === "openai") {
-    return createOpenAIRefundResponder();
+    return createOpenAIRefundResponder({ fetchImpl: fetch });
   }
 
   if (process.env.OLLAMA_MODEL || process.env.OLLAMA_ENDPOINT) {
-    return createOllamaRefundResponder();
+    return createOllamaRefundResponder({ fetchImpl: fetch });
   }
 
-  return createOpenAIRefundResponder();
+  return createOpenAIRefundResponder({ fetchImpl: fetch });
 }
 
 function getOrderId(): string {
   if (process.env.USE_REAL_SHOPIFY === "true") {
-    const realOrderId = process.env.REFUND_DEMO_ORDER_ID?.trim();
+    const realOrderId = readOptionalStringEnv("REFUND_DEMO_ORDER_ID");
 
     if (!realOrderId) {
       throw new Error(
@@ -41,7 +42,7 @@ function getOrderId(): string {
     return realOrderId;
   }
 
-  return process.env.REFUND_DEMO_ORDER_ID?.trim() || DEFAULT_DEMO_ORDER_ID;
+  return readOptionalStringEnv("REFUND_DEMO_ORDER_ID") ?? DEFAULT_DEMO_ORDER_ID;
 }
 
 async function main(): Promise<void> {

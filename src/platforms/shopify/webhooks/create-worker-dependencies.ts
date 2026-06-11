@@ -26,7 +26,7 @@ export interface CreateShopifyWebhookWorkerDependenciesInput {
   appClientId?: string;
   appClientSecret?: string;
   apiVersion?: string;
-  fetchImpl?: typeof fetch;
+  fetchImpl: typeof fetch;
   nowFn?: () => Date;
   syncShopifyOrderSnapshotWithClientFn: SyncShopifyOrderSnapshotWithClient;
 }

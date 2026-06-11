@@ -1,3 +1,4 @@
+import { readOptionalStringEnv } from "@shopify-agent/core";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
@@ -7,7 +8,7 @@ export interface CreatePrismaClientOptions {
 }
 
 function readDatabaseUrl(env: NodeJS.ProcessEnv): string {
-  const databaseUrl = env.DATABASE_URL?.trim();
+  const databaseUrl = readOptionalStringEnv("DATABASE_URL", env);
 
   if (!databaseUrl) {
     throw new Error("DATABASE_URL is required to create a Prisma client.");
@@ -32,4 +33,3 @@ export function getPrismaClient(): PrismaClient {
 
   return sharedPrismaClient;
 }
-

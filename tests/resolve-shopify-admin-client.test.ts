@@ -166,6 +166,7 @@ test("refreshes an expired access token and uses the rotated credentials", async
     Accept: "application/json",
     "Content-Type": "application/x-www-form-urlencoded",
   });
+  assert.ok(refreshRequest?.init?.signal);
   assert.equal(
     String(refreshRequest?.init?.body),
     "client_id=shopify-app-client-id&client_secret=shopify-app-client-secret&grant_type=refresh_token&refresh_token=merchant-refresh-token",
@@ -178,6 +179,7 @@ test("refreshes an expired access token and uses the rotated credentials", async
     "Content-Type": "application/json",
     "X-Shopify-Access-Token": "rotated-access-token",
   });
+  assert.ok(requests[1]?.init?.signal);
   assert.equal(prisma.updateArgs.length, 1);
 
   const updateData = prisma.updateArgs[0]?.data;
@@ -209,6 +211,7 @@ test("rejects inactive installations and expired refresh tokens", async () => {
         }),
       ),
       credentialEncryptionKey: ENCRYPTION_KEY,
+      fetchImpl: fetch,
     }),
     /is not active\./,
   );
@@ -225,6 +228,7 @@ test("rejects inactive installations and expired refresh tokens", async () => {
         }),
       ),
       credentialEncryptionKey: ENCRYPTION_KEY,
+      fetchImpl: fetch,
       nowFn: () => new Date("2026-06-07T00:00:00.000Z"),
     }),
     /refresh token .* has expired\./,

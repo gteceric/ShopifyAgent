@@ -23,7 +23,7 @@ export interface RefreshShopifyInstallationTokensDependencies {
   credentialEncryptionKey: Buffer;
   appClientId: string;
   appClientSecret: string;
-  fetchImpl?: typeof fetch;
+  fetchImpl: typeof fetch;
   nowFn?: () => Date;
 }
 

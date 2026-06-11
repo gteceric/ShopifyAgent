@@ -1,3 +1,4 @@
+import { readOptionalStringEnv } from "@shopify-agent/core";
 import { Prisma } from "@prisma/client";
 import type { PlatformAccount, PlatformEvent } from "@prisma/client";
 import { z } from "zod";
@@ -94,7 +95,7 @@ function readRequiredHeader(
 }
 
 function readShopifyAppClientSecret(env: NodeJS.ProcessEnv): string {
-  const clientSecret = env.SHOPIFY_APP_CLIENT_SECRET?.trim();
+  const clientSecret = readOptionalStringEnv("SHOPIFY_APP_CLIENT_SECRET", env);
 
   if (!clientSecret) {
     throw new Error(

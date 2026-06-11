@@ -1,21 +1,17 @@
+import assert from "node:assert/strict";
+import test from "node:test";
 import {
   RecommendedRefundAction,
   RefundDecision,
   RefundReasonCode,
 } from "@shopify-agent/core";
-import test from "node:test";
-import assert from "node:assert/strict";
-import {
-  createOpenAIRefundResponder,
-  generateRefundResponseWithOpenAI,
-} from "../src/tools/generate-refund-response-with-openai.js";
+import { generateRefundResponseWithOllama } from "../src/tools/generate-refund-response-with-ollama.js";
 import type { RefundAgentResponseContext } from "../src/tools/get-refund-response.js";
 
 function makeContext(): RefundAgentResponseContext {
   return {
     agentQuestion: "Can I refund order #1001?",
-    fallbackResponse:
-      "Yes. This order looks eligible for a refund. Order is within the 30-day refund window.",
+    fallbackResponse: "This order is eligible for a refund.",
     result: {
       orderId: "gid://shopify/Order/1",
       exceptionAvailable: false,
@@ -26,7 +22,7 @@ function makeContext(): RefundAgentResponseContext {
         reasons: [
           {
             code: RefundReasonCode.WithinRefundWindow,
-            message: "Order is within the 30-day refund window.",
+            message: "Order is within the refund window.",
           },
         ],
         evidence: {
@@ -66,47 +62,9 @@ function makeContext(): RefundAgentResponseContext {
   };
 }
 
-test("returns undefined when no OpenAI API key is configured", async () => {
-  const response = await generateRefundResponseWithOpenAI(makeContext(), {
-    apiKey: "",
-    fetchImpl: fetch,
-  });
-
-  assert.equal(response, undefined);
-});
-
-test("returns output_text from the OpenAI Responses API payload", async () => {
-  const response = await generateRefundResponseWithOpenAI(makeContext(), {
-    apiKey: "test-key",
-    fetchImpl: async () =>
-      new Response(JSON.stringify({ output_text: "Model refund reply." }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-  });
-
-  assert.equal(response, "Model refund reply.");
-});
-
-test("createOpenAIRefundResponder returns a responder object", async () => {
-  const responder = createOpenAIRefundResponder({
-    apiKey: "test-key",
-    fetchImpl: async () =>
-      new Response(JSON.stringify({ output_text: "Responder reply." }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-  });
-
-  const response = await responder.generateResponse(makeContext());
-
-  assert.equal(response, "Responder reply.");
-});
-
-test("times out an OpenAI responder request", async () => {
+test("times out an Ollama responder request", async () => {
   await assert.rejects(
-    generateRefundResponseWithOpenAI(makeContext(), {
-      apiKey: "test-key",
+    generateRefundResponseWithOllama(makeContext(), {
       timeoutMs: 10,
       fetchImpl: (_input, init) =>
         new Promise((_resolve, reject) => {

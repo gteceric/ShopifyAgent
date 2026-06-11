@@ -1,11 +1,12 @@
 import { DEFAULT_POLICY } from "./refund-policy.js";
 import type { RefundPolicyConfig } from "./refund-policy.types.js";
+import { readOptionalStringEnv } from "../shared/read-env.js";
 
 function readOptionalNonNegativeIntegerEnv(
   env: NodeJS.ProcessEnv,
   name: string,
 ): number | undefined {
-  const rawValue = env[name]?.trim();
+  const rawValue = readOptionalStringEnv(name, env);
 
   if (!rawValue) {
     return undefined;
@@ -24,7 +25,7 @@ function readOptionalNonNegativeNumberEnv(
   env: NodeJS.ProcessEnv,
   name: string,
 ): number | undefined {
-  const rawValue = env[name]?.trim();
+  const rawValue = readOptionalStringEnv(name, env);
 
   if (!rawValue) {
     return undefined;

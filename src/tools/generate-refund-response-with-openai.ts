@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "@shopify-agent/core";
 import type {
   RefundAgentResponseContext,
   RefundResponseResponder,
@@ -10,7 +11,8 @@ export interface OpenAIRefundResponderOptions {
   apiKey?: string;
   model?: string;
   endpoint?: string;
-  fetchImpl?: typeof fetch;
+  fetchImpl: typeof fetch;
+  timeoutMs?: number;
 }
 
 function buildSystemPrompt(): string {
@@ -41,7 +43,7 @@ function buildUserPrompt(context: RefundAgentResponseContext): string {
 
 export async function generateRefundResponseWithOpenAI(
   context: RefundAgentResponseContext,
-  options: OpenAIRefundResponderOptions = {},
+  options: OpenAIRefundResponderOptions,
 ): Promise<string | undefined> {
   const apiKey = options.apiKey ?? process.env.OPENAI_API_KEY;
 
@@ -49,11 +51,9 @@ export async function generateRefundResponseWithOpenAI(
     return undefined;
   }
 
-  const fetchImpl = options.fetchImpl ?? fetch;
   const endpoint = options.endpoint ?? DEFAULT_OPENAI_ENDPOINT;
   const model = options.model ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
-
-  const response = await fetchImpl(endpoint, {
+  const openAIRequest: RequestInit = {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -73,7 +73,16 @@ export async function generateRefundResponseWithOpenAI(
         },
       ],
     }),
-  });
+  };
+
+  const response = await fetchWithTimeout(
+    endpoint,
+    openAIRequest,
+    {
+      fetchImpl: options.fetchImpl,
+      timeoutMs: options.timeoutMs,
+    },
+  );
 
   if (!response.ok) {
     throw new Error(
@@ -88,7 +97,7 @@ export async function generateRefundResponseWithOpenAI(
 }
 
 export function createOpenAIRefundResponder(
-  options: OpenAIRefundResponderOptions = {},
+  options: OpenAIRefundResponderOptions,
 ): RefundResponseResponder {
   return {
     async generateResponse(context: RefundAgentResponseContext) {

@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { readOptionalStringEnv } from "@shopify-agent/core";
 import { createPrismaClient } from "../../persistence/prisma-client.js";
 import type {
   ErrorResponse,
@@ -19,7 +20,7 @@ const SHOPIFY_WEBHOOK_PATH = "/webhooks/shopify";
 class RequestBodyTooLargeError extends Error {}
 
 function readShopifyWebhookPort(): number {
-  const rawPort = process.env.SHOPIFY_WEBHOOK_PORT?.trim();
+  const rawPort = readOptionalStringEnv("SHOPIFY_WEBHOOK_PORT");
 
   if (!rawPort) {
     return DEFAULT_SHOPIFY_WEBHOOK_PORT;

@@ -9,11 +9,11 @@ function getResponder() {
   }
 
   if (process.env.RESPONSE_MODEL_PROVIDER === "ollama") {
-    return createOllamaRefundResponder();
+    return createOllamaRefundResponder({ fetchImpl: fetch });
   }
 
   if (process.env.RESPONSE_MODEL_PROVIDER === "openai") {
-    return createOpenAIRefundResponder();
+    return createOpenAIRefundResponder({ fetchImpl: fetch });
   }
 
   return undefined;

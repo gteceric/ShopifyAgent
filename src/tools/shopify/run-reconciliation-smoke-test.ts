@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import { loadShopifyOrderRefundSyncData } from "@shopify-agent/core";
+import {
+  loadShopifyOrderRefundSyncData,
+  readOptionalStringEnv,
+} from "@shopify-agent/core";
 import type {
   RefundContextLineItem,
   ShopifyOrderRefundSyncData,
@@ -42,7 +45,7 @@ const EMPTY_RECONCILIATION_DATABASE_COUNTS: ReconciliationSmokeDatabaseCounts =
   };
 
 function readSmokeDatabaseUrl(): string {
-  const databaseUrl = process.env.DATABASE_URL_SMOKE?.trim();
+  const databaseUrl = readOptionalStringEnv("DATABASE_URL_SMOKE");
 
   if (!databaseUrl) {
     throw new Error(
@@ -443,7 +446,7 @@ async function main(): Promise<void> {
     assertSmokeDatabaseIsEmpty(baselineCounts);
     smokeDatabaseWasEmpty = true;
 
-    const shopifyAdminClient = createShopifyAdminClientFromEnv();
+    const shopifyAdminClient = createShopifyAdminClientFromEnv(fetch);
     const platformInput = await loadShopifyReconciliationInput(
       shopifyAdminClient,
     );

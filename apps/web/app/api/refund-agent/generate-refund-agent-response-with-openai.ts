@@ -1,15 +1,19 @@
+import {
+  DEFAULT_HTTP_REQUEST_TIMEOUT_MS,
+  fetchWithTimeout,
+  isRequestTimeoutError,
+} from "@shopify-agent/core";
 import { readTimeoutMs } from "./read-timeout-ms";
 import type { RefundAgentResponseContext } from "./refund-agent-response-context";
 
 const DEFAULT_OPENAI_MODEL = "gpt-5.2";
 const DEFAULT_OPENAI_ENDPOINT = "https://api.openai.com/v1/responses";
-const DEFAULT_OPENAI_TIMEOUT_MS = 8000;
 
 export interface OpenAIRefundAgentResponderOptions {
   apiKey?: string;
   model?: string;
   endpoint?: string;
-  fetchImpl?: typeof fetch;
+  fetchImpl: typeof fetch;
   timeoutMs?: number;
 }
 
@@ -50,7 +54,7 @@ function buildUserPrompt(context: RefundAgentResponseContext): string {
 
 export async function generateRefundAgentResponseWithOpenAI(
   context: RefundAgentResponseContext,
-  options: OpenAIRefundAgentResponderOptions = {},
+  options: OpenAIRefundAgentResponderOptions,
 ): Promise<string | undefined> {
   const apiKey = options.apiKey ?? process.env.OPENAI_API_KEY;
 
@@ -58,38 +62,42 @@ export async function generateRefundAgentResponseWithOpenAI(
     return undefined;
   }
 
-  const fetchImpl = options.fetchImpl ?? fetch;
   const endpoint = options.endpoint ?? DEFAULT_OPENAI_ENDPOINT;
   const model = options.model ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
   const timeoutMs =
     options.timeoutMs ??
-    readTimeoutMs(process.env.OPENAI_TIMEOUT_MS, DEFAULT_OPENAI_TIMEOUT_MS);
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    readTimeoutMs(process.env.OPENAI_TIMEOUT_MS, DEFAULT_HTTP_REQUEST_TIMEOUT_MS);
+  const openAIRequest: RequestInit = {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      max_output_tokens: 220,
+      input: [
+        {
+          role: "system",
+          content: [{ type: "input_text", text: buildSystemPrompt() }],
+        },
+        {
+          role: "user",
+          content: [{ type: "input_text", text: buildUserPrompt(context) }],
+        },
+      ],
+    }),
+  };
 
   try {
-    const response = await fetchImpl(endpoint, {
-      method: "POST",
-      signal: controller.signal,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+    const response = await fetchWithTimeout(
+      endpoint,
+      openAIRequest,
+      {
+        fetchImpl: options.fetchImpl,
+        timeoutMs,
       },
-      body: JSON.stringify({
-        model,
-        max_output_tokens: 220,
-        input: [
-          {
-            role: "system",
-            content: [{ type: "input_text", text: buildSystemPrompt() }],
-          },
-          {
-            role: "user",
-            content: [{ type: "input_text", text: buildUserPrompt(context) }],
-          },
-        ],
-      }),
-    });
+    );
 
     if (!response.ok) {
       throw new Error(
@@ -102,12 +110,10 @@ export async function generateRefundAgentResponseWithOpenAI(
 
     return outputText && outputText.length > 0 ? outputText : undefined;
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
+    if (isRequestTimeoutError(error)) {
       throw new Error(`OpenAI responder timed out after ${timeoutMs}ms`);
     }
 
     throw error;
-  } finally {
-    clearTimeout(timeoutId);
   }
 }

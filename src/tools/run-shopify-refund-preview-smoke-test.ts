@@ -3,6 +3,7 @@ import {
   createPolicyConfig,
   createShopifyAdminRefundContextAdapter,
   previewShopifyRefund,
+  readOptionalStringEnv,
   RefundDecision,
 } from "@shopify-agent/core";
 import type {
@@ -15,7 +16,7 @@ import type {
 import { createShopifyAdminClientFromEnv } from "../platforms/shopify/admin-client/env-admin-client.js";
 
 function readRequiredEnv(name: string): string {
-  const value = process.env[name]?.trim();
+  const value = readOptionalStringEnv(name);
 
   if (!value) {
     throw new Error(`${name} is required for the refund preview smoke test.`);
@@ -92,7 +93,7 @@ function readSmokeRefundLineItemIds(): string[] {
 function readSmokeRefundQuantities(
   itemCount: number,
 ): number[] {
-  const rawQuantities = process.env.SMOKE_REFUND_QUANTITIES?.trim();
+  const rawQuantities = readOptionalStringEnv("SMOKE_REFUND_QUANTITIES");
 
   if (rawQuantities) {
     const quantities = parseIntegerListEnv(
@@ -220,7 +221,7 @@ async function main(): Promise<void> {
   const orderId = readRequiredEnv("SMOKE_REFUND_ORDER_ID");
   const selectedLineItemIds = readSmokeRefundLineItemIds();
   const quantities = readSmokeRefundQuantities(selectedLineItemIds.length);
-  const shopifyAdminClient = createShopifyAdminClientFromEnv();
+  const shopifyAdminClient = createShopifyAdminClientFromEnv(fetch);
   const adapter = createShopifyAdminRefundContextAdapter({
     shopifyAdminClient,
   });

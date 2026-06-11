@@ -16,6 +16,9 @@ import {
 } from "../src/platforms/shopify/persistence/installation.js";
 
 const ENCRYPTION_KEY = Buffer.alloc(32, 7);
+const unexpectedFetch: typeof fetch = async () => {
+  throw new Error("Unexpected HTTP request.");
+};
 
 function makePlatformAccount(
   id: string,
@@ -88,6 +91,7 @@ test("refreshes a bounded batch of Shopify installations expiring within 30 days
       credentialEncryptionKey: ENCRYPTION_KEY,
       appClientId: "shopify-app-client-id",
       appClientSecret: "shopify-app-client-secret",
+      fetchImpl: unexpectedFetch,
       nowFn: () => now,
       findCandidatesFn: async (input) => {
         findInputs.push(input);
@@ -146,6 +150,7 @@ test("continues refreshing the batch and reports individual failures", async () 
       credentialEncryptionKey: ENCRYPTION_KEY,
       appClientId: "shopify-app-client-id",
       appClientSecret: "shopify-app-client-secret",
+      fetchImpl: unexpectedFetch,
       nowFn: () => new Date("2026-06-09T00:00:00.000Z"),
       findCandidatesFn: async () => candidates,
       refreshInstallationTokensFn: async (input) => {

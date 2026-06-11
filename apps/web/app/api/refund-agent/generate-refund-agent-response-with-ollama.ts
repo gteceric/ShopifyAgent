@@ -1,14 +1,18 @@
+import {
+  DEFAULT_HTTP_REQUEST_TIMEOUT_MS,
+  fetchWithTimeout,
+  isRequestTimeoutError,
+} from "@shopify-agent/core";
 import { readTimeoutMs } from "./read-timeout-ms";
 import type { RefundAgentResponseContext } from "./refund-agent-response-context";
 
 const DEFAULT_OLLAMA_MODEL = "qwen3-coder:30b-a3b-q8_0";
 const DEFAULT_OLLAMA_ENDPOINT = "http://localhost:11434/api/chat";
-const DEFAULT_OLLAMA_TIMEOUT_MS = 8000;
 
 export interface OllamaRefundAgentResponderOptions {
   model?: string;
   endpoint?: string;
-  fetchImpl?: typeof fetch;
+  fetchImpl: typeof fetch;
   timeoutMs?: number;
 }
 
@@ -49,39 +53,43 @@ function buildUserPrompt(context: RefundAgentResponseContext): string {
 
 export async function generateRefundAgentResponseWithOllama(
   context: RefundAgentResponseContext,
-  options: OllamaRefundAgentResponderOptions = {},
+  options: OllamaRefundAgentResponderOptions,
 ): Promise<string | undefined> {
-  const fetchImpl = options.fetchImpl ?? fetch;
   const endpoint = options.endpoint ?? DEFAULT_OLLAMA_ENDPOINT;
   const model = options.model ?? process.env.OLLAMA_MODEL ?? DEFAULT_OLLAMA_MODEL;
   const timeoutMs =
     options.timeoutMs ??
-    readTimeoutMs(process.env.OLLAMA_TIMEOUT_MS, DEFAULT_OLLAMA_TIMEOUT_MS);
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    readTimeoutMs(process.env.OLLAMA_TIMEOUT_MS, DEFAULT_HTTP_REQUEST_TIMEOUT_MS);
+  const ollamaRequest: RequestInit = {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      stream: false,
+      messages: [
+        {
+          role: "system",
+          content: buildSystemPrompt(),
+        },
+        {
+          role: "user",
+          content: buildUserPrompt(context),
+        },
+      ],
+    }),
+  };
 
   try {
-    const response = await fetchImpl(endpoint, {
-      method: "POST",
-      signal: controller.signal,
-      headers: {
-        "Content-Type": "application/json",
+    const response = await fetchWithTimeout(
+      endpoint,
+      ollamaRequest,
+      {
+        fetchImpl: options.fetchImpl,
+        timeoutMs,
       },
-      body: JSON.stringify({
-        model,
-        stream: false,
-        messages: [
-          {
-            role: "system",
-            content: buildSystemPrompt(),
-          },
-          {
-            role: "user",
-            content: buildUserPrompt(context),
-          },
-        ],
-      }),
-    });
+    );
 
     if (!response.ok) {
       throw new Error(
@@ -96,12 +104,10 @@ export async function generateRefundAgentResponseWithOllama(
 
     return outputText && outputText.length > 0 ? outputText : undefined;
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
+    if (isRequestTimeoutError(error)) {
       throw new Error(`Ollama responder timed out after ${timeoutMs}ms`);
     }
 
     throw error;
-  } finally {
-    clearTimeout(timeoutId);
   }
 }

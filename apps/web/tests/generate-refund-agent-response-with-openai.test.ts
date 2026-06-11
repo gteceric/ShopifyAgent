@@ -9,6 +9,7 @@ test("returns undefined when no OpenAI API key is configured", async () => {
     makeEligibleRefundAgentResponseContext(),
     {
       apiKey: "",
+      fetchImpl: fetch,
     },
   );
 

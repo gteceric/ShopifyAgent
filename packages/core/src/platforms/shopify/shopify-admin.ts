@@ -1,4 +1,5 @@
 import { normalizeRequiredString } from "../../shared/normalize-value.js";
+import { fetchWithTimeout } from "../../shared/fetch-with-timeout.js";
 
 const DEFAULT_SHOPIFY_API_VERSION = "2026-01";
 
@@ -10,7 +11,8 @@ export interface CreateShopifyAdminClientOptions {
   shopDomain: string;
   accessToken: string;
   apiVersion?: string;
-  fetchImpl?: typeof fetch;
+  fetchImpl: typeof fetch;
+  timeoutMs?: number;
 }
 
 function ensureHttps(value: string): string {
@@ -26,7 +28,7 @@ export function createShopifyAdminClient(
     "accessToken",
   );
   const apiVersion = options.apiVersion?.trim() || undefined;
-  const fetchImpl = options.fetchImpl;
+  const timeoutMs = options.timeoutMs;
 
   return {
     fetch<T>(query: string, variables: Record<string, unknown>): Promise<T> {
@@ -34,7 +36,8 @@ export function createShopifyAdminClient(
         shopDomain,
         accessToken,
         apiVersion,
-        fetchImpl,
+        fetchImpl: options.fetchImpl,
+        timeoutMs,
       });
     },
   };
@@ -45,17 +48,21 @@ async function fetchShopifyAdminHelper<T>(
   variables: Record<string, unknown>,
   options: CreateShopifyAdminClientOptions,
 ): Promise<T> {
-  const fetchImpl = options.fetchImpl ?? fetch;
   const apiVersion = options.apiVersion ?? DEFAULT_SHOPIFY_API_VERSION;
-  const response = await fetchImpl(
+  const shopifyAdminRequest: RequestInit = {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Shopify-Access-Token": options.accessToken,
+    },
+    body: JSON.stringify({ query, variables }),
+  };
+  const response = await fetchWithTimeout(
     `${ensureHttps(options.shopDomain)}/admin/api/${apiVersion}/graphql.json`,
+    shopifyAdminRequest,
     {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": options.accessToken,
-      },
-      body: JSON.stringify({ query, variables }),
+      fetchImpl: options.fetchImpl,
+      timeoutMs: options.timeoutMs,
     },
   );
 

@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "@shopify-agent/core";
 import type {
   RefundAgentResponseContext,
   RefundResponseResponder,
@@ -9,7 +10,8 @@ const DEFAULT_OLLAMA_ENDPOINT = "http://localhost:11434/api/chat";
 export interface OllamaRefundResponderOptions {
   model?: string;
   endpoint?: string;
-  fetchImpl?: typeof fetch;
+  fetchImpl: typeof fetch;
+  timeoutMs?: number;
 }
 
 function buildSystemPrompt(): string {
@@ -40,13 +42,11 @@ function buildUserPrompt(context: RefundAgentResponseContext): string {
 
 export async function generateRefundResponseWithOllama(
   context: RefundAgentResponseContext,
-  options: OllamaRefundResponderOptions = {},
+  options: OllamaRefundResponderOptions,
 ): Promise<string | undefined> {
-  const fetchImpl = options.fetchImpl ?? fetch;
   const endpoint = options.endpoint ?? DEFAULT_OLLAMA_ENDPOINT;
   const model = options.model ?? process.env.OLLAMA_MODEL ?? DEFAULT_OLLAMA_MODEL;
-
-  const response = await fetchImpl(endpoint, {
+  const ollamaRequest: RequestInit = {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -65,7 +65,16 @@ export async function generateRefundResponseWithOllama(
         },
       ],
     }),
-  });
+  };
+
+  const response = await fetchWithTimeout(
+    endpoint,
+    ollamaRequest,
+    {
+      fetchImpl: options.fetchImpl,
+      timeoutMs: options.timeoutMs,
+    },
+  );
 
   if (!response.ok) {
     throw new Error(
@@ -82,7 +91,7 @@ export async function generateRefundResponseWithOllama(
 }
 
 export function createOllamaRefundResponder(
-  options: OllamaRefundResponderOptions = {},
+  options: OllamaRefundResponderOptions,
 ): RefundResponseResponder {
   return {
     async generateResponse(context: RefundAgentResponseContext) {

@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as RefundAgentRequestBody;
     const result = await handleRefundAgentRequest(body, {
       adapter: createShopifyRefundContextAdapter(), // load context from platform
-      responder: createRefundAgentResponder(), // use model to create response based on refundPolicyInput
+      responder: createRefundAgentResponder(fetch), // use model to create response based on refundPolicyInput
     });
 
     return NextResponse.json(result.body, { status: result.status });

@@ -46,6 +46,7 @@ async function main(): Promise<void> {
             credentialEncryptionKey,
             appClientId,
             appClientSecret,
+            fetchImpl: fetch,
             findCandidatesFn: (input) =>
               findShopifyInstallationsDueForTokenRefresh(input, prisma),
             refreshInstallationTokensFn: refreshShopifyInstallationTokens,

@@ -3,6 +3,10 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { createHmac, randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
+import {
+  fetchWithTimeout,
+  readOptionalStringEnv,
+} from "@shopify-agent/core";
 import { createPrismaClient } from "../../persistence/prisma-client.js";
 import type { ShopifyWebhookAcceptedResponse } from "./webhook-server-response.js";
 import {
@@ -22,6 +26,7 @@ const DEFAULT_SHOPIFY_WEBHOOK_SMOKE_CLIENT_SECRET =
   "local-shopify-webhook-smoke-secret";
 const SERVER_START_TIMEOUT_MS = 10_000;
 const SERVER_STOP_TIMEOUT_MS = 5_000;
+const SMOKE_HTTP_REQUEST_TIMEOUT_MS = 5_000;
 
 interface StartedShopifyWebhookServer {
   childProcess: ChildProcess;
@@ -30,7 +35,7 @@ interface StartedShopifyWebhookServer {
 }
 
 function readRequiredEnv(name: string): string {
-  const value = process.env[name]?.trim();
+  const value = readOptionalStringEnv(name);
 
   if (!value) {
     throw new Error(
@@ -39,12 +44,6 @@ function readRequiredEnv(name: string): string {
   }
 
   return value;
-}
-
-function readOptionalEnv(name: string): string | undefined {
-  const value = process.env[name]?.trim();
-
-  return value ? value : undefined;
 }
 
 function delay(milliseconds: number): Promise<void> {
@@ -142,7 +141,10 @@ async function waitForShopifyWebhookServer(
 
     try {
       // If I got a 404, the server is listening, so readiness check is done.
-      const response = await fetch(readinessUrl);
+      const response = await fetchWithTimeout(readinessUrl, {}, {
+        fetchImpl: fetch,
+        timeoutMs: SMOKE_HTTP_REQUEST_TIMEOUT_MS,
+      });
 
       if (response.status === 404) {
         return;
@@ -218,12 +220,17 @@ async function sendSignedShopifyWebhook(input: {
     [SHOPIFY_WEBHOOK_TOPIC_HEADER]: SHOPIFY_WEBHOOK_SMOKE_TOPIC,
     [SHOPIFY_WEBHOOK_SHOP_DOMAIN_HEADER]: input.shopDomain,
   };
-  const response = await fetch(
+  const syntheticWebhookRequest: RequestInit = {
+    method: "POST",
+    headers,
+    body: rawBody,
+  };
+  const response = await fetchWithTimeout(
     `http://127.0.0.1:${input.port}${SHOPIFY_WEBHOOK_PATH}`,
+    syntheticWebhookRequest,
     {
-      method: "POST",
-      headers,
-      body: rawBody,
+      fetchImpl: fetch,
+      timeoutMs: SMOKE_HTTP_REQUEST_TIMEOUT_MS,
     },
   );
   const responseText = await response.text();
@@ -294,11 +301,11 @@ async function ensureSyntheticPlatformAccount(
 async function main(): Promise<void> {
   const smokeDatabaseUrl = readRequiredEnv("DATABASE_URL_SMOKE");
   const shopDomain = normalizeShopifyShopDomain(
-    readOptionalEnv("SHOPIFY_STORE_DOMAIN") ??
+    readOptionalStringEnv("SHOPIFY_STORE_DOMAIN") ??
       DEFAULT_SHOPIFY_WEBHOOK_SMOKE_SHOP_DOMAIN,
   );
   const clientSecret =
-    readOptionalEnv("SHOPIFY_APP_CLIENT_SECRET") ??
+    readOptionalStringEnv("SHOPIFY_APP_CLIENT_SECRET") ??
     DEFAULT_SHOPIFY_WEBHOOK_SMOKE_CLIENT_SECRET;
   const platformEventId = `smoke:webhook:${Date.now()}:${randomUUID()}`;
   const prisma = createPrismaClient({
