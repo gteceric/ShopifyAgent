@@ -5,11 +5,18 @@ import {
   encryptCredential,
 } from "../../../security/credential-encryption.js";
 import {
+  isShopifyInstallationRequiresReauthorizationError,
+  ShopifyInstallationRequiresReauthorizationError,
   type ShopifyInstallationClient,
   type UpdateShopifyInstallationTokensInput,
+  updateShopifyInstallationToRequireReauthorization,
   updateShopifyInstallationTokens,
 } from "../persistence/installation.js";
-import { refreshShopifyOfflineToken } from "./refresh-offline-token.js";
+import {
+  isShopifyOfflineTokenRefreshRejectedError,
+  refreshShopifyOfflineToken,
+  type RefreshedShopifyOfflineToken,
+} from "./refresh-offline-token.js";
 
 export interface RefreshShopifyInstallationTokensInput {
   localPlatformAccountId: string;
@@ -37,26 +44,55 @@ export async function refreshShopifyInstallationTokens(
   dependencies: RefreshShopifyInstallationTokensDependencies,
 ): Promise<RefreshShopifyInstallationTokensResult> {
   const now = dependencies.nowFn?.() ?? new Date();
+  let refreshedToken: RefreshedShopifyOfflineToken;
 
-  requireNotExpired(input.refreshTokenExpiresAt, now, () => {
-    return new Error(
-      `Shopify refresh token for platform account ${input.localPlatformAccountId} has expired.`,
+  try {
+    requireNotExpired(input.refreshTokenExpiresAt, now, () => {
+      return new ShopifyInstallationRequiresReauthorizationError(
+        input.localPlatformAccountId,
+        "its refresh token has expired",
+      );
+    });
+
+    const refreshToken = decryptCredential(
+      input.encryptedRefreshToken,
+      dependencies.credentialEncryptionKey,
     );
-  });
+    refreshedToken = await refreshShopifyOfflineToken(
+      {
+        shopDomain: input.shopDomain,
+        clientId: dependencies.appClientId,
+        clientSecret: dependencies.appClientSecret,
+        refreshToken,
+      },
+      dependencies.fetchImpl,
+    );
+  } catch (error) {
+    const requiresReauthorization =
+      isShopifyInstallationRequiresReauthorizationError(error) ||
+      isShopifyOfflineTokenRefreshRejectedError(error);
 
-  const refreshToken = decryptCredential(
-    input.encryptedRefreshToken,
-    dependencies.credentialEncryptionKey,
-  );
-  const refreshedToken = await refreshShopifyOfflineToken(
-    {
-      shopDomain: input.shopDomain,
-      clientId: dependencies.appClientId,
-      clientSecret: dependencies.appClientSecret,
-      refreshToken,
-    },
-    dependencies.fetchImpl,
-  );
+    if (!requiresReauthorization) {
+      throw error;
+    }
+
+    await updateShopifyInstallationToRequireReauthorization(
+      {
+        localPlatformAccountId: input.localPlatformAccountId,
+      },
+      dependencies.prisma,
+    );
+
+    if (isShopifyInstallationRequiresReauthorizationError(error)) {
+      throw error;
+    }
+
+    throw new ShopifyInstallationRequiresReauthorizationError(
+      input.localPlatformAccountId,
+      "Shopify rejected its refresh token",
+    );
+  }
+
   const updateShopifyInstallationTokensInput: UpdateShopifyInstallationTokensInput =
     {
       localPlatformAccountId: input.localPlatformAccountId,

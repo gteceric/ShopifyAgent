@@ -11,6 +11,7 @@ import {
   type ShopifyTokenMaintenanceCandidate,
 } from "../src/platforms/shopify/auth/maintain-installation-tokens.js";
 import {
+  ShopifyInstallationRequiresReauthorizationError,
   SHOPIFY_INSTALLATION_ACTIVE_STATUS,
   type ShopifyInstallationClient,
 } from "../src/platforms/shopify/persistence/installation.js";
@@ -131,6 +132,7 @@ test("refreshes a bounded batch of Shopify installations expiring within 30 days
         shopDomain: "second-shop.myshopify.com",
       },
     ],
+    requiresReauthorizationInstallations: [],
     failedInstallations: [],
   });
 });
@@ -191,4 +193,40 @@ test("continues refreshing the batch and reports individual failures", async () 
         "Shopify platform account platform-account-3 has no shop domain.",
     },
   ]);
+  assert.deepEqual(result.requiresReauthorizationInstallations, []);
+});
+
+test("reports installations requiring reauthorization separately from retryable failures", async () => {
+  const candidate = makeCandidate(
+    "platform-account-1",
+    "first-shop.myshopify.com",
+  );
+
+  const result = await maintainShopifyInstallationTokens(
+    {},
+    {
+      prisma: new FakeShopifyInstallationClient(),
+      credentialEncryptionKey: ENCRYPTION_KEY,
+      appClientId: "shopify-app-client-id",
+      appClientSecret: "shopify-app-client-secret",
+      fetchImpl: unexpectedFetch,
+      findCandidatesFn: async () => [candidate],
+      refreshInstallationTokensFn: async (input) => {
+        throw new ShopifyInstallationRequiresReauthorizationError(
+          input.localPlatformAccountId,
+          "Shopify rejected its refresh token",
+        );
+      },
+    },
+  );
+
+  assert.deepEqual(result.requiresReauthorizationInstallations, [
+    {
+      localPlatformAccountId: "platform-account-1",
+      shopDomain: "first-shop.myshopify.com",
+      message:
+        "Shopify installation for platform account platform-account-1 requires reauthorization because Shopify rejected its refresh token. Ask the merchant to reopen the app and reconnect Shopify.",
+    },
+  ]);
+  assert.deepEqual(result.failedInstallations, []);
 });

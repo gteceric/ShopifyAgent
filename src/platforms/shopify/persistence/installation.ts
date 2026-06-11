@@ -5,12 +5,19 @@ import {
   normalizeRequiredString,
 } from "../../../persistence/normalize-persistence-value.js";
 
+// The app is installed and its credentials can be used or refreshed.
 export const SHOPIFY_INSTALLATION_ACTIVE_STATUS = "active";
+// The merchant uninstalled the app.
 export const SHOPIFY_INSTALLATION_INACTIVE_STATUS = "inactive";
+// The app is still installed, but the merchant must reconnect it because its
+// credentials are permanently unusable.
+export const SHOPIFY_INSTALLATION_REQUIRES_REAUTHORIZATION_STATUS =
+  "requires_reauthorization";
 
 export type ShopifyInstallationStatus =
   | typeof SHOPIFY_INSTALLATION_ACTIVE_STATUS
-  | typeof SHOPIFY_INSTALLATION_INACTIVE_STATUS;
+  | typeof SHOPIFY_INSTALLATION_INACTIVE_STATUS
+  | typeof SHOPIFY_INSTALLATION_REQUIRES_REAUTHORIZATION_STATUS;
 
 export interface PersistShopifyInstallationInput {
   localPlatformAccountId: string;
@@ -27,6 +34,10 @@ export interface PersistShopifyInstallationInput {
 export interface DeactivateShopifyInstallationInput {
   localPlatformAccountId: string;
   uninstalledAt: Date | string;
+}
+
+export interface UpdateShopifyInstallationToRequireReauthorizationInput {
+  localPlatformAccountId: string;
 }
 
 export interface UpdateShopifyInstallationTokensInput {
@@ -50,6 +61,24 @@ export interface ShopifyInstallationClient {
       args: Prisma.ShopifyInstallationUpsertArgs,
     ): Promise<ShopifyInstallation>;
   };
+}
+
+export class ShopifyInstallationRequiresReauthorizationError extends Error {
+  readonly localPlatformAccountId: string;
+
+  constructor(localPlatformAccountId: string, reason: string) {
+    super(
+      `Shopify installation for platform account ${localPlatformAccountId} requires reauthorization because ${reason}. Ask the merchant to reopen the app and reconnect Shopify.`,
+    );
+    this.name = "ShopifyInstallationRequiresReauthorizationError";
+    this.localPlatformAccountId = localPlatformAccountId;
+  }
+}
+
+export function isShopifyInstallationRequiresReauthorizationError(
+  error: unknown,
+): error is ShopifyInstallationRequiresReauthorizationError {
+  return error instanceof ShopifyInstallationRequiresReauthorizationError;
 }
 
 function normalizeOptionalEncryptedValue(
@@ -135,9 +164,12 @@ export async function updateShopifyInstallationTokens(
     "localPlatformAccountId",
   );
 
+  // Fail the credential update if the installation lifecycle changed while
+  // the remote token-refresh request was in flight.
   return client.shopifyInstallation.update({
     where: {
       platformAccountId: localPlatformAccountId,
+      status: SHOPIFY_INSTALLATION_ACTIVE_STATUS,
     },
     data: {
       encryptedAccessToken: normalizeRequiredString(
@@ -157,6 +189,31 @@ export async function updateShopifyInstallationTokens(
         "refreshTokenExpiresAt",
       ),
       grantedScopes: normalizeGrantedScopes(input.grantedScopes),
+    },
+  });
+}
+
+export async function updateShopifyInstallationToRequireReauthorization(
+  input: UpdateShopifyInstallationToRequireReauthorizationInput,
+  client: ShopifyInstallationClient,
+): Promise<ShopifyInstallation> {
+  const localPlatformAccountId = normalizeRequiredString(
+    input.localPlatformAccountId,
+    "localPlatformAccountId",
+  );
+
+  return client.shopifyInstallation.update({
+    where: {
+      platformAccountId: localPlatformAccountId,
+      status: SHOPIFY_INSTALLATION_ACTIVE_STATUS,
+    },
+    data: {
+      status: SHOPIFY_INSTALLATION_REQUIRES_REAUTHORIZATION_STATUS,
+      encryptedAccessToken: null,
+      encryptedRefreshToken: null,
+      accessTokenExpiresAt: null,
+      refreshTokenExpiresAt: null,
+      uninstalledAt: null,
     },
   });
 }

@@ -7,7 +7,10 @@ import type { PlatformAccount } from "@prisma/client";
 import {
   findShopifyInstallation,
   SHOPIFY_INSTALLATION_ACTIVE_STATUS,
+  SHOPIFY_INSTALLATION_REQUIRES_REAUTHORIZATION_STATUS,
+  ShopifyInstallationRequiresReauthorizationError,
   type ShopifyInstallationClient,
+  updateShopifyInstallationToRequireReauthorization,
 } from "../persistence/installation.js";
 import { decryptCredential } from "../../../security/credential-encryption.js";
 import { refreshShopifyInstallationTokens } from "../auth/refresh-installation-tokens.js";
@@ -47,13 +50,24 @@ export async function resolveShopifyAdminClient(
     dependencies.prisma,
   );
 
-  if (
-    !installation ||
-    installation.status !== SHOPIFY_INSTALLATION_ACTIVE_STATUS
-  ) {
+  if (!installation) {
     throw new Error(
       `Shopify installation for platform account ${localPlatformAccount.id} is not active.`,
     );
+  }
+
+  switch (installation.status) {
+    case SHOPIFY_INSTALLATION_ACTIVE_STATUS:
+      break;
+    case SHOPIFY_INSTALLATION_REQUIRES_REAUTHORIZATION_STATUS:
+      throw new ShopifyInstallationRequiresReauthorizationError(
+        localPlatformAccount.id,
+        "its stored credentials are no longer valid",
+      );
+    default:
+      throw new Error(
+        `Shopify installation for platform account ${localPlatformAccount.id} is not active.`,
+      );
   }
 
   const now = dependencies.nowFn?.() ?? new Date();
@@ -62,8 +76,16 @@ export async function resolveShopifyAdminClient(
 
   if (accessTokenExpired) {
     if (!installation.encryptedRefreshToken) {
-      throw new Error(
-        `Shopify installation for platform account ${localPlatformAccount.id} has no refresh token.`,
+      await updateShopifyInstallationToRequireReauthorization(
+        {
+          localPlatformAccountId: localPlatformAccount.id,
+        },
+        dependencies.prisma,
+      );
+
+      throw new ShopifyInstallationRequiresReauthorizationError(
+        localPlatformAccount.id,
+        "it has no refresh token",
       );
     }
 

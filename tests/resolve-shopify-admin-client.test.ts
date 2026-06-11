@@ -8,6 +8,7 @@ import type {
 import {
   SHOPIFY_INSTALLATION_ACTIVE_STATUS,
   SHOPIFY_INSTALLATION_INACTIVE_STATUS,
+  SHOPIFY_INSTALLATION_REQUIRES_REAUTHORIZATION_STATUS,
   type ShopifyInstallationClient,
 } from "../src/platforms/shopify/persistence/installation.js";
 import { resolveShopifyAdminClient } from "../src/platforms/shopify/admin-client/resolve-admin-client.js";
@@ -215,22 +216,160 @@ test("rejects inactive installations and expired refresh tokens", async () => {
     }),
     /is not active\./,
   );
+  const expiredRefreshTokenPrisma = new FakeShopifyInstallationClient(
+    makeInstallation({
+      accessTokenExpiresAt: new Date("2026-06-06T00:00:00.000Z"),
+      encryptedRefreshToken: encryptCredential(
+        "merchant-refresh-token",
+        ENCRYPTION_KEY,
+      ),
+      refreshTokenExpiresAt: new Date("2026-06-06T23:59:59.000Z"),
+    }),
+  );
+
   await assert.rejects(
     resolveShopifyAdminClient(localPlatformAccount, {
-      prisma: new FakeShopifyInstallationClient(
-        makeInstallation({
-          accessTokenExpiresAt: new Date("2026-06-06T00:00:00.000Z"),
-          encryptedRefreshToken: encryptCredential(
-            "merchant-refresh-token",
-            ENCRYPTION_KEY,
-          ),
-          refreshTokenExpiresAt: new Date("2026-06-06T23:59:59.000Z"),
-        }),
-      ),
+      prisma: expiredRefreshTokenPrisma,
       credentialEncryptionKey: ENCRYPTION_KEY,
       fetchImpl: fetch,
       nowFn: () => new Date("2026-06-07T00:00:00.000Z"),
     }),
-    /refresh token .* has expired\./,
+    /requires reauthorization because its refresh token has expired\./,
+  );
+  assert.deepEqual(expiredRefreshTokenPrisma.updateArgs[0]?.data, {
+    status: SHOPIFY_INSTALLATION_REQUIRES_REAUTHORIZATION_STATUS,
+    encryptedAccessToken: null,
+    encryptedRefreshToken: null,
+    accessTokenExpiresAt: null,
+    refreshTokenExpiresAt: null,
+    uninstalledAt: null,
+  });
+});
+
+test("marks an installation for reauthorization when its expired access token has no refresh token", async () => {
+  const prisma = new FakeShopifyInstallationClient(
+    makeInstallation({
+      encryptedRefreshToken: null,
+      accessTokenExpiresAt: new Date("2026-06-06T23:59:59.000Z"),
+      refreshTokenExpiresAt: null,
+    }),
+  );
+
+  await assert.rejects(
+    resolveShopifyAdminClient(makePlatformAccount(), {
+      prisma,
+      credentialEncryptionKey: ENCRYPTION_KEY,
+      fetchImpl: fetch,
+      nowFn: () => new Date("2026-06-07T00:00:00.000Z"),
+    }),
+    /requires reauthorization because it has no refresh token\./,
+  );
+  assert.deepEqual(prisma.updateArgs[0], {
+    where: {
+      platformAccountId: "local-platform-account-1",
+      status: SHOPIFY_INSTALLATION_ACTIVE_STATUS,
+    },
+    data: {
+      status: SHOPIFY_INSTALLATION_REQUIRES_REAUTHORIZATION_STATUS,
+      encryptedAccessToken: null,
+      encryptedRefreshToken: null,
+      accessTokenExpiresAt: null,
+      refreshTokenExpiresAt: null,
+      uninstalledAt: null,
+    },
+  });
+});
+
+test("marks a Shopify installation for reauthorization when Shopify rejects its refresh token", async () => {
+  const now = new Date("2026-06-07T00:00:00.000Z");
+  const prisma = new FakeShopifyInstallationClient(
+    makeInstallation({
+      encryptedRefreshToken: encryptCredential(
+        "revoked-refresh-token",
+        ENCRYPTION_KEY,
+      ),
+      accessTokenExpiresAt: new Date("2026-06-06T23:59:59.000Z"),
+      refreshTokenExpiresAt: new Date("2026-09-07T00:00:00.000Z"),
+    }),
+  );
+
+  await assert.rejects(
+    resolveShopifyAdminClient(makePlatformAccount(), {
+      prisma,
+      credentialEncryptionKey: ENCRYPTION_KEY,
+      appClientId: "shopify-app-client-id",
+      appClientSecret: "shopify-app-client-secret",
+      fetchImpl: async () =>
+        Response.json(
+          {
+            error: "invalid_grant",
+            error_description: "The refresh token is invalid or revoked.",
+          },
+          {
+            status: 400,
+          },
+        ),
+      nowFn: () => now,
+    }),
+    /requires reauthorization because Shopify rejected its refresh token\./,
+  );
+  assert.deepEqual(prisma.updateArgs[0]?.data, {
+    status: SHOPIFY_INSTALLATION_REQUIRES_REAUTHORIZATION_STATUS,
+    encryptedAccessToken: null,
+    encryptedRefreshToken: null,
+    accessTokenExpiresAt: null,
+    refreshTokenExpiresAt: null,
+    uninstalledAt: null,
+  });
+});
+
+test("keeps a Shopify installation active after a temporary token refresh failure", async () => {
+  const prisma = new FakeShopifyInstallationClient(
+    makeInstallation({
+      encryptedRefreshToken: encryptCredential(
+        "merchant-refresh-token",
+        ENCRYPTION_KEY,
+      ),
+      accessTokenExpiresAt: new Date("2026-06-06T23:59:59.000Z"),
+      refreshTokenExpiresAt: new Date("2026-09-07T00:00:00.000Z"),
+    }),
+  );
+
+  await assert.rejects(
+    resolveShopifyAdminClient(makePlatformAccount(), {
+      prisma,
+      credentialEncryptionKey: ENCRYPTION_KEY,
+      appClientId: "shopify-app-client-id",
+      appClientSecret: "shopify-app-client-secret",
+      fetchImpl: async () =>
+        Response.json(
+          {
+            error: "temporarily_unavailable",
+          },
+          {
+            status: 503,
+          },
+        ),
+      nowFn: () => new Date("2026-06-07T00:00:00.000Z"),
+    }),
+    /Shopify offline token refresh failed with status 503/,
+  );
+  assert.deepEqual(prisma.updateArgs, []);
+});
+
+test("prompts the merchant to reconnect an installation requiring reauthorization", async () => {
+  await assert.rejects(
+    resolveShopifyAdminClient(makePlatformAccount(), {
+      prisma: new FakeShopifyInstallationClient(
+        makeInstallation({
+          status: SHOPIFY_INSTALLATION_REQUIRES_REAUTHORIZATION_STATUS,
+          encryptedAccessToken: null,
+          encryptedRefreshToken: null,
+        }),
+      ),
+      credentialEncryptionKey: ENCRYPTION_KEY,
+      fetchImpl: fetch,
+    }),
+    /Ask the merchant to reopen the app and reconnect Shopify\./,
   );
 });

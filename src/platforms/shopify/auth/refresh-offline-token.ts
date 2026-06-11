@@ -24,10 +24,36 @@ export interface RefreshedShopifyOfflineToken {
 
 interface ShopifyOfflineTokenRefreshResponse {
   access_token?: unknown;
+  error?: unknown;
+  error_description?: unknown;
   expires_in?: unknown;
   refresh_token?: unknown;
   refresh_token_expires_in?: unknown;
   scope?: unknown;
+}
+
+const SHOPIFY_PERMANENT_REFRESH_TOKEN_ERROR_CODE = "invalid_grant";
+
+export class ShopifyOfflineTokenRefreshRejectedError extends Error {
+  readonly errorCode: string;
+  readonly status: number;
+
+  constructor(status: number, errorCode: string, errorDescription: string | null) {
+    const description = errorDescription ? `: ${errorDescription}` : "";
+
+    super(
+      `Shopify rejected the offline refresh token with ${errorCode}${description}`,
+    );
+    this.name = "ShopifyOfflineTokenRefreshRejectedError";
+    this.errorCode = errorCode;
+    this.status = status;
+  }
+}
+
+export function isShopifyOfflineTokenRefreshRejectedError(
+  error: unknown,
+): error is ShopifyOfflineTokenRefreshRejectedError {
+  return error instanceof ShopifyOfflineTokenRefreshRejectedError;
 }
 
 function missingRefreshResponseValueError(name: string): Error {
@@ -82,6 +108,21 @@ export async function refreshShopifyOfflineToken(
   const payload = (await response.json()) as ShopifyOfflineTokenRefreshResponse;
 
   if (!response.ok) {
+    const errorCode =
+      typeof payload.error === "string" ? payload.error.trim() : "";
+    const errorDescription =
+      typeof payload.error_description === "string"
+        ? payload.error_description.trim() || null
+        : null;
+
+    if (errorCode === SHOPIFY_PERMANENT_REFRESH_TOKEN_ERROR_CODE) {
+      throw new ShopifyOfflineTokenRefreshRejectedError(
+        response.status,
+        errorCode,
+        errorDescription,
+      );
+    }
+
     throw new Error(
       `Shopify offline token refresh failed with status ${response.status}: ${JSON.stringify(payload)}`,
     );

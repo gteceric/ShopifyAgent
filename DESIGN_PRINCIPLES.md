@@ -233,5 +233,22 @@ normalized order, line item, refund, and transaction tables. Background
 reconciliation jobs should periodically re-fetch recent or open orders from the
 platform, compare them with local state, and repair drift.
 
+## Credential Refresh Failure Classification
+
+Credential maintenance must distinguish failures that require merchant action
+from failures that should be retried automatically.
+
+- Mark an installation as `requires_reauthorization` when its refresh token is
+  locally expired or the platform rejects it with a permanent OAuth error such
+  as `invalid_grant`.
+- Do not require reauthorization for timeouts, network failures, platform 5xx
+  responses, malformed responses, or application configuration errors.
+- Exclude installations requiring reauthorization from automatic refresh
+  retries and surface them for merchant notification.
+- Show merchants whose installation requires reauthorization a clear UI warning
+  and reconnect action. Backend errors and maintenance logs are operator
+  signals, not substitutes for the merchant-facing prompt.
+- Restore `active` status only after valid new credentials are persisted.
+
 Add database changes as small migrations. Prefer additive schema changes while
 the refund and return domain is still evolving.

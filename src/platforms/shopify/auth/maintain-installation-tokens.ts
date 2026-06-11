@@ -1,6 +1,7 @@
 import { getErrorMessage, normalizePositiveInteger } from "@shopify-agent/core";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import {
+  isShopifyInstallationRequiresReauthorizationError,
   SHOPIFY_INSTALLATION_ACTIVE_STATUS,
   type ShopifyInstallationClient,
 } from "../persistence/installation.js";
@@ -51,10 +52,17 @@ export interface FailedShopifyInstallationRefresh {
   message: string;
 }
 
+export interface ShopifyInstallationReauthorizationSummary {
+  localPlatformAccountId: string;
+  shopDomain: string | null;
+  message: string;
+}
+
 export interface MaintainShopifyInstallationTokensResult {
   candidateCount: number;
   refreshBefore: Date;
   refreshedInstallations: RefreshedShopifyInstallationSummary[];
+  requiresReauthorizationInstallations: ShopifyInstallationReauthorizationSummary[];
   failedInstallations: FailedShopifyInstallationRefresh[];
 }
 
@@ -100,6 +108,8 @@ export async function maintainShopifyInstallationTokens(
     refreshBefore,
   });
   const refreshedInstallations: RefreshedShopifyInstallationSummary[] = [];
+  const requiresReauthorizationInstallations: ShopifyInstallationReauthorizationSummary[] =
+    [];
   const failedInstallations: FailedShopifyInstallationRefresh[] = [];
 
   for (const candidate of candidates) {
@@ -139,11 +149,17 @@ export async function maintainShopifyInstallationTokens(
         shopDomain,
       });
     } catch (error) {
-      failedInstallations.push({
+      const installationFailure = {
         localPlatformAccountId: candidate.platformAccountId,
         shopDomain,
         message: getErrorMessage(error),
-      });
+      };
+
+      if (isShopifyInstallationRequiresReauthorizationError(error)) {
+        requiresReauthorizationInstallations.push(installationFailure);
+      } else {
+        failedInstallations.push(installationFailure);
+      }
     }
   }
 
@@ -151,6 +167,7 @@ export async function maintainShopifyInstallationTokens(
     candidateCount: candidates.length,
     refreshBefore,
     refreshedInstallations,
+    requiresReauthorizationInstallations,
     failedInstallations,
   };
 }

@@ -7,7 +7,9 @@ import {
   persistShopifyInstallation,
   SHOPIFY_INSTALLATION_ACTIVE_STATUS,
   SHOPIFY_INSTALLATION_INACTIVE_STATUS,
+  SHOPIFY_INSTALLATION_REQUIRES_REAUTHORIZATION_STATUS,
   type ShopifyInstallationClient,
+  updateShopifyInstallationToRequireReauthorization,
   updateShopifyInstallationTokens,
 } from "../src/platforms/shopify/persistence/installation.js";
 
@@ -134,7 +136,7 @@ test("loads a Shopify installation by local platform account ID", async () => {
   ]);
 });
 
-test("updates rotated Shopify installation tokens together", async () => {
+test("updates rotated Shopify installation tokens only while it remains active", async () => {
   const client = new FakeShopifyInstallationClient();
 
   await updateShopifyInstallationTokens(
@@ -155,6 +157,7 @@ test("updates rotated Shopify installation tokens together", async () => {
       args: {
         where: {
           platformAccountId: "platform-account-1",
+          status: SHOPIFY_INSTALLATION_ACTIVE_STATUS,
         },
         data: {
           encryptedAccessToken: "encrypted-rotated-access-token",
@@ -162,6 +165,37 @@ test("updates rotated Shopify installation tokens together", async () => {
           accessTokenExpiresAt: new Date("2026-06-06T02:00:00.000Z"),
           refreshTokenExpiresAt: new Date("2026-09-04T01:00:00.000Z"),
           grantedScopes: ["read_orders", "write_orders"],
+        },
+      },
+    },
+  ]);
+});
+
+test("marks a Shopify installation as requiring reauthorization and clears credentials", async () => {
+  const client = new FakeShopifyInstallationClient();
+
+  await updateShopifyInstallationToRequireReauthorization(
+    {
+      localPlatformAccountId: " platform-account-1 ",
+    },
+    client,
+  );
+
+  assert.deepEqual(client.calls, [
+    {
+      operation: "shopifyInstallation.update",
+      args: {
+        where: {
+          platformAccountId: "platform-account-1",
+          status: SHOPIFY_INSTALLATION_ACTIVE_STATUS,
+        },
+        data: {
+          status: SHOPIFY_INSTALLATION_REQUIRES_REAUTHORIZATION_STATUS,
+          encryptedAccessToken: null,
+          encryptedRefreshToken: null,
+          accessTokenExpiresAt: null,
+          refreshTokenExpiresAt: null,
+          uninstalledAt: null,
         },
       },
     },

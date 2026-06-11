@@ -74,8 +74,12 @@ async function main(): Promise<void> {
           candidateCount: result.candidateCount,
           refreshBefore: result.refreshBefore.toISOString(),
           refreshedCount: result.refreshedInstallations.length,
+          requiresReauthorizationCount:
+            result.requiresReauthorizationInstallations.length,
           failedCount: result.failedInstallations.length,
           refreshedInstallations: result.refreshedInstallations,
+          requiresReauthorizationInstallations:
+            result.requiresReauthorizationInstallations,
           failedInstallations: result.failedInstallations,
         },
         null,
@@ -83,7 +87,10 @@ async function main(): Promise<void> {
       ),
     );
 
-    if (result.failedInstallations.length > 0) {
+    if (
+      result.requiresReauthorizationInstallations.length > 0 ||
+      result.failedInstallations.length > 0
+    ) {
       process.exitCode = 1;
     }
   } finally {
