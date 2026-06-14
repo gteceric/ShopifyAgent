@@ -250,5 +250,24 @@ from failures that should be retried automatically.
   signals, not substitutes for the merchant-facing prompt.
 - Restore `active` status only after valid new credentials are persisted.
 
+## Shopify Managed Installation
+
+Use Shopify-managed installation and token exchange for both first-time
+installation and reconnection. The backend must verify the short-lived Shopify
+session token before exchanging it for an expiring offline access token.
+
+Treat connection as one idempotent flow:
+
+- exchange the verified session token for expiring offline credentials
+- use the new access token to load the real Shopify shop identity
+- reject the connection if the authenticated domain and shop identity differ
+- transactionally upsert the platform account and encrypted installation
+- restore `active` only after valid credentials and identity are confirmed
+
+The merchant-facing reconnect action should invoke the same connection flow as
+the initial installation. It should send Shopify's session token as a bearer
+token to `POST /api/shopify/connect`. Do not build a separate reauthorization
+mechanism.
+
 Add database changes as small migrations. Prefer additive schema changes while
 the refund and return domain is still evolving.
