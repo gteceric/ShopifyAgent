@@ -185,18 +185,21 @@ test("connects or reconnects a Shopify installation using managed token exchange
   );
   assert.deepEqual(requests[0]?.init?.headers, {
     Accept: "application/json",
-    "Content-Type": "application/json",
+    "Content-Type": "application/x-www-form-urlencoded",
   });
-  assert.deepEqual(JSON.parse(String(requests[0]?.init?.body)), {
-    client_id: APP_CLIENT_ID,
-    client_secret: APP_CLIENT_SECRET,
-    grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
-    subject_token: sessionToken,
-    subject_token_type: "urn:ietf:params:oauth:token-type:id_token",
-    requested_token_type:
-      "urn:shopify:params:oauth:token-type:offline-access-token",
-    expiring: "1",
-  });
+  assert.deepEqual(
+    Object.fromEntries(new URLSearchParams(String(requests[0]?.init?.body))),
+    {
+      client_id: APP_CLIENT_ID,
+      client_secret: APP_CLIENT_SECRET,
+      grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
+      subject_token: sessionToken,
+      subject_token_type: "urn:ietf:params:oauth:token-type:id_token",
+      requested_token_type:
+        "urn:shopify:params:oauth:token-type:offline-access-token",
+      expiring: "1",
+    },
+  );
   assert.equal(
     requests[1]?.url,
     `https://${SHOP_DOMAIN}/admin/api/2026-01/graphql.json`,

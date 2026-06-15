@@ -269,5 +269,10 @@ the initial installation. It should send Shopify's session token as a bearer
 token to `POST /api/shopify/connect`. Do not build a separate reauthorization
 mechanism.
 
+The embedded frontend should load Shopify App Bridge and call the connection
+route with global `fetch`. App Bridge owns obtaining a fresh session token and
+adding its bearer authorization header; frontend application code should not
+store or manually refresh session tokens.
+
 Add database changes as small migrations. Prefer additive schema changes while
 the refund and return domain is still evolving.

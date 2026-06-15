@@ -16,6 +16,7 @@ import {
 import { DashboardHero } from "./dashboard-hero";
 import { OrderDetailsPanel } from "./order-details-panel";
 import { OrdersPanel } from "./orders-panel";
+import { ShopifyAppBridgeConnect } from "./shopify-app-bridge-connect";
 
 interface DashboardProps {
   orders: DashboardOrder[];
@@ -106,6 +107,8 @@ export function Dashboard({
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(180,138,56,0.23),transparent_28%),radial-gradient(circle_at_top_right,rgba(80,100,67,0.18),transparent_24%),linear-gradient(180deg,#fbf7ef_0%,#f1e5d5_100%)] px-4 py-6 text-stone-950 sm:px-6 lg:px-8">
       <div className="mx-auto grid max-w-[1380px] gap-6">
+        <ShopifyAppBridgeConnect />
+
         <DashboardHero
           totalOrders={orders.length}
           visibleOrders={filteredOrders.length}

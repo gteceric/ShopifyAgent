@@ -130,9 +130,9 @@ export async function exchangeShopifySessionTokenForOfflineCredentials(
   ).toLowerCase();
   const tokenExchangeHeaders: HeadersInit = {
     Accept: "application/json",
-    "Content-Type": "application/json",
+    "Content-Type": "application/x-www-form-urlencoded",
   };
-  const tokenExchangeBody = {
+  const tokenExchangeBody = new URLSearchParams({
     client_id: appClientId,
     client_secret: appClientSecret,
     grant_type: SHOPIFY_TOKEN_EXCHANGE_GRANT_TYPE,
@@ -140,11 +140,11 @@ export async function exchangeShopifySessionTokenForOfflineCredentials(
     subject_token_type: SHOPIFY_ID_TOKEN_TYPE,
     requested_token_type: SHOPIFY_OFFLINE_ACCESS_TOKEN_TYPE,
     expiring: "1",
-  };
+  });
   const tokenExchangeRequest: RequestInit = {
     method: "POST",
     headers: tokenExchangeHeaders,
-    body: JSON.stringify(tokenExchangeBody),
+    body: tokenExchangeBody,
   };
   const tokenExchangeRequestOptions: FetchWithTimeoutOptions = {
     fetchImpl: options.fetchImpl,
