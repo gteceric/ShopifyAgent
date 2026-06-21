@@ -1,0 +1,37 @@
+
+client_id = "46f0e3bce304dd953df8c721ef0c7cd1"
+name = "CommerceOps-Agent"
+application_url = "https://shopify.dev/apps/default-app-home"
+embedded = true
+web_directories = ["apps/web"]
+
+[build]
+automatically_update_urls_on_dev = true
+include_config_on_deploy = true
+
+[access_scopes]
+# read_orders supports order/refund synchronization. write_orders is required
+# for the existing refund preview and execution workflow.
+scopes = "read_orders,write_orders"
+use_legacy_install_flow = false
+
+[auth]
+# Required by Shopify app configuration. Managed installation and token
+# exchange do not use the legacy OAuth callback during the normal app flow.
+redirect_urls = [
+  "https://shopify.dev/apps/default-app-home/api/auth",
+]
+
+[webhooks]
+api_version = "2026-01"
+
+# Shopify creates and maintains these subscriptions for every installed shop.
+# The relative URI resolves against application_url.
+[[webhooks.subscriptions]]
+topics = [
+  "orders/create",
+  "orders/updated",
+  "refunds/create",
+  "order_transactions/create",
+]
+uri = "/webhooks/shopify"

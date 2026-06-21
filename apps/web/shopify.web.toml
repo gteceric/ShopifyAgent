@@ -1,0 +1,7 @@
+name = "web"
+roles = ["frontend", "backend"]
+port = 3000
+webhooks_path = "/webhooks/shopify"
+
+[commands]
+dev = "node scripts/dev-with-root-env.mjs"

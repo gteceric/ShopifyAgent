@@ -274,5 +274,10 @@ route with global `fetch`. App Bridge owns obtaining a fresh session token and
 adding its bearer authorization header; frontend application code should not
 store or manually refresh session tokens.
 
+Define Shopify-managed installation scopes and app-specific webhook
+subscriptions in `shopify.app.toml`. Merchants should not manually configure
+webhook subscriptions. Only deploy subscriptions whose public handlers are
+implemented and reachable.
+
 Add database changes as small migrations. Prefer additive schema changes while
 the refund and return domain is still evolving.

@@ -4,6 +4,15 @@ interface ShopifyConnectResponse {
   status: string;
 }
 
+export interface ShopifySessionTokenProvider {
+  idToken(): Promise<string>;
+}
+
+interface ConnectShopifyInstallationFromBrowserInput {
+  fetchImpl: typeof fetch;
+  shopifySessionTokenProvider: ShopifySessionTokenProvider;
+}
+
 function readErrorMessage(payload: unknown): string | null {
   if (
     typeof payload === "object" &&
@@ -43,13 +52,16 @@ function parseShopifyConnectResponse(payload: unknown): ShopifyConnectResponse {
 }
 
 export async function connectShopifyInstallationFromBrowser(
-  fetchImpl: typeof fetch,
+  input: ConnectShopifyInstallationFromBrowserInput,
 ): Promise<ShopifyConnectResponse> {
+  const sessionToken = await input.shopifySessionTokenProvider.idToken();
   const shopifyConnectRequest: RequestInit = {
     method: "POST",
+    headers: {
+      Authorization: `Bearer ${sessionToken}`,
+    },
   };
-  // App Bridge adds the Shopify session token in header
-  const response = await fetchImpl(
+  const response = await input.fetchImpl(
     "/api/shopify/connect",
     shopifyConnectRequest,
   );

@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import "./globals.css";
+import { readOptionalShopifyAppClientId } from "./shopify-app-env";
+
+const SHOPIFY_APP_BRIDGE_SCRIPT_URL =
+  "https://cdn.shopify.com/shopifycloud/app-bridge.js";
 
 export const metadata: Metadata = {
   title: "Shopify Agent Web",
@@ -12,7 +15,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const shopifyApiKey = process.env.SHOPIFY_APP_CLIENT_ID?.trim();
+  const shopifyApiKey = readOptionalShopifyAppClientId();
 
   return (
     <html lang="en" className="h-full antialiased">
@@ -20,10 +23,8 @@ export default function RootLayout({
         {shopifyApiKey ? (
           <>
             <meta name="shopify-api-key" content={shopifyApiKey} />
-            <Script
-              src="https://cdn.shopify.com/shopifycloud/app-bridge.js"
-              strategy="beforeInteractive"
-            />
+            {/* eslint-disable-next-line @next/next/no-sync-scripts -- Shopify App Bridge rejects async script tags. */}
+            <script src={SHOPIFY_APP_BRIDGE_SCRIPT_URL}></script>
           </>
         ) : null}
       </head>

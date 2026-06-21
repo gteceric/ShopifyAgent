@@ -1,10 +1,15 @@
-import { readRequiredStringEnv } from "@shopify-agent/core";
 import { InvalidJwtError } from "@shopify/shopify-api";
 import { NextRequest, NextResponse } from "next/server";
 import { getPrismaClient } from "../../../../../../src/persistence/prisma-client";
 import { connectShopifyInstallation } from "../../../../../../src/platforms/shopify/auth/connect-installation";
 import { readCredentialEncryptionKey } from "../../../../../../src/security/credential-encryption";
 import { logger } from "../../../logger";
+import {
+  readShopifyApiVersion,
+  readShopifyAppClientId,
+  readShopifyAppClientSecret,
+  readShopifyAppUrl,
+} from "../../../shopify-app-env";
 
 const SHOPIFY_TOKEN_ENCRYPTION_KEY_ENV = "SHOPIFY_TOKEN_ENCRYPTION_KEY";
 
@@ -53,10 +58,10 @@ export async function POST(request: NextRequest) {
         credentialEncryptionKey: readCredentialEncryptionKey(
           SHOPIFY_TOKEN_ENCRYPTION_KEY_ENV,
         ),
-        appClientId: readRequiredStringEnv("SHOPIFY_APP_CLIENT_ID"),
-        appClientSecret: readRequiredStringEnv("SHOPIFY_APP_CLIENT_SECRET"),
-        appUrl: readRequiredStringEnv("SHOPIFY_APP_URL"),
-        apiVersion: readRequiredStringEnv("SHOPIFY_API_VERSION"),
+        appClientId: readShopifyAppClientId(),
+        appClientSecret: readShopifyAppClientSecret(),
+        appUrl: readShopifyAppUrl(),
+        apiVersion: readShopifyApiVersion(),
         fetchImpl: fetch,
         nowFn: () => new Date(),
       },

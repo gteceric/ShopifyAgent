@@ -1,5 +1,7 @@
 /** @type {import("next").NextConfig} */
 const nextConfig = {
+  allowedDevOrigins: ["*.trycloudflare.com"],
+
   webpack(config) {
     config.resolve.extensionAlias = {
       ...config.resolve.extensionAlias,

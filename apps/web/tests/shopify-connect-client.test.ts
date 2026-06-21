@@ -4,6 +4,9 @@ import { connectShopifyInstallationFromBrowser } from "../app/shopify-connect-cl
 
 test("connects the Shopify installation through the browser API route", async () => {
   const requests: Array<{ url: string; init?: RequestInit }> = [];
+  const shopifySessionTokenProvider = {
+    idToken: async () => "test-session-token",
+  };
   const fetchImpl: typeof fetch = async (input, init) => {
     requests.push({
       url: String(input),
@@ -17,13 +20,19 @@ test("connects the Shopify installation through the browser API route", async ()
     });
   };
 
-  const result = await connectShopifyInstallationFromBrowser(fetchImpl);
+  const result = await connectShopifyInstallationFromBrowser({
+    fetchImpl,
+    shopifySessionTokenProvider,
+  });
 
   assert.deepEqual(requests, [
     {
       url: "/api/shopify/connect",
       init: {
         method: "POST",
+        headers: {
+          Authorization: "Bearer test-session-token",
+        },
       },
     },
   ]);
@@ -35,6 +44,9 @@ test("connects the Shopify installation through the browser API route", async ()
 });
 
 test("surfaces the Shopify connection API error", async () => {
+  const shopifySessionTokenProvider = {
+    idToken: async () => "test-session-token",
+  };
   const fetchImpl: typeof fetch = async () =>
     Response.json(
       {
@@ -46,7 +58,10 @@ test("surfaces the Shopify connection API error", async () => {
     );
 
   await assert.rejects(
-    connectShopifyInstallationFromBrowser(fetchImpl),
+    connectShopifyInstallationFromBrowser({
+      fetchImpl,
+      shopifySessionTokenProvider,
+    }),
     /A Shopify session token is required/,
   );
 });
