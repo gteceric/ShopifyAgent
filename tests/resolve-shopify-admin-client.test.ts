@@ -136,7 +136,7 @@ test("refreshes an expired access token and uses the rotated credentials", async
             expires_in: 3600,
             refresh_token: "rotated-refresh-token",
             refresh_token_expires_in: 7776000,
-            scope: "write_orders,read_orders",
+            scope: "write_orders,read_products,read_customers,read_orders",
           }),
           {
             status: 200,
@@ -198,7 +198,12 @@ test("refreshes an expired access token and uses the rotated credentials", async
     updateData.refreshTokenExpiresAt,
     new Date("2026-09-05T00:00:00.000Z"),
   );
-  assert.deepEqual(updateData.grantedScopes, ["read_orders", "write_orders"]);
+  assert.deepEqual(updateData.grantedScopes, [
+    "read_customers",
+    "read_orders",
+    "read_products",
+    "write_orders",
+  ]);
 });
 
 test("rejects inactive installations and expired refresh tokens", async () => {

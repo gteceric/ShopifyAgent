@@ -9,7 +9,10 @@ import type {
   Prisma,
   ShopifyInstallation,
 } from "@prisma/client";
-import { loadDashboardOrderSummaries } from "../app/dashboard-order-summaries";
+import {
+  loadDashboardOrderSummaries,
+  resolveDashboardShopifyAdminClient,
+} from "../app/dashboard-order-summaries";
 import { encryptCredential } from "../../../src/security/credential-encryption";
 
 const ENCRYPTION_KEY = Buffer.alloc(32, 9);
@@ -42,7 +45,12 @@ function makeShopifyInstallation(): ShopifyInstallation {
     ),
     accessTokenExpiresAt: new Date("2026-06-19T01:00:00.000Z"),
     refreshTokenExpiresAt: new Date("2026-09-17T00:00:00.000Z"),
-    grantedScopes: ["read_orders", "write_orders"],
+    grantedScopes: [
+      "read_customers",
+      "read_orders",
+      "read_products",
+      "write_orders",
+    ],
     installedAt: new Date("2026-06-19T00:00:00.000Z"),
     uninstalledAt: null,
     createdAt: new Date("2026-06-19T00:00:00.000Z"),
@@ -72,6 +80,47 @@ test("loads real dashboard order summaries with the stored installation token", 
   const prisma = new FakeDashboardOrderSummariesClient();
   const requests: Array<{ input: string; init?: RequestInit }> = [];
 
+  const shopifyAdminClient = await resolveDashboardShopifyAdminClient(
+    {
+      shopDomain: " CommerceOps-Dev.MyShopify.com ",
+    },
+    {
+      prisma,
+      credentialEncryptionKey: ENCRYPTION_KEY,
+      appClientId: "shopify-app-client-id",
+      appClientSecret: "shopify-app-client-secret",
+      apiVersion: "2026-01",
+      fetchImpl: async (input, init) => {
+        requests.push({ input: String(input), init });
+
+        return Response.json({
+          data: {
+            orders: {
+              nodes: [
+                {
+                  id: "gid://shopify/Order/123",
+                  name: "#1001",
+                  createdAt: "2026-06-18T00:00:00.000Z",
+                  totalPriceSet: {
+                    shopMoney: {
+                      amount: "42.50",
+                    },
+                  },
+                  displayFinancialStatus: "PAID",
+                  displayFulfillmentStatus: "FULFILLED",
+                  transactions: [],
+                  customer: {
+                    displayName: "Ada Lovelace",
+                  },
+                },
+              ],
+            },
+          },
+        });
+      },
+      nowFn: () => new Date("2026-06-19T00:30:00.000Z"),
+    },
+  );
   const orders = await loadDashboardOrderSummaries(
     {
       limit: 2,
@@ -80,40 +129,7 @@ test("loads real dashboard order summaries with the stored installation token", 
     },
     {
       realShopify: {
-        prisma,
-        credentialEncryptionKey: ENCRYPTION_KEY,
-        appClientId: "shopify-app-client-id",
-        appClientSecret: "shopify-app-client-secret",
-        apiVersion: "2026-01",
-        fetchImpl: async (input, init) => {
-          requests.push({ input: String(input), init });
-
-          return Response.json({
-            data: {
-              orders: {
-                nodes: [
-                  {
-                    id: "gid://shopify/Order/123",
-                    name: "#1001",
-                    createdAt: "2026-06-18T00:00:00.000Z",
-                    totalPriceSet: {
-                      shopMoney: {
-                        amount: "42.50",
-                      },
-                    },
-                    displayFinancialStatus: "PAID",
-                    displayFulfillmentStatus: "FULFILLED",
-                    transactions: [],
-                    customer: {
-                      displayName: "Ada Lovelace",
-                    },
-                  },
-                ],
-              },
-            },
-          });
-        },
-        nowFn: () => new Date("2026-06-19T00:30:00.000Z"),
+        shopifyAdminClient,
       },
     },
   );

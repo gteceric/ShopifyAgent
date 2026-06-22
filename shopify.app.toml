@@ -10,9 +10,11 @@ automatically_update_urls_on_dev = true
 include_config_on_deploy = true
 
 [access_scopes]
-# read_orders supports order/refund synchronization. write_orders is required
-# for the existing refund preview and execution workflow.
-scopes = "read_orders,write_orders"
+# read_orders supports order/refund synchronization. read_customers allows the
+# dashboard order list to display customer names. read_products supports
+# product and variant context in refund checks. write_orders is required for
+# the existing refund preview and execution workflow.
+scopes = "read_orders,read_customers,read_products,write_orders"
 use_legacy_install_flow = false
 
 [auth]

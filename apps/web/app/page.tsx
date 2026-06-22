@@ -1,11 +1,15 @@
 import {
   checkRefundEligibility,
   createShopifyRefundContextAdapter,
+  type ShopifyAdminClient,
 } from "@shopify-agent/core";
 import { getPrismaClient } from "../../../src/persistence/prisma-client";
 import { readCredentialEncryptionKey } from "../../../src/security/credential-encryption";
 import { Dashboard } from "./dashboard";
-import { loadDashboardOrderSummaries } from "./dashboard-order-summaries";
+import {
+  loadDashboardOrderSummaries,
+  resolveDashboardShopifyAdminClient,
+} from "./dashboard-order-summaries";
 import {
   applyRefundEvaluationToOrder,
   loadMerchantRefundPolicyConfig,
@@ -47,6 +51,37 @@ function readSearchParamValue(
   return value ?? null;
 }
 
+async function resolveHomeShopifyAdminClient(
+  shopDomain: string | null,
+): Promise<ShopifyAdminClient> {
+  const realShopifyAdminClientDependencies = {
+    prisma: getPrismaClient(),
+    credentialEncryptionKey: readCredentialEncryptionKey(
+      SHOPIFY_TOKEN_ENCRYPTION_KEY_ENV,
+    ),
+    appClientId: readShopifyAppClientId(),
+    appClientSecret: readShopifyAppClientSecret(),
+    apiVersion: readShopifyApiVersion(),
+    fetchImpl: fetch,
+    nowFn: () => new Date(),
+  };
+
+  return resolveDashboardShopifyAdminClient(
+    { shopDomain },
+    realShopifyAdminClientDependencies,
+  );
+}
+
+function requireResolvedShopifyAdminClient(
+  shopifyAdminClient: ShopifyAdminClient | undefined,
+): ShopifyAdminClient {
+  if (!shopifyAdminClient) {
+    throw new Error("Real Shopify dashboard requires ShopifyAdminClient.");
+  }
+
+  return shopifyAdminClient;
+}
+
 export default async function Home({ searchParams }: HomeProps) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const now = new Date();
@@ -64,22 +99,22 @@ export default async function Home({ searchParams }: HomeProps) {
       "Live Shopify loading is disabled. Set USE_REAL_SHOPIFY=true or explicitly enable WEB_ENABLE_MOCK_ORDERS_FALLBACK=true.";
   } else {
     try {
+      const shopDomain = readSearchParamValue(resolvedSearchParams, "shop");
       const dashboardOrderSummariesInput = {
         limit: 9,
-        shopDomain: readSearchParamValue(resolvedSearchParams, "shop"),
+        shopDomain,
         useRealShopify,
       };
-      const realShopifyOrderSummariesDependencies = useRealShopify
+      let shopifyAdminClient: ShopifyAdminClient | undefined;
+
+      if (useRealShopify) {
+        shopifyAdminClient = await resolveHomeShopifyAdminClient(shopDomain);
+        shopifyAdminClient =
+          requireResolvedShopifyAdminClient(shopifyAdminClient);
+      }
+      const realShopifyOrderSummariesDependencies = shopifyAdminClient
         ? {
-            prisma: getPrismaClient(),
-            credentialEncryptionKey: readCredentialEncryptionKey(
-              SHOPIFY_TOKEN_ENCRYPTION_KEY_ENV,
-            ),
-            appClientId: readShopifyAppClientId(),
-            appClientSecret: readShopifyAppClientSecret(),
-            apiVersion: readShopifyApiVersion(),
-            fetchImpl: fetch,
-            nowFn: () => new Date(),
+            shopifyAdminClient,
           }
         : undefined;
       const dashboardOrderSummariesDependencies = {
@@ -89,7 +124,17 @@ export default async function Home({ searchParams }: HomeProps) {
         dashboardOrderSummariesInput,
         dashboardOrderSummariesDependencies,
       );
-      const refundContextAdapter = createShopifyRefundContextAdapter();
+      const refundContextDependencies = shopifyAdminClient
+        ? {
+            env: process.env,
+            shopifyAdminClient,
+          }
+        : {
+            env: process.env,
+          };
+      const refundContextAdapter = createShopifyRefundContextAdapter(
+        refundContextDependencies,
+      );
       // Each loaded row gets its own refund evaluation so the queue can show
       // real posture immediately instead of only enriching the selected order.
       const evaluationOutcomes = await Promise.allSettled(
@@ -155,7 +200,8 @@ export default async function Home({ searchParams }: HomeProps) {
     initialState.selectedOrderId,
   );
   const selectedOrderError: DashboardOrderErrorState | null =
-    activeSelectedOrder && orderEvaluationErrors.has(activeSelectedOrder.base.id)
+    activeSelectedOrder &&
+    orderEvaluationErrors.has(activeSelectedOrder.base.id)
       ? {
           orderId: activeSelectedOrder.base.id,
           message: orderEvaluationErrors.get(activeSelectedOrder.base.id)!,

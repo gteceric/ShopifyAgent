@@ -100,6 +100,12 @@ Tests can still stay isolated while following the same architecture as productio
 Make a dependency optional only when absence is a genuine supported production
 behavior, not merely a testing technique.
 
+When a runtime mode explicitly requests real platform behavior, missing real
+dependencies must fail loudly instead of silently falling back to mock data. For
+example, if `USE_REAL_SHOPIFY=true`, failing to resolve a
+`ShopifyAdminClient` should surface an error rather than switching to mock
+Shopify orders or refund context.
+
 ## Preserve Intentional Comments
 
 Comments in code and types are part of the design record.

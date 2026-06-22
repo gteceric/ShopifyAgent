@@ -1,4 +1,8 @@
-import { loadOrders, type ShopifyOrderSummary } from "@shopify-agent/core";
+import {
+  loadOrders,
+  type ShopifyAdminClient,
+  type ShopifyOrderSummary,
+} from "@shopify-agent/core";
 import type { PlatformAccount, Prisma } from "@prisma/client";
 import { resolveShopifyAdminClient } from "../../../src/platforms/shopify/admin-client/resolve-admin-client";
 import {
@@ -23,6 +27,10 @@ interface DashboardOrderSummariesClient extends ShopifyInstallationClient {
 }
 
 interface RealShopifyOrderSummariesDependencies {
+  shopifyAdminClient: ShopifyAdminClient;
+}
+
+interface ResolveDashboardShopifyAdminClientDependencies {
   prisma: DashboardOrderSummariesClient;
   credentialEncryptionKey: Buffer;
   appClientId: string;
@@ -85,6 +93,27 @@ async function findActiveShopifyPlatformAccount(
   return localPlatformAccount;
 }
 
+export async function resolveDashboardShopifyAdminClient(
+  input: Pick<LoadDashboardOrderSummariesInput, "shopDomain">,
+  dependencies: ResolveDashboardShopifyAdminClientDependencies,
+): Promise<ShopifyAdminClient> {
+  const shopDomain = readRequiredShopDomain(input.shopDomain);
+  const localPlatformAccount = await findActiveShopifyPlatformAccount(
+    shopDomain,
+    dependencies.prisma,
+  );
+
+  return resolveShopifyAdminClient(localPlatformAccount, {
+    prisma: dependencies.prisma,
+    credentialEncryptionKey: dependencies.credentialEncryptionKey,
+    appClientId: dependencies.appClientId,
+    appClientSecret: dependencies.appClientSecret,
+    apiVersion: dependencies.apiVersion,
+    fetchImpl: dependencies.fetchImpl,
+    nowFn: dependencies.nowFn,
+  });
+}
+
 export async function loadDashboardOrderSummaries(
   input: LoadDashboardOrderSummariesInput,
   dependencies: LoadDashboardOrderSummariesDependencies = {},
@@ -94,24 +123,6 @@ export async function loadDashboardOrderSummaries(
   }
 
   const realShopifyDependencies = requireRealShopifyDependencies(dependencies);
-  const shopDomain = readRequiredShopDomain(input.shopDomain);
-  const localPlatformAccount = await findActiveShopifyPlatformAccount(
-    shopDomain,
-    realShopifyDependencies.prisma,
-  );
-  const shopifyAdminClient = await resolveShopifyAdminClient(
-    localPlatformAccount,
-    {
-      prisma: realShopifyDependencies.prisma,
-      credentialEncryptionKey:
-        realShopifyDependencies.credentialEncryptionKey,
-      appClientId: realShopifyDependencies.appClientId,
-      appClientSecret: realShopifyDependencies.appClientSecret,
-      apiVersion: realShopifyDependencies.apiVersion,
-      fetchImpl: realShopifyDependencies.fetchImpl,
-      nowFn: realShopifyDependencies.nowFn,
-    },
-  );
 
   return loadOrders(
     {
@@ -119,9 +130,10 @@ export async function loadDashboardOrderSummaries(
     },
     {
       env: {
+        ...process.env,
         USE_REAL_SHOPIFY: "true",
       },
-      shopifyAdminClient,
+      shopifyAdminClient: realShopifyDependencies.shopifyAdminClient,
     },
   );
 }

@@ -43,9 +43,10 @@ While `app dev` is running, Shopify applies saved TOML configuration changes to
 the selected development store. Shopify-managed installation prompts the
 merchant to approve the configured scopes.
 
-`read_orders` accesses protected customer data. Complete Shopify's protected
-customer data access request for the app before relying on real merchant order
-data.
+`read_orders` and `read_customers` access protected customer data.
+`read_products` allows refund checks to inspect product and variant context.
+Complete Shopify's protected customer data access request for the app before
+relying on real merchant order and customer data.
 
 ## Webhook Delivery
 
