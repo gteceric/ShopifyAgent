@@ -132,7 +132,7 @@ function makeTokenExchangeResponse(): Response {
     expires_in: 3600,
     refresh_token: "real-offline-refresh-token",
     refresh_token_expires_in: 7_776_000,
-    scope: "write_orders,read_products,read_customers,read_orders",
+    scope: "write_orders,read_returns,read_products,read_customers,read_orders",
   });
 }
 
@@ -242,6 +242,7 @@ test("connects or reconnects a Shopify installation using managed token exchange
     "read_customers",
     "read_orders",
     "read_products",
+    "read_returns",
     "write_orders",
   ]);
   assert.equal(

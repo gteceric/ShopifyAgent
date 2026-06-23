@@ -17,6 +17,7 @@ import type {
 
 interface MerchantQuestionPanelProps {
   orderId: string;
+  shopDomain: string | null;
   decision: RefundDecision;
 }
 
@@ -41,6 +42,7 @@ function getProviderLabel(provider: RefundAgentProvider): string {
 
 export function MerchantQuestionPanel({
   orderId,
+  shopDomain,
   decision,
 }: MerchantQuestionPanelProps) {
   const [question, setQuestion] = useState("");
@@ -62,6 +64,7 @@ export function MerchantQuestionPanel({
     try {
       const requestBody: RefundAgentRequest = {
         orderId,
+        shopDomain,
         question: trimmedQuestion,
       };
       const refundAgentRequest: RequestInit = {

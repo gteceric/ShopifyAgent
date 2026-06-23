@@ -18,6 +18,8 @@ export function parseRefundAgentRequest(
   body: RefundAgentRequestBody,
 ): RefundAgentRequestParseResult {
   const orderId = typeof body.orderId === "string" ? body.orderId.trim() : "";
+  const shopDomain =
+    typeof body.shopDomain === "string" ? body.shopDomain.trim() : null;
   const question =
     typeof body.question === "string" ? body.question.trim() : "";
 
@@ -39,6 +41,7 @@ export function parseRefundAgentRequest(
     ok: true,
     data: {
       orderId,
+      shopDomain,
       question,
     },
   };

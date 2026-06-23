@@ -9,6 +9,7 @@ import { RefundPreviewPanel } from "./refund-preview-panel";
 
 interface OrderDetailsPanelProps {
   order: DashboardOrder | null;
+  shopDomain: string | null;
   errorMessage?: string | null;
   emptyMessage?: string;
   isPending?: boolean;
@@ -16,6 +17,7 @@ interface OrderDetailsPanelProps {
 
 export function OrderDetailsPanel({
   order,
+  shopDomain,
   errorMessage,
   emptyMessage,
   isPending = false,
@@ -112,6 +114,7 @@ export function OrderDetailsPanel({
               />
               <RefundPreviewPanel
                 orderId={base.id}
+                shopDomain={shopDomain}
                 itemEvaluations={refundEvaluation.itemEvaluations}
               />
             </>
@@ -141,6 +144,7 @@ export function OrderDetailsPanel({
           <MerchantQuestionPanel
             key={base.id}
             orderId={base.id}
+            shopDomain={shopDomain}
             decision={refundEvaluation.decision}
           />
         </>

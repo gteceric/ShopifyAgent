@@ -3,13 +3,12 @@ import {
   createShopifyRefundContextAdapter,
   type ShopifyAdminClient,
 } from "@shopify-agent/core";
-import { getPrismaClient } from "../../../src/persistence/prisma-client";
-import { readCredentialEncryptionKey } from "../../../src/security/credential-encryption";
 import { Dashboard } from "./dashboard";
+import { loadDashboardOrderSummaries } from "./dashboard-order-summaries";
 import {
-  loadDashboardOrderSummaries,
-  resolveDashboardShopifyAdminClient,
-} from "./dashboard-order-summaries";
+  requireResolvedShopifyAdminClient,
+  resolveCurrentShopifyAdminClient,
+} from "./shopify-admin-client-resolver";
 import {
   applyRefundEvaluationToOrder,
   loadMerchantRefundPolicyConfig,
@@ -21,18 +20,11 @@ import {
   parseDashboardUrlState,
   selectActiveOrder,
 } from "./dashboard-helpers";
-import {
-  readShopifyApiVersion,
-  readShopifyAppClientId,
-  readShopifyAppClientSecret,
-} from "./shopify-app-env";
 import { type DashboardOrder } from "./mock-orders";
 
 interface HomeProps {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
-
-const SHOPIFY_TOKEN_ENCRYPTION_KEY_ENV = "SHOPIFY_TOKEN_ENCRYPTION_KEY";
 
 function readSearchParamValue(
   searchParams: Record<string, string | string[] | undefined>,
@@ -45,37 +37,6 @@ function readSearchParamValue(
   }
 
   return value ?? null;
-}
-
-async function resolveHomeShopifyAdminClient(
-  shopDomain: string | null,
-): Promise<ShopifyAdminClient> {
-  const realShopifyAdminClientDependencies = {
-    prisma: getPrismaClient(),
-    credentialEncryptionKey: readCredentialEncryptionKey(
-      SHOPIFY_TOKEN_ENCRYPTION_KEY_ENV,
-    ),
-    appClientId: readShopifyAppClientId(),
-    appClientSecret: readShopifyAppClientSecret(),
-    apiVersion: readShopifyApiVersion(),
-    fetchImpl: fetch,
-    nowFn: () => new Date(),
-  };
-
-  return resolveDashboardShopifyAdminClient(
-    { shopDomain },
-    realShopifyAdminClientDependencies,
-  );
-}
-
-function requireResolvedShopifyAdminClient(
-  shopifyAdminClient: ShopifyAdminClient | undefined,
-): ShopifyAdminClient {
-  if (!shopifyAdminClient) {
-    throw new Error("Real Shopify dashboard requires ShopifyAdminClient.");
-  }
-
-  return shopifyAdminClient;
 }
 
 export default async function Home({ searchParams }: HomeProps) {
@@ -99,7 +60,7 @@ export default async function Home({ searchParams }: HomeProps) {
     let shopifyAdminClient: ShopifyAdminClient | undefined;
 
     if (useRealShopify) {
-      shopifyAdminClient = await resolveHomeShopifyAdminClient(shopDomain);
+      shopifyAdminClient = await resolveCurrentShopifyAdminClient(shopDomain);
       shopifyAdminClient =
         requireResolvedShopifyAdminClient(shopifyAdminClient);
     }
@@ -195,6 +156,7 @@ export default async function Home({ searchParams }: HomeProps) {
   return (
     <Dashboard
       orders={orders}
+      shopDomain={readSearchParamValue(resolvedSearchParams, "shop")}
       initialState={initialState}
       ordersLoadError={ordersLoadError}
       selectedOrderError={selectedOrderError}

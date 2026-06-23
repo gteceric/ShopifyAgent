@@ -49,6 +49,7 @@ function makeShopifyInstallation(): ShopifyInstallation {
       "read_customers",
       "read_orders",
       "read_products",
+      "read_returns",
       "write_orders",
     ],
     installedAt: new Date("2026-06-19T00:00:00.000Z"),

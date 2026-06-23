@@ -10,6 +10,7 @@ import {
   type RefundPolicyConfig,
 } from "@shopify-agent/core";
 import { previewRefund } from "../app/refund-preview.js";
+import { createTestShopifyAdminClient } from "../../../packages/core/tests/test-shopify-admin-client.js";
 
 const orderId = "gid://shopify/Order/910000000090";
 const eligibleLineItemId = "gid://shopify/LineItem/700000000090";
@@ -153,11 +154,7 @@ test("previews a selected eligible refund through Shopify", async () => {
       adapter: makeAdapter(),
       config: policyConfig,
       shopifyPreviewDependencies: {
-        env: {
-          SHOPIFY_STORE_DOMAIN: "example.myshopify.com",
-          SHOPIFY_ADMIN_TOKEN: "shpat_test",
-        },
-        fetchImpl,
+        shopifyAdminClient: createTestShopifyAdminClient(fetchImpl),
       },
     },
   );
@@ -187,11 +184,6 @@ test("stops before Shopify preview when selected item is not eligible", async ()
     {
       adapter: makeAdapter({ secondItemFinalSale: true }),
       config: policyConfig,
-      shopifyPreviewDependencies: {
-        fetchImpl: async () => {
-          throw new Error("Blocked preview should not call Shopify.");
-        },
-      },
     },
   );
 

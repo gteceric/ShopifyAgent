@@ -5,6 +5,7 @@ import type {
 
 export interface RefundAgentRequest {
   orderId: string;
+  shopDomain: string | null;
   question: string;
 }
 

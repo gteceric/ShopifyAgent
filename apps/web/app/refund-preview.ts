@@ -2,6 +2,7 @@ import {
   createShopifyRefundContextAdapter,
   previewShopifyRefund,
   RefundActionValidationStatus,
+  type ShopifyAdminClient,
   type PreviewShopifyRefundDependencies,
   type RefundActionBlocker,
   type RefundActionMatchedLineItem,
@@ -10,6 +11,7 @@ import {
   type ShopifyRefundPreview,
 } from "@shopify-agent/core";
 import { loadMerchantRefundPolicyConfig } from "./dashboard-order-evaluation";
+import { resolveCurrentShopifyAdminClient } from "./shopify-admin-client-resolver";
 import {
   validateDashboardRefundAction,
   type DashboardRefundActionRequest,
@@ -45,6 +47,16 @@ export interface PreviewRefundDependencies {
   shopifyPreviewDependencies?: PreviewShopifyRefundDependencies;
 }
 
+function requireShopifyPreviewDependencies(
+  dependencies?: PreviewShopifyRefundDependencies,
+): PreviewShopifyRefundDependencies {
+  if (!dependencies) {
+    throw new Error("Shopify refund preview requires ShopifyAdminClient.");
+  }
+
+  return dependencies;
+}
+
 export async function previewRefund(
   input: RefundPreviewRequest,
   dependencies: PreviewRefundDependencies,
@@ -71,7 +83,9 @@ export async function previewRefund(
           quantity: lineItem.requestedQuantity,
         })),
       },
-      dependencies.shopifyPreviewDependencies,
+      requireShopifyPreviewDependencies(
+        dependencies.shopifyPreviewDependencies,
+      ),
     );
 
     return {
@@ -83,8 +97,7 @@ export async function previewRefund(
   } catch (error) {
     return {
       ok: false,
-      error:
-        error instanceof Error ? error.message : "Refund preview failed.",
+      error: error instanceof Error ? error.message : "Refund preview failed.",
     };
   }
 }
@@ -93,9 +106,33 @@ export async function previewRefundForDashboard(
   input: RefundPreviewRequest,
 ): Promise<RefundPreviewResult> {
   const config = await loadMerchantRefundPolicyConfig();
+  const useRealShopify = process.env.USE_REAL_SHOPIFY === "true";
+  let shopifyAdminClient: ShopifyAdminClient | undefined;
+
+  if (useRealShopify) {
+    shopifyAdminClient = await resolveCurrentShopifyAdminClient(
+      input.shopDomain ?? null,
+    );
+  }
   const dependencies: PreviewRefundDependencies = {
-    adapter: createShopifyRefundContextAdapter(),
+    adapter: createShopifyRefundContextAdapter(
+      shopifyAdminClient
+        ? {
+            env: process.env,
+            shopifyAdminClient,
+          }
+        : {
+            env: process.env,
+          },
+    ),
     config,
+    ...(shopifyAdminClient
+      ? {
+          shopifyPreviewDependencies: {
+            shopifyAdminClient,
+          },
+        }
+      : {}),
   };
 
   return previewRefund(input, dependencies);

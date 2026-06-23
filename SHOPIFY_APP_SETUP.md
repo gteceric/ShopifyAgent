@@ -45,6 +45,7 @@ merchant to approve the configured scopes.
 
 `read_orders` and `read_customers` access protected customer data.
 `read_products` allows refund checks to inspect product and variant context.
+`read_returns` allows refund checks to inspect returnable fulfillment context.
 Complete Shopify's protected customer data access request for the app before
 relying on real merchant order and customer data.
 

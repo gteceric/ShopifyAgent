@@ -14,6 +14,7 @@ import type {
 
 interface RefundPreviewPanelProps {
   orderId: string;
+  shopDomain: string | null;
   itemEvaluations: DashboardItemEvaluationViewModel[];
 }
 
@@ -101,6 +102,7 @@ function createRefundConfirmIdempotencyKey(orderId: string): string {
 
 export function RefundPreviewPanel({
   orderId,
+  shopDomain,
   itemEvaluations,
 }: RefundPreviewPanelProps) {
   const router = useRouter();
@@ -216,6 +218,7 @@ export function RefundPreviewPanel({
       setConfirmResult(null);
       const result = await previewRefundAction({
         orderId,
+        shopDomain,
         lineItems: getSelectedLineItemRequests(),
       });
 
@@ -241,6 +244,7 @@ export function RefundPreviewPanel({
       confirmIdempotencyKeyRef.current = idempotencyKey;
       const result = await confirmRefundAction({
         orderId,
+        shopDomain,
         lineItems: getSelectedLineItemRequests(),
         idempotencyKey,
         note: "Refund confirmed from dashboard preview.",

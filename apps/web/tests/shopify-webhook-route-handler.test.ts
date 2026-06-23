@@ -76,6 +76,7 @@ function makeDependencies(
   return {
     prisma,
     env: {
+      ...process.env,
       SHOPIFY_APP_CLIENT_SECRET: CLIENT_SECRET,
     },
     logger: {
@@ -97,7 +98,7 @@ function makeSignedWebhookRequest(input: {
       "x-shopify-topic": "orders/updated",
       "x-shopify-webhook-id": input.deliveryId,
     },
-    body: input.rawBody,
+    body: new Uint8Array(input.rawBody),
   });
 }
 

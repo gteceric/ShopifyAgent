@@ -10,6 +10,7 @@ import {
 
 export interface DashboardRefundActionRequest {
   orderId: string;
+  shopDomain?: string | null;
   lineItems: RefundActionLineItemRequest[];
 }
 
@@ -28,6 +29,7 @@ export function parseDashboardRefundActionRequest(
   input: DashboardRefundActionRequest,
 ): DashboardRefundActionRequest {
   const orderId = input.orderId.trim();
+  const shopDomain = input.shopDomain?.trim() || null;
   const lineItems = input.lineItems.map((lineItem) => ({
     lineItemId: lineItem.lineItemId.trim(),
     quantity: lineItem.quantity,
@@ -47,7 +49,7 @@ export function parseDashboardRefundActionRequest(
     }
   }
 
-  return { orderId, lineItems };
+  return { orderId, shopDomain, lineItems };
 }
 
 export async function validateDashboardRefundAction(

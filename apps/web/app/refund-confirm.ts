@@ -2,12 +2,14 @@ import {
   createShopifyRefundContextAdapter,
   executeShopifyRefundAction,
   RefundActionValidationStatus,
+  type ShopifyAdminClient,
   type ExecuteShopifyRefundActionDependencies,
   type RefundActionBlocker,
   type RefundActionMatchedLineItem,
   type ShopifyRefundActionResult,
 } from "@shopify-agent/core";
 import { loadMerchantRefundPolicyConfig } from "./dashboard-order-evaluation";
+import { resolveCurrentShopifyAdminClient } from "./shopify-admin-client-resolver";
 import {
   validateDashboardRefundAction,
   type DashboardRefundActionRequest,
@@ -124,9 +126,34 @@ export async function confirmRefundForDashboard(
   input: RefundConfirmRequest,
 ): Promise<RefundConfirmResult> {
   const config = await loadMerchantRefundPolicyConfig();
+  const useRealShopify = process.env.USE_REAL_SHOPIFY === "true";
+  let shopifyAdminClient: ShopifyAdminClient | undefined;
+
+  if (useRealShopify) {
+    shopifyAdminClient = await resolveCurrentShopifyAdminClient(
+      input.shopDomain ?? null,
+    );
+  }
   const dependencies: ConfirmRefundDependencies = {
-    adapter: createShopifyRefundContextAdapter(),
+    adapter: createShopifyRefundContextAdapter(
+      shopifyAdminClient
+        ? {
+            env: process.env,
+            shopifyAdminClient,
+          }
+        : {
+            env: process.env,
+          },
+    ),
     config,
+    ...(shopifyAdminClient
+      ? {
+          shopifyExecutionDependencies: {
+            env: process.env,
+            shopifyAdminClient,
+          },
+        }
+      : {}),
   };
 
   return confirmRefund(input, dependencies);

@@ -20,6 +20,7 @@ import { ShopifyAppBridgeConnect } from "./shopify-app-bridge-connect";
 
 interface DashboardProps {
   orders: DashboardOrder[];
+  shopDomain: string | null;
   initialState: DashboardUrlState;
   ordersLoadError?: string | null;
   selectedOrderError: DashboardOrderErrorState | null;
@@ -27,6 +28,7 @@ interface DashboardProps {
 
 export function Dashboard({
   orders,
+  shopDomain,
   initialState,
   ordersLoadError,
   selectedOrderError,
@@ -161,6 +163,7 @@ export function Dashboard({
           />
           <OrderDetailsPanel
             order={displayedOrder}
+            shopDomain={shopDomain}
             errorMessage={displayedOrderError}
             emptyMessage={emptyDetailsMessage}
             isPending={isPending}

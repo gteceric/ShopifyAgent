@@ -136,7 +136,7 @@ test("refreshes an expired access token and uses the rotated credentials", async
             expires_in: 3600,
             refresh_token: "rotated-refresh-token",
             refresh_token_expires_in: 7776000,
-            scope: "write_orders,read_products,read_customers,read_orders",
+            scope: "write_orders,read_returns,read_products,read_customers,read_orders",
           }),
           {
             status: 200,
@@ -202,6 +202,7 @@ test("refreshes an expired access token and uses the rotated credentials", async
     "read_customers",
     "read_orders",
     "read_products",
+    "read_returns",
     "write_orders",
   ]);
 });

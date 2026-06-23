@@ -87,9 +87,9 @@ test("confirms a selected eligible refund after revalidation", async () => {
       adapter: makeAdapter(),
       config: policyConfig,
       shopifyExecutionDependencies: {
-        env: {},
-        fetchImpl: async () => {
-          throw new Error("Mock refund execution should not call fetch.");
+        env: {
+          ...process.env,
+          USE_REAL_SHOPIFY: "false",
         },
       },
     },
@@ -125,11 +125,6 @@ test("blocks confirmation when revalidation finds an ineligible item", async () 
     {
       adapter: makeAdapter({ secondItemFinalSale: true }),
       config: policyConfig,
-      shopifyExecutionDependencies: {
-        fetchImpl: async () => {
-          throw new Error("Blocked confirmation should not call Shopify.");
-        },
-      },
     },
   );
 
