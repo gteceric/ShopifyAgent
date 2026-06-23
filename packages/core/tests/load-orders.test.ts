@@ -15,7 +15,7 @@ test("uses mock Shopify orders for order listing when real Shopify is disabled",
   const result = await loadOrders(
     { limit: 3 },
     {
-      env: {},
+      useRealShopify: false,
     },
   );
 
@@ -79,9 +79,7 @@ test("loads a recent order page from Shopify Admin when USE_REAL_SHOPIFY=true", 
   const result = await loadOrders(
     { limit: 2 },
     {
-      env: {
-        USE_REAL_SHOPIFY: "true",
-      },
+      useRealShopify: true,
       shopifyAdminClient: createTestShopifyAdminClient(fetchImpl),
     },
   );
@@ -107,9 +105,7 @@ test("throws when real Shopify order listing is requested without an Admin clien
       loadOrders(
         { limit: 5 },
         {
-          env: {
-            USE_REAL_SHOPIFY: "true",
-          },
+          useRealShopify: true,
         },
       ),
     /requires ShopifyAdminClient\./,

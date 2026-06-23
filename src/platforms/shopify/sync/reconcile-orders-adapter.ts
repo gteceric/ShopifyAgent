@@ -54,13 +54,19 @@ export function createShopifyReconcileOrdersDependencies(
   prisma: PrismaClient,
   shopifyAdminClient: ShopifyAdminClient,
 ): ReconcileOrdersDependencies {
+  const useRealShopify = process.env.USE_REAL_SHOPIFY === "true";
+
+  if (!useRealShopify) {
+    throw new Error(
+      "Shopify order reconciliation requires USE_REAL_SHOPIFY=true.",
+    );
+  }
+
   return {
     prisma,
     loadOrderCandidatesFn: async (loadInput) => {
       const shopifyOrders = await loadOrders(loadInput, {
-        env: {
-          USE_REAL_SHOPIFY: "true",
-        },
+        useRealShopify,
         shopifyAdminClient,
       });
 

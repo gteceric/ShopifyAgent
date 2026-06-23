@@ -129,10 +129,7 @@ export async function loadDashboardOrderSummaries(
       limit: input.limit,
     },
     {
-      env: {
-        ...process.env,
-        USE_REAL_SHOPIFY: "true",
-      },
+      useRealShopify: input.useRealShopify,
       shopifyAdminClient: realShopifyDependencies.shopifyAdminClient,
     },
   );

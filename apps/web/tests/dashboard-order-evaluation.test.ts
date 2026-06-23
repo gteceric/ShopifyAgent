@@ -361,21 +361,12 @@ test("summarizes mixed pending and eligible line items as manual review", () => 
 });
 
 test("loads merchant policy config from refund window env", async () => {
-  const previousRefundWindowDays = process.env.REFUND_WINDOW_DAYS;
+  const config = await loadMerchantRefundPolicyConfig({
+    ...process.env,
+    REFUND_WINDOW_DAYS: "999",
+  });
 
-  try {
-    process.env.REFUND_WINDOW_DAYS = "999";
-
-    const config = await loadMerchantRefundPolicyConfig();
-
-    assert.equal(config.refundWindowDays, 999);
-  } finally {
-    if (previousRefundWindowDays === undefined) {
-      delete process.env.REFUND_WINDOW_DAYS;
-    } else {
-      process.env.REFUND_WINDOW_DAYS = previousRefundWindowDays;
-    }
-  }
+  assert.equal(config.refundWindowDays, 999);
 });
 
 test("summarizes missing returnable fulfillment distinctly", () => {

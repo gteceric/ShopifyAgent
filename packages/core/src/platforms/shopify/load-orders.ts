@@ -23,7 +23,7 @@ export interface LoadShopifyOrdersInput {
 }
 
 export interface LoadShopifyOrdersDependencies {
-  env?: NodeJS.ProcessEnv;
+  useRealShopify?: boolean;
   shopifyAdminClient?: ShopifyAdminClient;
 }
 
@@ -52,10 +52,6 @@ interface ShopifyOrdersListResponse {
 }
 
 const DEFAULT_ORDERS_LIMIT = 25;
-
-function shouldUseRealShopify(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.USE_REAL_SHOPIFY === "true";
-}
 
 function mapFinancialStatus(status?: string | null): FinancialStatus {
   switch (status) {
@@ -144,7 +140,7 @@ export async function loadOrders(
   input: LoadShopifyOrdersInput = {},
   dependencies: LoadShopifyOrdersDependencies = {},
 ): Promise<ShopifyOrderSummary[]> {
-  if (shouldUseRealShopify(dependencies.env)) {
+  if (dependencies.useRealShopify) {
     if (!dependencies.shopifyAdminClient) {
       throw new Error("Real Shopify order listing requires ShopifyAdminClient.");
     }

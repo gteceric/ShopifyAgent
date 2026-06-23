@@ -27,8 +27,10 @@ export interface DashboardOrderErrorState {
 // Merchant refund policy should eventually be loaded from merchant-owned
 // settings storage. For now, keep the same policy-loading boundary but source
 // it from env-backed config so local merchant settings affect the dashboard.
-export async function loadMerchantRefundPolicyConfig(): Promise<RefundPolicyConfig> {
-  return createPolicyConfig();
+export async function loadMerchantRefundPolicyConfig(
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<RefundPolicyConfig> {
+  return createPolicyConfig(env);
 }
 
 function formatStatusLabel(value: string): string {
