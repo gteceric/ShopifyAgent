@@ -1,74 +1,89 @@
 import {
   readOptionalPositiveIntegerEnv,
   readOptionalStringEnv,
+  readRequiredStringEnv,
 } from "@shopify-agent/core";
 import { createPrismaClient } from "../../persistence/prisma-client.js";
-import { createShopifyAdminClientFromEnv } from "../../platforms/shopify/admin-client/env-admin-client.js";
-import {
-  createShopifyReconcileOrdersDependencies,
-  loadShopifyReconciliationInput,
-} from "../../platforms/shopify/sync/reconcile-orders-adapter.js";
-import {
-  reconcileOrders,
-  type PlatformReconciliationInput,
-  type ReconcileOrdersInput,
-} from "../../sync/reconcile-orders.js";
+import { reconcileInstalledShopifyShops } from "../../platforms/shopify/sync/reconcile-installed-shops.js";
+import { readCredentialEncryptionKey } from "../../security/credential-encryption.js";
 
-async function loadPlatformReconciliationInput(
-  platform: string,
-  shopifyAdminClient: ReturnType<typeof createShopifyAdminClientFromEnv>,
-): Promise<PlatformReconciliationInput> {
-  switch (platform) {
-    case "shopify":
-      return loadShopifyReconciliationInput(shopifyAdminClient);
+const SHOPIFY_TOKEN_ENCRYPTION_KEY_ENV = "SHOPIFY_TOKEN_ENCRYPTION_KEY";
 
-    default:
-      throw new Error(
-        `No reconciliation CLI adapter is configured for ${platform}.`,
-      );
+function requireShopifyReconciliationPlatform(): void {
+  const platform = readOptionalStringEnv("RECONCILE_PLATFORM") ?? "shopify";
+
+  if (platform !== "shopify") {
+    throw new Error(
+      `No reconciliation CLI adapter is configured for ${platform}.`,
+    );
   }
 }
 
 async function main(): Promise<void> {
-  const platform = readOptionalStringEnv("RECONCILE_PLATFORM") ?? "shopify";
+  requireShopifyReconciliationPlatform();
+
   const limit = readOptionalPositiveIntegerEnv("RECONCILE_ORDER_LIMIT");
-  const shopifyAdminClient = createShopifyAdminClientFromEnv(fetch);
-  const platformInput = await loadPlatformReconciliationInput(
-    platform,
-    shopifyAdminClient,
+  const shopLimit = readOptionalPositiveIntegerEnv("RECONCILE_SHOP_LIMIT");
+  const appClientId = readRequiredStringEnv("SHOPIFY_APP_CLIENT_ID");
+  const appClientSecret = readRequiredStringEnv("SHOPIFY_APP_CLIENT_SECRET");
+  const credentialEncryptionKey = readCredentialEncryptionKey(
+    SHOPIFY_TOKEN_ENCRYPTION_KEY_ENV,
   );
   const prisma = createPrismaClient();
-  const reconcileInput: ReconcileOrdersInput = {
-    platform,
-    platformAccountId: platformInput.platformAccountId,
-    platformAccountData: platformInput.platformAccountData,
-    platformContext: platformInput.platformContext,
-    limit,
-  };
-  const reconcileDependencies =
-    createShopifyReconcileOrdersDependencies(prisma, shopifyAdminClient);
 
   try {
-    const result = await reconcileOrders(reconcileInput, reconcileDependencies);
+    const result = await reconcileInstalledShopifyShops(
+      {
+        orderLimit: limit,
+        shopLimit,
+      },
+      {
+        prisma,
+        credentialEncryptionKey,
+        appClientId,
+        appClientSecret,
+        apiVersion: process.env.SHOPIFY_API_VERSION,
+        fetchImpl: fetch,
+      },
+    );
+    const failedReconciliationCount = result.reconciledInstallations.filter(
+      (installation) => installation.reconciliation.status === "failed",
+    ).length;
 
-    console.log("Shopify order reconciliation finished");
+    console.log("Shopify installed-shop reconciliation finished");
     console.log(
       JSON.stringify(
         {
-          localSyncRunId: result.localSyncRunId,
-          localPlatformAccountId: result.localPlatformAccountId,
-          status: result.status,
-          candidateOrderCount: result.candidateOrderCount,
-          syncedCount: result.syncedOrders.length,
-          failedCount: result.failedOrders.length,
-          failedOrders: result.failedOrders,
+          candidateInstallationCount: result.candidateInstallationCount,
+          reconciledCount: result.reconciledInstallations.length,
+          failedInstallationCount: result.failedInstallations.length,
+          failedReconciliationCount,
+          reconciledInstallations: result.reconciledInstallations.map(
+            (installation) => ({
+              localSyncRunId: installation.reconciliation.localSyncRunId,
+              localPlatformAccountId:
+                installation.reconciliation.localPlatformAccountId,
+              platformAccountId: installation.platformAccountId,
+              shopDomain: installation.shopDomain,
+              status: installation.reconciliation.status,
+              candidateOrderCount:
+                installation.reconciliation.candidateOrderCount,
+              syncedCount: installation.reconciliation.syncedOrders.length,
+              failedCount: installation.reconciliation.failedOrders.length,
+              failedOrders: installation.reconciliation.failedOrders,
+            }),
+          ),
+          failedInstallations: result.failedInstallations,
         },
         null,
         2,
       ),
     );
 
-    if (result.status === "failed") {
+    if (
+      result.failedInstallations.length > 0 ||
+      failedReconciliationCount > 0
+    ) {
       process.exitCode = 1;
     }
   } finally {
