@@ -1,0 +1,2 @@
+-- RenameIndex
+ALTER INDEX "platform_events_platform_platform_account_id_platform_event_id_" RENAME TO "platform_events_platform_platform_account_id_platform_event_key";

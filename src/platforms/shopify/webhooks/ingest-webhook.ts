@@ -179,12 +179,14 @@ function isUniqueConstraintViolation(error: unknown): boolean {
 
 async function findExistingPlatformEvent(
   prisma: IngestShopifyWebhookClient,
+  localPlatformAccountId: string,
   platformEventId: string,
 ): Promise<PlatformEvent | null> {
   return prisma.platformEvent.findUnique({
     where: {
-      platform_platformEventId: {
+      platform_platformAccountId_platformEventId: {
         platform: SHOPIFY_PLATFORM,
+        platformAccountId: localPlatformAccountId,
         platformEventId,
       },
     },
@@ -274,6 +276,7 @@ export async function ingestShopifyWebhook(
 
   const existingPlatformEvent = await findExistingPlatformEvent(
     dependencies.prisma,
+    localPlatformAccount.id,
     platformEventId,
   );
 
@@ -305,6 +308,7 @@ export async function ingestShopifyWebhook(
 
     const duplicatePlatformEvent = await findExistingPlatformEvent(
       dependencies.prisma,
+      localPlatformAccount.id,
       platformEventId,
     );
 

@@ -195,7 +195,7 @@ model PlatformEvent {
 
   platformAccount PlatformAccount? @relation(fields: [platformAccountId], references: [id], onDelete: SetNull)
 
-  @@unique([platform, platformEventId])
+  @@unique([platform, platformAccountId, platformEventId])
   @@index([platformAccountId])
   @@index([platform, eventType])
   @@map("platform_events")

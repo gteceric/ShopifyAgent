@@ -254,11 +254,15 @@ async function sendSignedShopifyWebhook(input: {
 async function cleanupSyntheticPlatformEvent(
   prisma: ReturnType<typeof createPrismaClient>,
   platformEventId: string,
+  localPlatformAccountId?: string,
 ): Promise<number> {
   const deleteResult = await prisma.platformEvent.deleteMany({
     where: {
       platform: SHOPIFY_PLATFORM,
       platformEventId,
+      ...(localPlatformAccountId
+        ? { platformAccountId: localPlatformAccountId }
+        : {}),
     },
   });
 
@@ -361,18 +365,18 @@ async function main(): Promise<void> {
     const localPlatformEventCount = await prisma.platformEvent.count({
       where: {
         platform: SHOPIFY_PLATFORM,
+        platformAccountId: syntheticPlatformAccount.id,
         platformEventId,
       },
     });
 
     assert.equal(localPlatformEventCount, 1);
 
-    const localPlatformEvent = await prisma.platformEvent.findUnique({
+    const localPlatformEvent = await prisma.platformEvent.findFirst({
       where: {
-        platform_platformEventId: {
-          platform: SHOPIFY_PLATFORM,
-          platformEventId,
-        },
+        platform: SHOPIFY_PLATFORM,
+        platformAccountId: syntheticPlatformAccount.id,
+        platformEventId,
       },
     });
 
@@ -420,12 +424,16 @@ async function main(): Promise<void> {
       cleanupDeletedCount = await cleanupSyntheticPlatformEvent(
         prisma,
         platformEventId,
+        syntheticPlatformAccount?.id,
       );
 
       const remainingSyntheticPlatformEventCount =
         await prisma.platformEvent.count({
           where: {
             platform: SHOPIFY_PLATFORM,
+            ...(syntheticPlatformAccount?.id
+              ? { platformAccountId: syntheticPlatformAccount.id }
+              : {}),
             platformEventId,
           },
         });

@@ -20,7 +20,9 @@ function signBody(rawBody: Buffer): string {
     .digest("base64");
 }
 
-function makePlatformAccount(): PlatformAccount {
+function makePlatformAccount(
+  overrides: Partial<PlatformAccount> = {},
+): PlatformAccount {
   return {
     id: "local-platform-account-1",
     platform: "shopify",
@@ -30,6 +32,7 @@ function makePlatformAccount(): PlatformAccount {
     rawPayload: null,
     createdAt: new Date("2026-06-03T00:00:00.000Z"),
     updatedAt: new Date("2026-06-03T00:00:00.000Z"),
+    ...overrides,
   };
 }
 
@@ -54,31 +57,60 @@ function makePlatformEvent(
 class FakeIngestShopifyWebhookClient implements IngestShopifyWebhookClient {
   readonly createdPlatformEventData: Prisma.PlatformEventUncheckedCreateInput[] =
     [];
+  readonly localPlatformAccounts: PlatformAccount[];
+  readonly existingPlatformEvents: PlatformEvent[];
 
   constructor(
-    readonly localPlatformAccount: PlatformAccount | null = makePlatformAccount(),
-    readonly existingPlatformEvent: PlatformEvent | null = null,
-  ) {}
+    localPlatformAccount:
+      | PlatformAccount
+      | PlatformAccount[]
+      | null = makePlatformAccount(),
+    existingPlatformEvent: PlatformEvent | PlatformEvent[] | null = null,
+  ) {
+    this.localPlatformAccounts = Array.isArray(localPlatformAccount)
+      ? localPlatformAccount
+      : localPlatformAccount
+        ? [localPlatformAccount]
+        : [];
+    this.existingPlatformEvents = Array.isArray(existingPlatformEvent)
+      ? existingPlatformEvent
+      : existingPlatformEvent
+        ? [existingPlatformEvent]
+        : [];
+  }
 
   readonly platformAccount = {
     findFirst: async (args: Prisma.PlatformAccountFindFirstArgs) => {
       const where = args.where;
-      const localPlatformAccount = this.localPlatformAccount;
 
-      if (
-        localPlatformAccount &&
-        localPlatformAccount.platform === where?.platform &&
-        localPlatformAccount.shopDomain === where?.shopDomain
-      ) {
-        return localPlatformAccount;
-      }
-
-      return null;
+      return (
+        this.localPlatformAccounts.find(
+          (localPlatformAccount) =>
+            localPlatformAccount.platform === where?.platform &&
+            localPlatformAccount.shopDomain === where?.shopDomain,
+        ) ?? null
+      );
     },
   };
 
   readonly platformEvent = {
-    findUnique: async () => this.existingPlatformEvent,
+    findUnique: async (args: Prisma.PlatformEventFindUniqueArgs) => {
+      const uniqueInput =
+        args.where.platform_platformAccountId_platformEventId;
+
+      if (!uniqueInput) {
+        return null;
+      }
+
+      return (
+        this.existingPlatformEvents.find(
+          (event) =>
+            event.platform === uniqueInput.platform &&
+            event.platformAccountId === uniqueInput.platformAccountId &&
+            event.platformEventId === uniqueInput.platformEventId,
+        ) ?? null
+      );
+    },
     create: async (args: Prisma.PlatformEventCreateArgs) => {
       const data = args.data as Prisma.PlatformEventUncheckedCreateInput;
 
@@ -184,6 +216,7 @@ test("maps a refund webhook order ID to a Shopify order GID", async () => {
 
 test("accepts a duplicate signed webhook without inserting another inbox event", async () => {
   const existingPlatformEvent = makePlatformEvent({
+    platformAccountId: "local-platform-account-1",
     platform: "shopify",
     eventType: "orders/updated",
     platformEventId: "webhook-delivery-1",
@@ -210,6 +243,60 @@ test("accepts a duplicate signed webhook without inserting another inbox event",
   assert.equal(result.duplicate, true);
   assert.equal(result.localPlatformEventId, existingPlatformEvent.id);
   assert.deepEqual(client.createdPlatformEventData, []);
+});
+
+test("scopes duplicate webhook detection to the installed shop", async () => {
+  const firstPlatformAccount = makePlatformAccount();
+  const secondPlatformAccount = makePlatformAccount({
+    id: "local-platform-account-2",
+    platformAccountId: "gid://shopify/Shop/2",
+    shopDomain: "second-shop.myshopify.com",
+  });
+  const existingPlatformEvent = makePlatformEvent({
+    platformAccountId: firstPlatformAccount.id,
+    platform: "shopify",
+    eventType: "orders/updated",
+    platformEventId: "webhook-delivery-1",
+    resourceType: "order",
+    resourceId: "gid://shopify/Order/123",
+    payload: {
+      platformOrderId: "gid://shopify/Order/123",
+    },
+  });
+  const client = new FakeIngestShopifyWebhookClient(
+    [firstPlatformAccount, secondPlatformAccount],
+    existingPlatformEvent,
+  );
+  const result = await ingestShopifyWebhook(
+    makeSignedWebhookInput(
+      "orders/updated",
+      {
+        admin_graphql_api_id: "gid://shopify/Order/456",
+      },
+      {
+        "x-shopify-shop-domain": "second-shop.myshopify.com",
+      },
+    ),
+    {
+      prisma: client,
+      env,
+    },
+  );
+
+  assert.equal(result.duplicate, false);
+  assert.deepEqual(client.createdPlatformEventData, [
+    {
+      platformAccountId: "local-platform-account-2",
+      platform: "shopify",
+      eventType: "orders/updated",
+      platformEventId: "webhook-delivery-1",
+      resourceType: "order",
+      resourceId: "gid://shopify/Order/456",
+      payload: {
+        platformOrderId: "gid://shopify/Order/456",
+      },
+    },
+  ]);
 });
 
 test("rejects a webhook with an invalid HMAC", async () => {
