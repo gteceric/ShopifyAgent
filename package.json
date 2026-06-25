@@ -27,6 +27,7 @@
     "shopify-webhooks:smoke:synthetic": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/run-webhook-smoke-test.js",
     "shopify-webhooks:serve": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/run-webhook-server.js",
     "shopify-tokens:maintain": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/maintain-installation-tokens.js",
+    "shopify-tokens:refresh-smoke": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/run-token-refresh-smoke-test.js",
     "sync-shopify-order": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/sync-order.js",
     "reconcile-orders": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/reconcile-orders.js",
     "test": "npm run cleanbuild && node --test build/tests/**/*.test.js",
