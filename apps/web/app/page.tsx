@@ -9,6 +9,8 @@ import {
   requireResolvedShopifyAdminClient,
   resolveCurrentShopifyAdminClient,
 } from "./shopify-admin-client-resolver";
+import { isShopifyInstallationRequiresReauthorizationError } from "../../../src/platforms/shopify/persistence/installation";
+import { ShopifyConnectionStatus } from "./shopify-connection-status";
 import {
   applyRefundEvaluationToOrder,
   loadMerchantRefundPolicyConfig,
@@ -46,6 +48,8 @@ export default async function Home({ searchParams }: HomeProps) {
   const merchantPolicyConfig = await loadMerchantRefundPolicyConfig();
   let orders: DashboardOrder[] = [];
   let ordersLoadError: string | null = null;
+  let shopifyConnectionStatus: ShopifyConnectionStatus =
+    ShopifyConnectionStatus.Ready;
   // Keep row-level refund-check failures separate from top-level order-feed
   // failures so the dashboard can still render partial success.
   const orderEvaluationErrors = new Map<string, string>();
@@ -111,10 +115,7 @@ export default async function Home({ searchParams }: HomeProps) {
       const evaluationOutcome = evaluationOutcomes[index];
 
       if (evaluationOutcome?.status === "fulfilled") {
-        return applyRefundEvaluationToOrder(
-          baseOrder,
-          evaluationOutcome.value,
-        );
+        return applyRefundEvaluationToOrder(baseOrder, evaluationOutcome.value);
       }
 
       if (evaluationOutcome?.status === "rejected") {
@@ -129,8 +130,14 @@ export default async function Home({ searchParams }: HomeProps) {
       return baseOrder;
     });
   } catch (error) {
-    ordersLoadError =
-      error instanceof Error ? error.message : "Shopify order loading failed.";
+    if (isShopifyInstallationRequiresReauthorizationError(error)) {
+      shopifyConnectionStatus = ShopifyConnectionStatus.RequiresReauthorization;
+    } else {
+      ordersLoadError =
+        error instanceof Error
+          ? error.message
+          : "Shopify order loading failed.";
+    }
   }
 
   const initialState = parseDashboardUrlState(resolvedSearchParams, orders);
@@ -159,6 +166,7 @@ export default async function Home({ searchParams }: HomeProps) {
       shopDomain={readSearchParamValue(resolvedSearchParams, "shop")}
       initialState={initialState}
       ordersLoadError={ordersLoadError}
+      shopifyConnectionStatus={shopifyConnectionStatus}
       selectedOrderError={selectedOrderError}
     />
   );

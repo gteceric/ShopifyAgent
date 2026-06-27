@@ -254,6 +254,10 @@ from failures that should be retried automatically.
 - Show merchants whose installation requires reauthorization a clear UI warning
   and reconnect action. Backend errors and maintenance logs are operator
   signals, not substitutes for the merchant-facing prompt.
+- Do not pass backend error messages directly into merchant-facing UI. Map
+  backend errors to stable status codes or enum-like states at the application
+  boundary, then let the UI choose display copy. This keeps localization,
+  wording changes, and operator diagnostics separate.
 - Restore `active` status only after valid new credentials are persisted.
 
 ## Shopify Managed Installation

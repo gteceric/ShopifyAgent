@@ -5,10 +5,7 @@ import {
 } from "@shopify-agent/core";
 import type { PlatformAccount, Prisma } from "@prisma/client";
 import { resolveShopifyAdminClient } from "../../../src/platforms/shopify/admin-client/resolve-admin-client";
-import {
-  SHOPIFY_INSTALLATION_ACTIVE_STATUS,
-  type ShopifyInstallationClient,
-} from "../../../src/platforms/shopify/persistence/installation";
+import { type ShopifyInstallationClient } from "../../../src/platforms/shopify/persistence/installation";
 
 const SHOPIFY_PLATFORM = "shopify";
 
@@ -66,19 +63,17 @@ function requireRealShopifyDependencies(
   return dependencies.realShopify;
 }
 
-async function findActiveShopifyPlatformAccount(
+async function findShopifyPlatformAccount(
   shopDomain: string,
   prisma: DashboardOrderSummariesClient,
 ): Promise<PlatformAccount> {
   const where: Prisma.PlatformAccountWhereInput = {
     platform: SHOPIFY_PLATFORM,
     shopDomain,
-    shopifyInstallation: {
-      is: {
-        status: SHOPIFY_INSTALLATION_ACTIVE_STATUS,
-      },
-    },
   };
+
+  // Find the Shopify platform account for this shop,
+  // regardless of installation status.
   const localPlatformAccount = await prisma.platformAccount.findFirst({
     where,
     orderBy: {
@@ -87,7 +82,7 @@ async function findActiveShopifyPlatformAccount(
   });
 
   if (!localPlatformAccount) {
-    throw new Error(`No active Shopify installation was found for ${shopDomain}.`);
+    throw new Error(`No Shopify installation was found for ${shopDomain}.`);
   }
 
   return localPlatformAccount;
@@ -98,7 +93,7 @@ export async function resolveDashboardShopifyAdminClient(
   dependencies: ResolveDashboardShopifyAdminClientDependencies,
 ): Promise<ShopifyAdminClient> {
   const shopDomain = readRequiredShopDomain(input.shopDomain);
-  const localPlatformAccount = await findActiveShopifyPlatformAccount(
+  const localPlatformAccount = await findShopifyPlatformAccount(
     shopDomain,
     dependencies.prisma,
   );

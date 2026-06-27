@@ -139,6 +139,10 @@ test("loads real dashboard order summaries with the stored installation token", 
     prisma.platformAccountFindFirstArgs?.where?.shopDomain,
     "commerceops-dev.myshopify.com",
   );
+  assert.deepEqual(prisma.platformAccountFindFirstArgs?.where, {
+    platform: "shopify",
+    shopDomain: "commerceops-dev.myshopify.com",
+  });
   assert.deepEqual(prisma.platformAccountFindFirstArgs?.orderBy, {
     updatedAt: "desc",
   });

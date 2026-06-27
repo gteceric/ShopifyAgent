@@ -17,12 +17,14 @@ import { DashboardHero } from "./dashboard-hero";
 import { OrderDetailsPanel } from "./order-details-panel";
 import { OrdersPanel } from "./orders-panel";
 import { ShopifyAppBridgeConnect } from "./shopify-app-bridge-connect";
+import { ShopifyConnectionStatus } from "./shopify-connection-status";
 
 interface DashboardProps {
   orders: DashboardOrder[];
   shopDomain: string | null;
   initialState: DashboardUrlState;
   ordersLoadError?: string | null;
+  shopifyConnectionStatus: ShopifyConnectionStatus;
   selectedOrderError: DashboardOrderErrorState | null;
 }
 
@@ -31,6 +33,7 @@ export function Dashboard({
   shopDomain,
   initialState,
   ordersLoadError,
+  shopifyConnectionStatus,
   selectedOrderError,
 }: DashboardProps) {
   const pathname = usePathname();
@@ -73,13 +76,23 @@ export function Dashboard({
     dashboardState.search.trim().length > 0 ||
     dashboardState.decisionFilter !== "all" ||
     dashboardState.ageFilter !== "all";
+  const requiresShopifyReauthorization =
+    shopifyConnectionStatus ===
+    ShopifyConnectionStatus.RequiresReauthorization;
   const summary = getSummary(filteredOrders);
-  const emptyDetailsMessage =
-    ordersLoadError && orders.length === 0
-      ? "Live Shopify orders could not be loaded. Fix the connection details or retry the order feed."
-      : filteredOrders.length === 0 && orders.length > 0
-        ? "No order matches the current search and filters. Adjust the queue to inspect refund guidance."
-        : "Select an order to inspect refund posture, policy reasoning, and next-step guidance.";
+  let emptyDetailsMessage =
+    "Select an order to inspect refund posture, policy reasoning, and next-step guidance.";
+
+  if (requiresShopifyReauthorization) {
+    emptyDetailsMessage =
+      "Reconnect Shopify to reload live orders and refund guidance.";
+  } else if (ordersLoadError && orders.length === 0) {
+    emptyDetailsMessage =
+      "Live Shopify orders could not be loaded. Fix the connection details or retry the order feed.";
+  } else if (filteredOrders.length === 0 && orders.length > 0) {
+    emptyDetailsMessage =
+      "No order matches the current search and filters. Adjust the queue to inspect refund guidance.";
+  }
 
   function updateDashboardState(
     nextState: DashboardUrlState,
@@ -109,7 +122,9 @@ export function Dashboard({
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(180,138,56,0.23),transparent_28%),radial-gradient(circle_at_top_right,rgba(80,100,67,0.18),transparent_24%),linear-gradient(180deg,#fbf7ef_0%,#f1e5d5_100%)] px-4 py-6 text-stone-950 sm:px-6 lg:px-8">
       <div className="mx-auto grid max-w-[1380px] gap-6">
-        <ShopifyAppBridgeConnect />
+        <ShopifyAppBridgeConnect
+          shopifyConnectionStatus={shopifyConnectionStatus}
+        />
 
         <DashboardHero
           totalOrders={orders.length}
@@ -118,7 +133,9 @@ export function Dashboard({
           manualReviewCount={summary.manualReviewCount}
           blockedCount={summary.blockedCount}
           hasActiveFilters={hasActiveFilters}
-          isUsingLiveOrders={!ordersLoadError}
+          isUsingLiveOrders={
+            !ordersLoadError && !requiresShopifyReauthorization
+          }
         />
 
         {ordersLoadError ? (
