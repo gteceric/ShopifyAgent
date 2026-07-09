@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import test from "node:test";
-import type { PlatformAccount, PlatformEvent, Prisma } from "@prisma/client";
+import type {
+  PlatformAccount,
+  PlatformEvent,
+  Prisma,
+  ShopifyInstallation,
+} from "@prisma/client";
 import {
   handleShopifyWebhookRequest,
   type ShopifyWebhookRouteHandlerDependencies,
@@ -50,8 +55,31 @@ function makePlatformEvent(input: {
   };
 }
 
+function makeShopifyInstallation(): ShopifyInstallation {
+  return {
+    id: "shopify-installation-1",
+    platformAccountId: "platform-account-1",
+    status: "active",
+    encryptedAccessToken: "encrypted-access-token",
+    encryptedRefreshToken: "encrypted-refresh-token",
+    accessTokenExpiresAt: new Date("2026-06-16T01:00:00.000Z"),
+    refreshTokenExpiresAt: new Date("2026-09-14T00:00:00.000Z"),
+    grantedScopes: ["read_orders"],
+    installedAt: NOW,
+    uninstalledAt: null,
+    createdAt: NOW,
+    updatedAt: NOW,
+  };
+}
+
 class FakeShopifyWebhookRouteClient implements ShopifyWebhookRouteClient {
   platformEventCreateArgs?: Prisma.PlatformEventCreateArgs;
+
+  async $transaction<T>(
+    callback: (transaction: ShopifyWebhookRouteClient) => Promise<T>,
+  ): Promise<T> {
+    return callback(this);
+  }
 
   platformAccount = {
     findFirst: async () => makePlatformAccount(),
@@ -67,6 +95,12 @@ class FakeShopifyWebhookRouteClient implements ShopifyWebhookRouteClient {
         resourceId: String(args.data.resourceId),
       });
     },
+  };
+
+  shopifyInstallation = {
+    findUnique: async () => makeShopifyInstallation(),
+    update: async () => makeShopifyInstallation(),
+    upsert: async () => makeShopifyInstallation(),
   };
 }
 

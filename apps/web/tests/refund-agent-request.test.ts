@@ -37,6 +37,7 @@ test("trims validated request fields before returning them", () => {
     ok: true,
     data: {
       orderId: "gid://shopify/Order/123",
+      shopDomain: null,
       question: "Can I refund this order?",
     },
   });

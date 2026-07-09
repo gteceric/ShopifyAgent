@@ -3,7 +3,8 @@
   "compilerOptions": {
     "outDir": "build",
     "rootDir": ".",
-    "declaration": false
+    "declaration": false,
+    "declarationMap": false
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"],
   "exclude": ["dist", "build", "node_modules"]

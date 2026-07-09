@@ -8,9 +8,29 @@ import {
   type ShopifyWebhookHeaders,
   verifyShopifyWebhookHmac,
 } from "./verify-webhook.js";
+import {
+  deactivateShopifyInstallation,
+  type ShopifyInstallationClient,
+} from "../persistence/installation.js";
 
 const SHOPIFY_PLATFORM = "shopify";
 const SHOPIFY_ORDER_GID_PATTERN = /^gid:\/\/shopify\/Order\/\d+$/;
+
+const ShopifyWebhookResourceType = {
+  Order: "order",
+  Shop: "shop",
+} as const;
+
+type ShopifyWebhookResourceType =
+  (typeof ShopifyWebhookResourceType)[keyof typeof ShopifyWebhookResourceType];
+
+const ShopifyWebhookTopicCategory = {
+  App: "app",
+  Order: "order",
+} as const;
+
+type ShopifyWebhookTopicCategory =
+  (typeof ShopifyWebhookTopicCategory)[keyof typeof ShopifyWebhookTopicCategory];
 
 export const SHOPIFY_WEBHOOK_ID_HEADER = "x-shopify-webhook-id";
 export const SHOPIFY_WEBHOOK_TOPIC_HEADER = "x-shopify-topic";
@@ -31,8 +51,23 @@ export const SUPPORTED_SHOPIFY_ORDER_WEBHOOK_TOPICS = [
 export type SupportedShopifyOrderWebhookTopic =
   (typeof SUPPORTED_SHOPIFY_ORDER_WEBHOOK_TOPICS)[number];
 
-const SupportedShopifyOrderWebhookTopicSchema = z.enum(
-  SUPPORTED_SHOPIFY_ORDER_WEBHOOK_TOPICS,
+export const SUPPORTED_SHOPIFY_APP_WEBHOOK_TOPICS = [
+  "app/uninstalled",
+] as const;
+
+export type SupportedShopifyAppWebhookTopic =
+  (typeof SUPPORTED_SHOPIFY_APP_WEBHOOK_TOPICS)[number];
+
+const SUPPORTED_SHOPIFY_WEBHOOK_TOPICS = [
+  ...SUPPORTED_SHOPIFY_ORDER_WEBHOOK_TOPICS,
+  ...SUPPORTED_SHOPIFY_APP_WEBHOOK_TOPICS,
+] as const;
+
+type SupportedShopifyWebhookTopic =
+  (typeof SUPPORTED_SHOPIFY_WEBHOOK_TOPICS)[number];
+
+const SupportedShopifyWebhookTopicSchema = z.enum(
+  SUPPORTED_SHOPIFY_WEBHOOK_TOPICS,
 );
 const ShopifyOrderWebhookPayloadSchema = z.looseObject({
   admin_graphql_api_id: z.string().regex(SHOPIFY_ORDER_GID_PATTERN),
@@ -41,7 +76,16 @@ const ShopifyOrderChildWebhookPayloadSchema = z.looseObject({
   order_id: z.union([z.number().int().positive(), z.string().regex(/^\d+$/)]),
 });
 
-export interface IngestShopifyWebhookClient {
+interface IngestShopifyWebhookTransaction extends ShopifyInstallationClient {
+  platformEvent: {
+    create(args: Prisma.PlatformEventCreateArgs): Promise<PlatformEvent>;
+  };
+}
+
+export interface IngestShopifyWebhookClient extends ShopifyInstallationClient {
+  $transaction<T>(
+    callback: (transaction: IngestShopifyWebhookTransaction) => Promise<T>,
+  ): Promise<T>;
   platformAccount: {
     findFirst(
       args: Prisma.PlatformAccountFindFirstArgs,
@@ -68,8 +112,18 @@ export interface IngestShopifyWebhookDependencies {
 export interface IngestShopifyWebhookResult {
   duplicate: boolean;
   localPlatformEventId: string;
-  platformOrderId: string;
+  platformOrderId?: string;
 }
+
+type ShopifyWebhookTopicRoute =
+  | {
+      category: typeof ShopifyWebhookTopicCategory.App;
+      topic: SupportedShopifyAppWebhookTopic;
+    }
+  | {
+      category: typeof ShopifyWebhookTopicCategory.Order;
+      topic: SupportedShopifyOrderWebhookTopic;
+    };
 
 export class ShopifyWebhookRequestError extends Error {
   readonly httpStatusCode: number;
@@ -131,8 +185,8 @@ function parseWebhookPayload(rawBody: Buffer): unknown {
   }
 }
 
-function parseSupportedTopic(value: string): SupportedShopifyOrderWebhookTopic {
-  const result = SupportedShopifyOrderWebhookTopicSchema.safeParse(value);
+function parseSupportedTopic(value: string): SupportedShopifyWebhookTopic {
+  const result = SupportedShopifyWebhookTopicSchema.safeParse(value);
 
   if (!result.success) {
     throw new ShopifyWebhookRequestError(
@@ -142,6 +196,46 @@ function parseSupportedTopic(value: string): SupportedShopifyOrderWebhookTopic {
   }
 
   return result.data;
+}
+
+function isOrderWebhookTopic(
+  topic: SupportedShopifyWebhookTopic,
+): topic is SupportedShopifyOrderWebhookTopic {
+  return (SUPPORTED_SHOPIFY_ORDER_WEBHOOK_TOPICS as readonly string[]).includes(
+    topic,
+  );
+}
+
+function isAppWebhookTopic(
+  topic: SupportedShopifyWebhookTopic,
+): topic is SupportedShopifyAppWebhookTopic {
+  return (SUPPORTED_SHOPIFY_APP_WEBHOOK_TOPICS as readonly string[]).includes(
+    topic,
+  );
+}
+
+function readShopifyWebhookTopicRoute(
+  topic: SupportedShopifyWebhookTopic,
+): ShopifyWebhookTopicRoute {
+  if (isAppWebhookTopic(topic)) {
+    return {
+      category: ShopifyWebhookTopicCategory.App,
+      topic,
+    };
+  }
+
+  if (isOrderWebhookTopic(topic)) {
+    return {
+      category: ShopifyWebhookTopicCategory.Order,
+      topic,
+    };
+  }
+
+  const unhandledWebhookTopic: never = topic;
+  throw new ShopifyWebhookRequestError(
+    `Unsupported Shopify webhook topic: ${unhandledWebhookTopic}.`,
+    400,
+  );
 }
 
 function extractPlatformOrderId(
@@ -156,9 +250,8 @@ function extractPlatformOrderId(
     case "orders/fulfilled":
     case "orders/partially_fulfilled":
     case "orders/edited":
-      return ShopifyOrderWebhookPayloadSchema.parse(
-        payload,
-      ).admin_graphql_api_id;
+      return ShopifyOrderWebhookPayloadSchema.parse(payload)
+        .admin_graphql_api_id;
 
     case "refunds/create":
     case "order_transactions/create": {
@@ -168,6 +261,58 @@ function extractPlatformOrderId(
       return `gid://shopify/Order/${orderId}`;
     }
   }
+}
+
+function readPlatformOrderIdFromEvent(
+  platformEvent: PlatformEvent,
+): string | undefined {
+  return platformEvent.resourceType === ShopifyWebhookResourceType.Order
+    ? (platformEvent.resourceId ?? undefined)
+    : undefined;
+}
+
+interface CreatePlatformEventInput {
+  localPlatformAccount: PlatformAccount;
+  platformEventId: string;
+  topic: SupportedShopifyWebhookTopic;
+  resourceType: ShopifyWebhookResourceType;
+  resourceId: string;
+  payload: Prisma.InputJsonValue;
+}
+
+interface CreateOrderPlatformEventInput {
+  localPlatformAccount: PlatformAccount;
+  platformEventId: string;
+  topic: SupportedShopifyOrderWebhookTopic;
+  platformOrderId: string;
+}
+
+interface HandleOrderWebhookTopicInput {
+  localPlatformAccount: PlatformAccount;
+  platformEventId: string;
+  topic: SupportedShopifyOrderWebhookTopic;
+  payload: unknown;
+}
+
+interface IngestAppUninstalledWebhookInput {
+  localPlatformAccount: PlatformAccount;
+  platformEventId: string;
+  topic: SupportedShopifyAppWebhookTopic;
+  receivedShopDomain: string;
+}
+
+interface HandleAppWebhookTopicInput {
+  localPlatformAccount: PlatformAccount;
+  platformEventId: string;
+  topic: SupportedShopifyAppWebhookTopic;
+  receivedShopDomain: string;
+}
+
+interface CreateAppUninstalledPlatformEventInput {
+  localPlatformAccount: PlatformAccount;
+  platformEventId: string;
+  topic: SupportedShopifyAppWebhookTopic;
+  receivedShopDomain: string;
 }
 
 function isUniqueConstraintViolation(error: unknown): boolean {
@@ -194,29 +339,201 @@ async function findExistingPlatformEvent(
 }
 
 async function createPlatformEvent(
-  prisma: IngestShopifyWebhookClient,
-  input: {
-    localPlatformAccountId: string;
-    platformEventId: string;
-    platformOrderId: string;
-    topic: SupportedShopifyOrderWebhookTopic;
-  },
+  prisma: Pick<IngestShopifyWebhookTransaction, "platformEvent">,
+  input: CreatePlatformEventInput,
 ): Promise<PlatformEvent> {
   const createData: Prisma.PlatformEventUncheckedCreateInput = {
-    platformAccountId: input.localPlatformAccountId,
+    platformAccountId: input.localPlatformAccount.id,
     platform: SHOPIFY_PLATFORM,
     eventType: input.topic,
     platformEventId: input.platformEventId,
-    resourceType: "order",
+    resourceType: input.resourceType,
+    resourceId: input.resourceId,
+    payload: input.payload,
+  };
+
+  return prisma.platformEvent.create({
+    data: createData,
+  });
+}
+
+async function createOrderPlatformEvent(
+  prisma: Pick<IngestShopifyWebhookTransaction, "platformEvent">,
+  input: CreateOrderPlatformEventInput,
+): Promise<PlatformEvent> {
+  const createOrderPlatformEventInput: CreatePlatformEventInput = {
+    localPlatformAccount: input.localPlatformAccount,
+    platformEventId: input.platformEventId,
+    topic: input.topic,
+    resourceType: ShopifyWebhookResourceType.Order,
     resourceId: input.platformOrderId,
     payload: {
       platformOrderId: input.platformOrderId,
     },
   };
 
-  return prisma.platformEvent.create({
-    data: createData,
-  });
+  return createPlatformEvent(prisma, createOrderPlatformEventInput);
+}
+
+async function createAppUninstalledPlatformEvent(
+  prisma: Pick<IngestShopifyWebhookTransaction, "platformEvent">,
+  input: CreateAppUninstalledPlatformEventInput,
+): Promise<PlatformEvent> {
+  const platformEventInput: CreatePlatformEventInput = {
+    localPlatformAccount: input.localPlatformAccount,
+    platformEventId: input.platformEventId,
+    topic: input.topic,
+    resourceType: ShopifyWebhookResourceType.Shop,
+    resourceId: input.localPlatformAccount.platformAccountId,
+    payload: {
+      shopDomain: input.receivedShopDomain,
+    },
+  };
+
+  return createPlatformEvent(prisma, platformEventInput);
+}
+
+async function ingestAppUninstalledWebhook(
+  dependencies: IngestShopifyWebhookDependencies,
+  input: IngestAppUninstalledWebhookInput,
+): Promise<IngestShopifyWebhookResult> {
+  // Keep the uninstall audit event and token invalidation atomic.
+  const localPlatformEvent = await dependencies.prisma.$transaction(
+    async (transaction) => {
+      const appUninstalledPlatformEventInput: CreateAppUninstalledPlatformEventInput =
+        {
+          localPlatformAccount: input.localPlatformAccount,
+          platformEventId: input.platformEventId,
+          topic: input.topic,
+          receivedShopDomain: input.receivedShopDomain,
+        };
+      const platformEvent = await createAppUninstalledPlatformEvent(
+        transaction,
+        appUninstalledPlatformEventInput,
+      );
+
+      await deactivateShopifyInstallation(
+        {
+          localPlatformAccountId: input.localPlatformAccount.id,
+          uninstalledAt: new Date(),
+        },
+        transaction,
+      );
+
+      return platformEvent;
+    },
+  );
+
+  return {
+    duplicate: false,
+    localPlatformEventId: localPlatformEvent.id,
+  };
+}
+
+async function handleAppWebhookTopic(
+  dependencies: IngestShopifyWebhookDependencies,
+  input: HandleAppWebhookTopicInput,
+): Promise<IngestShopifyWebhookResult> {
+  try {
+    switch (input.topic) {
+      case "app/uninstalled": {
+        const appUninstalledWebhookInput: IngestAppUninstalledWebhookInput = {
+          localPlatformAccount: input.localPlatformAccount,
+          platformEventId: input.platformEventId,
+          receivedShopDomain: input.receivedShopDomain,
+          topic: input.topic,
+        };
+
+        return await ingestAppUninstalledWebhook(
+          dependencies,
+          appUninstalledWebhookInput,
+        );
+      }
+    }
+
+    const unhandledAppWebhookTopic: never = input.topic;
+    throw new ShopifyWebhookRequestError(
+      `Unsupported Shopify app webhook topic: ${unhandledAppWebhookTopic}.`,
+      400,
+    );
+  } catch (error) {
+    // Handle duplicate webhook delivery that wins the database race.
+    if (!isUniqueConstraintViolation(error)) {
+      throw error;
+    }
+
+    const duplicatePlatformEvent = await findExistingPlatformEvent(
+      dependencies.prisma,
+      input.localPlatformAccount.id,
+      input.platformEventId,
+    );
+
+    if (!duplicatePlatformEvent) {
+      throw error;
+    }
+
+    return {
+      duplicate: true,
+      localPlatformEventId: duplicatePlatformEvent.id,
+      platformOrderId: readPlatformOrderIdFromEvent(
+        duplicatePlatformEvent,
+      ),
+    };
+  }
+}
+
+async function handleOrderWebhookTopic(
+  dependencies: IngestShopifyWebhookDependencies,
+  input: HandleOrderWebhookTopicInput,
+): Promise<IngestShopifyWebhookResult> {
+  let platformOrderId: string;
+
+  try {
+    platformOrderId = extractPlatformOrderId(input.topic, input.payload);
+  } catch {
+    throw new ShopifyWebhookRequestError(
+      `Shopify ${input.topic} webhook payload is missing a valid order ID.`,
+      400,
+    );
+  }
+
+  try {
+    const localPlatformEvent = await createOrderPlatformEvent(
+      dependencies.prisma,
+      {
+        localPlatformAccount: input.localPlatformAccount,
+        platformEventId: input.platformEventId,
+        platformOrderId,
+        topic: input.topic,
+      },
+    );
+
+    return {
+      duplicate: false,
+      localPlatformEventId: localPlatformEvent.id,
+      platformOrderId,
+    };
+  } catch (error) {
+    if (!isUniqueConstraintViolation(error)) {
+      throw error;
+    }
+
+    const duplicatePlatformEvent = await findExistingPlatformEvent(
+      dependencies.prisma,
+      input.localPlatformAccount.id,
+      input.platformEventId,
+    );
+
+    if (!duplicatePlatformEvent) {
+      throw error;
+    }
+
+    return {
+      duplicate: true,
+      localPlatformEventId: duplicatePlatformEvent.id,
+      platformOrderId,
+    };
+  }
 }
 
 export async function ingestShopifyWebhook(
@@ -262,18 +579,6 @@ export async function ingestShopifyWebhook(
     );
   }
 
-  const payload = parseWebhookPayload(input.rawBody);
-  let platformOrderId: string;
-
-  try {
-    platformOrderId = extractPlatformOrderId(topic, payload);
-  } catch {
-    throw new ShopifyWebhookRequestError(
-      `Shopify ${topic} webhook payload is missing a valid order ID.`,
-      400,
-    );
-  }
-
   const existingPlatformEvent = await findExistingPlatformEvent(
     dependencies.prisma,
     localPlatformAccount.id,
@@ -284,42 +589,43 @@ export async function ingestShopifyWebhook(
     return {
       duplicate: true,
       localPlatformEventId: existingPlatformEvent.id,
-      platformOrderId,
+      platformOrderId: readPlatformOrderIdFromEvent(existingPlatformEvent),
     };
   }
 
-  try {
-    const localPlatformEvent = await createPlatformEvent(dependencies.prisma, {
-      localPlatformAccountId: localPlatformAccount.id,
-      platformEventId,
-      platformOrderId,
-      topic,
-    });
+  const payload = parseWebhookPayload(input.rawBody);
+  const topicRoute = readShopifyWebhookTopicRoute(topic);
 
-    return {
-      duplicate: false,
-      localPlatformEventId: localPlatformEvent.id,
-      platformOrderId,
-    };
-  } catch (error) {
-    if (!isUniqueConstraintViolation(error)) {
-      throw error;
+  switch (topicRoute.category) {
+    case ShopifyWebhookTopicCategory.App: {
+      const appWebhookTopicInput: HandleAppWebhookTopicInput = {
+        localPlatformAccount,
+        platformEventId,
+        receivedShopDomain,
+        topic: topicRoute.topic,
+      };
+
+      return await handleAppWebhookTopic(dependencies, appWebhookTopicInput);
     }
 
-    const duplicatePlatformEvent = await findExistingPlatformEvent(
-      dependencies.prisma,
-      localPlatformAccount.id,
-      platformEventId,
-    );
+    case ShopifyWebhookTopicCategory.Order: {
+      const orderWebhookTopicInput: HandleOrderWebhookTopicInput = {
+        localPlatformAccount,
+        platformEventId,
+        payload,
+        topic: topicRoute.topic,
+      };
 
-    if (!duplicatePlatformEvent) {
-      throw error;
+      return await handleOrderWebhookTopic(
+        dependencies,
+        orderWebhookTopicInput,
+      );
     }
-
-    return {
-      duplicate: true,
-      localPlatformEventId: duplicatePlatformEvent.id,
-      platformOrderId,
-    };
   }
+
+  const unhandledTopicCategory: never = topicRoute;
+  throw new ShopifyWebhookRequestError(
+    `Unsupported Shopify webhook topic category: ${unhandledTopicCategory}.`,
+    400,
+  );
 }

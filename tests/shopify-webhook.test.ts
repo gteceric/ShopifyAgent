@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import test from "node:test";
-import type { PlatformAccount, PlatformEvent, Prisma } from "@prisma/client";
+import type {
+  PlatformAccount,
+  PlatformEvent,
+  Prisma,
+  ShopifyInstallation,
+} from "@prisma/client";
 import {
   ingestShopifyWebhook,
   ShopifyWebhookRequestError,
@@ -54,11 +59,36 @@ function makePlatformEvent(
   };
 }
 
+function makeShopifyInstallation(): ShopifyInstallation {
+  return {
+    id: "shopify-installation-1",
+    platformAccountId: "local-platform-account-1",
+    status: "active",
+    encryptedAccessToken: "encrypted-access-token",
+    encryptedRefreshToken: "encrypted-refresh-token",
+    accessTokenExpiresAt: new Date("2026-06-03T01:00:00.000Z"),
+    refreshTokenExpiresAt: new Date("2026-09-01T00:00:00.000Z"),
+    grantedScopes: ["read_orders"],
+    installedAt: new Date("2026-06-03T00:00:00.000Z"),
+    uninstalledAt: null,
+    createdAt: new Date("2026-06-03T00:00:00.000Z"),
+    updatedAt: new Date("2026-06-03T00:00:00.000Z"),
+  };
+}
+
 class FakeIngestShopifyWebhookClient implements IngestShopifyWebhookClient {
   readonly createdPlatformEventData: Prisma.PlatformEventUncheckedCreateInput[] =
     [];
+  readonly shopifyInstallationUpdateArgs: Prisma.ShopifyInstallationUpdateArgs[] =
+    [];
   readonly localPlatformAccounts: PlatformAccount[];
   readonly existingPlatformEvents: PlatformEvent[];
+
+  async $transaction<T>(
+    callback: (transaction: IngestShopifyWebhookClient) => Promise<T>,
+  ): Promise<T> {
+    return callback(this);
+  }
 
   constructor(
     localPlatformAccount:
@@ -118,6 +148,16 @@ class FakeIngestShopifyWebhookClient implements IngestShopifyWebhookClient {
 
       return makePlatformEvent(data);
     },
+  };
+
+  readonly shopifyInstallation = {
+    findUnique: async () => makeShopifyInstallation(),
+    update: async (args: Prisma.ShopifyInstallationUpdateArgs) => {
+      this.shopifyInstallationUpdateArgs.push(args);
+
+      return makeShopifyInstallation();
+    },
+    upsert: async () => makeShopifyInstallation(),
   };
 }
 
@@ -212,6 +252,52 @@ test("maps a refund webhook order ID to a Shopify order GID", async () => {
     client.createdPlatformEventData[0]?.platformAccountId,
     "local-platform-account-1",
   );
+});
+
+test("marks a Shopify installation inactive when the app is uninstalled", async () => {
+  const client = new FakeIngestShopifyWebhookClient();
+  const result = await ingestShopifyWebhook(
+    makeSignedWebhookInput("app/uninstalled", {
+      id: 1,
+      myshopify_domain: SHOP_DOMAIN,
+    }),
+    {
+      prisma: client,
+      env,
+    },
+  );
+
+  assert.deepEqual(result, {
+    duplicate: false,
+    localPlatformEventId: "local-platform-event-1",
+  });
+  assert.deepEqual(client.createdPlatformEventData, [
+    {
+      platformAccountId: "local-platform-account-1",
+      platform: "shopify",
+      eventType: "app/uninstalled",
+      platformEventId: "webhook-delivery-1",
+      resourceType: "shop",
+      resourceId: "gid://shopify/Shop/1",
+      payload: {
+        shopDomain: SHOP_DOMAIN,
+      },
+    },
+  ]);
+  assert.equal(client.shopifyInstallationUpdateArgs.length, 1);
+  assert.deepEqual(client.shopifyInstallationUpdateArgs[0]?.where, {
+    platformAccountId: "local-platform-account-1",
+  });
+  assert.equal(client.shopifyInstallationUpdateArgs[0]?.data.status, "inactive");
+  assert.equal(
+    client.shopifyInstallationUpdateArgs[0]?.data.encryptedAccessToken,
+    null,
+  );
+  assert.equal(
+    client.shopifyInstallationUpdateArgs[0]?.data.encryptedRefreshToken,
+    null,
+  );
+  assert.ok(client.shopifyInstallationUpdateArgs[0]?.data.uninstalledAt);
 });
 
 test("accepts a duplicate signed webhook without inserting another inbox event", async () => {
