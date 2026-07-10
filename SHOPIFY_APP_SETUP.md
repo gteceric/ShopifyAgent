@@ -32,16 +32,23 @@ development values such as `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`, and
 `APP_URL`; the app maps those to the internal `SHOPIFY_APP_*` names used by the
 backend.
 
-Start Shopify CLI development mode and select the NextLensFix development
-store:
+Start Shopify CLI development mode and select the development store you want to
+open:
 
 ```bash
-shopify app dev --store nextlensfix.myshopify.com
+shopify app dev --store commerceops-dev.myshopify.com
 ```
 
 While `app dev` is running, Shopify applies saved TOML configuration changes to
 the selected development store. Shopify-managed installation prompts the
 merchant to approve the configured scopes.
+
+Installing or reinstalling the app in Shopify is not enough to update the local
+`ShopifyInstallation` row. The embedded app page must load so App Bridge can
+send a session token to `POST /api/shopify/connect`; that route exchanges the
+session token for offline credentials and stores the encrypted merchant token.
+In development, the Shopify CLI preview is the most reliable way to open the
+embedded app context.
 
 `read_orders` and `read_customers` access protected customer data.
 `read_products` allows refund checks to inspect product and variant context.
@@ -53,6 +60,7 @@ relying on real merchant order and customer data.
 
 The app configuration subscribes every installed shop to:
 
+- `app/uninstalled`
 - `orders/create`
 - `orders/updated`
 - `refunds/create`
@@ -68,8 +76,40 @@ The deployed application URL or its reverse proxy must route that path to the
 existing Shopify webhook receiver. Do not deploy the subscriptions until the
 public HTTPS webhook path is reachable.
 
-`app/uninstalled` is intentionally not subscribed yet. Add it after its webhook
-handler deactivates the corresponding `ShopifyInstallation`.
+`app/uninstalled` is handled synchronously during webhook ingestion: the app
+writes a `PlatformEvent` audit row, marks only that shop's
+`ShopifyInstallation` inactive, clears stored access and refresh tokens, and
+leaves other shops untouched. Order-related webhook events stay in the
+`PlatformEvent` inbox for the webhook processor to sync order snapshots.
+
+Shopify webhook delivery is at-least-once, so duplicate delivery is expected.
+The database uniqueness key includes `platform`, `platformAccountId`, and
+`platformEventId` so duplicate detection is scoped per merchant.
+
+## Runtime Environment
+
+Production web/runtime environments should provide:
+
+- `DATABASE_URL`
+- `USE_REAL_SHOPIFY=true`
+- `SHOPIFY_APP_CLIENT_ID`
+- `SHOPIFY_APP_CLIENT_SECRET`
+- `SHOPIFY_APP_URL`
+- `SHOPIFY_API_VERSION`
+- `SHOPIFY_TOKEN_ENCRYPTION_KEY`
+
+`SHOPIFY_TOKEN_ENCRYPTION_KEY` must be a base64-encoded 32-byte key and must be
+kept stable; rotating it without a migration will make stored merchant
+credentials unreadable.
+
+`SHOPIFY_STORE_DOMAIN` and `SHOPIFY_ADMIN_TOKEN` are single-store smoke/manual
+tool inputs. They are not used by the multi-merchant dashboard, refund routes,
+webhook processor, or installed-shop reconciliation path.
+
+Set `ENABLE_REAL_REFUND_EXECUTION=true` only when real Shopify refund creation
+is intentionally enabled. `USE_REAL_SHOPIFY=true` by itself loads live data and
+performs live preview/revalidation, but refund execution still has this separate
+safety gate.
 
 ## Production
 

@@ -1,6 +1,8 @@
 
 client_id = "46f0e3bce304dd953df8c721ef0c7cd1"
 name = "CommerceOps-Agent"
+# Shopify CLI replaces this placeholder during app dev/config linking. Before
+# production deploy, confirm it points at the deployed web app HTTPS origin.
 application_url = "https://shopify.dev/apps/default-app-home"
 embedded = true
 web_directories = ["apps/web"]
@@ -21,6 +23,7 @@ use_legacy_install_flow = false
 [auth]
 # Required by Shopify app configuration. Managed installation and token
 # exchange do not use the legacy OAuth callback during the normal app flow.
+# Keep this host aligned with application_url before production deploy.
 redirect_urls = [
   "https://shopify.dev/apps/default-app-home/api/auth",
 ]
