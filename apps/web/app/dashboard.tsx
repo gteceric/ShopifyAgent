@@ -28,6 +28,36 @@ interface DashboardProps {
   selectedOrderError: DashboardOrderErrorState | null;
 }
 
+interface DashboardEmptyDetailsMessageInput {
+  shopifyConnectionStatus: ShopifyConnectionStatus;
+  ordersLoadError?: string | null;
+  orderCount: number;
+  filteredOrderCount: number;
+}
+
+function createDashboardEmptyDetailsMessage(
+  input: DashboardEmptyDetailsMessageInput,
+): string {
+  switch (input.shopifyConnectionStatus) {
+    case ShopifyConnectionStatus.RequiresReauthorization:
+      return "Reconnect Shopify to reload live orders and refund guidance.";
+    case ShopifyConnectionStatus.Inactive:
+      return "Reinstall or open the app from Shopify Admin to reconnect Shopify and reload live orders.";
+    case ShopifyConnectionStatus.Ready:
+      break;
+  }
+
+  if (input.ordersLoadError && input.orderCount === 0) {
+    return "Live Shopify orders could not be loaded. Fix the connection details or retry the order feed.";
+  }
+
+  if (input.filteredOrderCount === 0 && input.orderCount > 0) {
+    return "No order matches the current search and filters. Adjust the queue to inspect refund guidance.";
+  }
+
+  return "Select an order to inspect refund posture, policy reasoning, and next-step guidance.";
+}
+
 export function Dashboard({
   orders,
   shopDomain,
@@ -79,20 +109,22 @@ export function Dashboard({
   const requiresShopifyReauthorization =
     shopifyConnectionStatus ===
     ShopifyConnectionStatus.RequiresReauthorization;
+  const isShopifyConnectionInactive =
+    shopifyConnectionStatus === ShopifyConnectionStatus.Inactive;
+  const isUsingLiveOrders =
+    !ordersLoadError &&
+    !requiresShopifyReauthorization &&
+    !isShopifyConnectionInactive;
   const summary = getSummary(filteredOrders);
-  let emptyDetailsMessage =
-    "Select an order to inspect refund posture, policy reasoning, and next-step guidance.";
-
-  if (requiresShopifyReauthorization) {
-    emptyDetailsMessage =
-      "Reconnect Shopify to reload live orders and refund guidance.";
-  } else if (ordersLoadError && orders.length === 0) {
-    emptyDetailsMessage =
-      "Live Shopify orders could not be loaded. Fix the connection details or retry the order feed.";
-  } else if (filteredOrders.length === 0 && orders.length > 0) {
-    emptyDetailsMessage =
-      "No order matches the current search and filters. Adjust the queue to inspect refund guidance.";
-  }
+  const dashboardEmptyDetailsMessageInput: DashboardEmptyDetailsMessageInput = {
+    shopifyConnectionStatus,
+    ordersLoadError,
+    orderCount: orders.length,
+    filteredOrderCount: filteredOrders.length,
+  };
+  const emptyDetailsMessage = createDashboardEmptyDetailsMessage(
+    dashboardEmptyDetailsMessageInput,
+  );
 
   function updateDashboardState(
     nextState: DashboardUrlState,
@@ -133,9 +165,7 @@ export function Dashboard({
           manualReviewCount={summary.manualReviewCount}
           blockedCount={summary.blockedCount}
           hasActiveFilters={hasActiveFilters}
-          isUsingLiveOrders={
-            !ordersLoadError && !requiresShopifyReauthorization
-          }
+          isUsingLiveOrders={isUsingLiveOrders}
         />
 
         {ordersLoadError ? (

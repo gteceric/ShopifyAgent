@@ -75,10 +75,28 @@ export class ShopifyInstallationRequiresReauthorizationError extends Error {
   }
 }
 
+export class ShopifyInstallationInactiveError extends Error {
+  readonly localPlatformAccountId: string;
+
+  constructor(localPlatformAccountId: string) {
+    super(
+      `Shopify installation for platform account ${localPlatformAccountId} is inactive. Ask the merchant to reopen the embedded app to reconnect Shopify.`,
+    );
+    this.name = "ShopifyInstallationInactiveError";
+    this.localPlatformAccountId = localPlatformAccountId;
+  }
+}
+
 export function isShopifyInstallationRequiresReauthorizationError(
   error: unknown,
 ): error is ShopifyInstallationRequiresReauthorizationError {
   return error instanceof ShopifyInstallationRequiresReauthorizationError;
+}
+
+export function isShopifyInstallationInactiveError(
+  error: unknown,
+): error is ShopifyInstallationInactiveError {
+  return error instanceof ShopifyInstallationInactiveError;
 }
 
 function normalizeOptionalEncryptedValue(

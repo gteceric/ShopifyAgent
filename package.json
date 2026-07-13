@@ -26,6 +26,7 @@
     "shopify-webhooks:process": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/process-webhook-events.js",
     "shopify-webhooks:smoke:synthetic": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/run-webhook-smoke-test.js",
     "shopify-webhooks:serve": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/run-webhook-server.js",
+    "shopify-installations:mark-inactive": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/mark-installation-inactive.js",
     "shopify-installations:require-reauth": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/mark-installation-requires-reauthorization.js",
     "shopify-tokens:maintain": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/maintain-installation-tokens.js",
     "shopify-tokens:refresh-smoke": "npm run build && node --env-file=.env --enable-source-maps build/src/tools/shopify/run-token-refresh-smoke-test.js",

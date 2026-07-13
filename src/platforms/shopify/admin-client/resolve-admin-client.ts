@@ -7,7 +7,9 @@ import type { PlatformAccount } from "@prisma/client";
 import {
   findShopifyInstallation,
   SHOPIFY_INSTALLATION_ACTIVE_STATUS,
+  SHOPIFY_INSTALLATION_INACTIVE_STATUS,
   SHOPIFY_INSTALLATION_REQUIRES_REAUTHORIZATION_STATUS,
+  ShopifyInstallationInactiveError,
   ShopifyInstallationRequiresReauthorizationError,
   type ShopifyInstallationClient,
   updateShopifyInstallationToRequireReauthorization,
@@ -59,6 +61,8 @@ export async function resolveShopifyAdminClient(
   switch (installation.status) {
     case SHOPIFY_INSTALLATION_ACTIVE_STATUS:
       break;
+    case SHOPIFY_INSTALLATION_INACTIVE_STATUS:
+      throw new ShopifyInstallationInactiveError(localPlatformAccount.id);
     case SHOPIFY_INSTALLATION_REQUIRES_REAUTHORIZATION_STATUS:
       throw new ShopifyInstallationRequiresReauthorizationError(
         localPlatformAccount.id,

@@ -9,6 +9,7 @@ import {
   SHOPIFY_INSTALLATION_ACTIVE_STATUS,
   SHOPIFY_INSTALLATION_INACTIVE_STATUS,
   SHOPIFY_INSTALLATION_REQUIRES_REAUTHORIZATION_STATUS,
+  ShopifyInstallationInactiveError,
   type ShopifyInstallationClient,
 } from "../src/platforms/shopify/persistence/installation.js";
 import { resolveShopifyAdminClient } from "../src/platforms/shopify/admin-client/resolve-admin-client.js";
@@ -220,7 +221,7 @@ test("rejects inactive installations and expired refresh tokens", async () => {
       credentialEncryptionKey: ENCRYPTION_KEY,
       fetchImpl: fetch,
     }),
-    /is not active\./,
+    ShopifyInstallationInactiveError,
   );
   const expiredRefreshTokenPrisma = new FakeShopifyInstallationClient(
     makeInstallation({

@@ -9,7 +9,10 @@ import {
   requireResolvedShopifyAdminClient,
   resolveCurrentShopifyAdminClient,
 } from "./shopify-admin-client-resolver";
-import { isShopifyInstallationRequiresReauthorizationError } from "../../../src/platforms/shopify/persistence/installation";
+import {
+  isShopifyInstallationInactiveError,
+  isShopifyInstallationRequiresReauthorizationError,
+} from "../../../src/platforms/shopify/persistence/installation";
 import { ShopifyConnectionStatus } from "./shopify-connection-status";
 import {
   applyRefundEvaluationToOrder,
@@ -39,6 +42,20 @@ function readSearchParamValue(
   }
 
   return value ?? null;
+}
+
+function readShopifyConnectionStatusFromError(
+  error: unknown,
+): ShopifyConnectionStatus | null {
+  if (isShopifyInstallationRequiresReauthorizationError(error)) {
+    return ShopifyConnectionStatus.RequiresReauthorization;
+  }
+
+  if (isShopifyInstallationInactiveError(error)) {
+    return ShopifyConnectionStatus.Inactive;
+  }
+
+  return null;
 }
 
 export default async function Home({ searchParams }: HomeProps) {
@@ -130,8 +147,11 @@ export default async function Home({ searchParams }: HomeProps) {
       return baseOrder;
     });
   } catch (error) {
-    if (isShopifyInstallationRequiresReauthorizationError(error)) {
-      shopifyConnectionStatus = ShopifyConnectionStatus.RequiresReauthorization;
+    const errorShopifyConnectionStatus =
+      readShopifyConnectionStatusFromError(error);
+
+    if (errorShopifyConnectionStatus) {
+      shopifyConnectionStatus = errorShopifyConnectionStatus;
     } else {
       ordersLoadError =
         error instanceof Error
