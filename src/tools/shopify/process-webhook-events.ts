@@ -1,46 +1,53 @@
-import { readOptionalPositiveIntegerEnv } from "@shopify-agent/core";
-import { createPrismaClient } from "../../persistence/prisma-client.js";
-import { syncShopifyOrderSnapshot } from "../../platforms/shopify/sync/order-snapshot.js";
-import { createShopifyWebhookWorkerDependencies } from "../../platforms/shopify/webhooks/create-worker-dependencies.js";
-import { readCredentialEncryptionKey } from "../../security/credential-encryption.js";
 import {
-  processPendingShopifyWebhookEvents,
-  type ProcessPendingShopifyWebhookEventsInput,
-} from "../../platforms/shopify/webhooks/process-webhook-events.js";
+  readOptionalPositiveIntegerEnv,
+  readRequiredStringEnv,
+} from "@shopify-agent/core";
+import { createPrismaClient } from "../../persistence/prisma-client.js";
+import { runShopifyWebhookProcessingJob } from "../../platforms/shopify/ops/background-jobs.js";
+import { readCredentialEncryptionKey } from "../../security/credential-encryption.js";
 
 const SHOPIFY_TOKEN_ENCRYPTION_KEY_ENV = "SHOPIFY_TOKEN_ENCRYPTION_KEY";
 
 async function main(): Promise<void> {
+  const databaseUrl = readRequiredStringEnv("DATABASE_URL");
   const limit = readOptionalPositiveIntegerEnv("SHOPIFY_WEBHOOK_PROCESS_LIMIT");
-  const prisma = createPrismaClient();
+  const appClientId = readRequiredStringEnv("SHOPIFY_APP_CLIENT_ID");
+  const appClientSecret = readRequiredStringEnv("SHOPIFY_APP_CLIENT_SECRET");
   const credentialEncryptionKey = readCredentialEncryptionKey(
     SHOPIFY_TOKEN_ENCRYPTION_KEY_ENV,
   );
+  const prisma = createPrismaClient({
+    databaseUrl,
+  });
 
   try {
-    const eventsInput: ProcessPendingShopifyWebhookEventsInput = {
-      limit,
-    };
-    const dependencies = createShopifyWebhookWorkerDependencies({
-      prisma,
-      credentialEncryptionKey,
-      appClientId: process.env.SHOPIFY_APP_CLIENT_ID,
-      appClientSecret: process.env.SHOPIFY_APP_CLIENT_SECRET,
-      apiVersion: process.env.SHOPIFY_API_VERSION,
-      fetchImpl: fetch,
-      syncShopifyOrderSnapshotWithClientFn: (
-        orderSnapshotInput,
-        shopifyAdminClient,
-      ) =>
-        syncShopifyOrderSnapshot(orderSnapshotInput, {
-          prisma,
-          shopifyAdminClient,
-        }),
-    });
-    const result = await processPendingShopifyWebhookEvents(
-      eventsInput,
-      dependencies,
+    const lockedRun = await runShopifyWebhookProcessingJob(
+      {
+        limit,
+      },
+      {
+        databaseUrl,
+        prisma,
+        credentialEncryptionKey,
+        appClientId,
+        appClientSecret,
+        apiVersion: process.env.SHOPIFY_API_VERSION,
+        fetchImpl: fetch,
+      },
     );
+
+    if (!lockedRun.lockAcquired) {
+      console.log(
+        "Shopify webhook event processing skipped because another run holds the lock.",
+      );
+      return;
+    }
+
+    const result = lockedRun.result;
+
+    if (!result) {
+      throw new Error("Shopify webhook event processing did not return a result.");
+    }
 
     console.log("Shopify webhook event processing finished");
     console.log(

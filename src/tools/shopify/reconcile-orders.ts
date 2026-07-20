@@ -4,7 +4,7 @@ import {
   readRequiredStringEnv,
 } from "@shopify-agent/core";
 import { createPrismaClient } from "../../persistence/prisma-client.js";
-import { reconcileInstalledShopifyShops } from "../../platforms/shopify/sync/reconcile-installed-shops.js";
+import { runShopifyReconciliationJob } from "../../platforms/shopify/ops/background-jobs.js";
 import { readCredentialEncryptionKey } from "../../security/credential-encryption.js";
 
 const SHOPIFY_TOKEN_ENCRYPTION_KEY_ENV = "SHOPIFY_TOKEN_ENCRYPTION_KEY";
@@ -22,6 +22,7 @@ function requireShopifyReconciliationPlatform(): void {
 async function main(): Promise<void> {
   requireShopifyReconciliationPlatform();
 
+  const databaseUrl = readRequiredStringEnv("DATABASE_URL");
   const limit = readOptionalPositiveIntegerEnv("RECONCILE_ORDER_LIMIT");
   const shopLimit = readOptionalPositiveIntegerEnv("RECONCILE_SHOP_LIMIT");
   const appClientId = readRequiredStringEnv("SHOPIFY_APP_CLIENT_ID");
@@ -29,15 +30,18 @@ async function main(): Promise<void> {
   const credentialEncryptionKey = readCredentialEncryptionKey(
     SHOPIFY_TOKEN_ENCRYPTION_KEY_ENV,
   );
-  const prisma = createPrismaClient();
+  const prisma = createPrismaClient({
+    databaseUrl,
+  });
 
   try {
-    const result = await reconcileInstalledShopifyShops(
+    const lockedRun = await runShopifyReconciliationJob(
       {
         orderLimit: limit,
         shopLimit,
       },
       {
+        databaseUrl,
         prisma,
         credentialEncryptionKey,
         appClientId,
@@ -46,6 +50,20 @@ async function main(): Promise<void> {
         fetchImpl: fetch,
       },
     );
+
+    if (!lockedRun.lockAcquired) {
+      console.log(
+        "Shopify installed-shop reconciliation skipped because another run holds the lock.",
+      );
+      return;
+    }
+
+    const result = lockedRun.result;
+
+    if (!result) {
+      throw new Error("Shopify installed-shop reconciliation did not return a result.");
+    }
+
     const failedReconciliationCount = result.reconciledInstallations.filter(
       (installation) => installation.reconciliation.status === "failed",
     ).length;
