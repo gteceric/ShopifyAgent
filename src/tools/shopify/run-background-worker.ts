@@ -12,8 +12,12 @@ import {
   type ShopifyBackgroundJobDependencies,
 } from "../../platforms/shopify/ops/background-jobs.js";
 import type { ReconcileInstalledShopifyShopsResult } from "../../platforms/shopify/sync/reconcile-installed-shops.js";
-import type { ProcessPendingShopifyWebhookEventsResult } from "../../platforms/shopify/webhooks/process-webhook-events.js";
+import type {
+  ProcessPendingShopifyWebhookEventsResult,
+  ShopifyWebhookRetryPolicy,
+} from "../../platforms/shopify/webhooks/process-webhook-events.js";
 import { readCredentialEncryptionKey } from "../../security/credential-encryption.js";
+import { readShopifyWebhookRetryPolicy } from "./read-webhook-retry-policy.js";
 
 const SHOPIFY_TOKEN_ENCRYPTION_KEY_ENV = "SHOPIFY_TOKEN_ENCRYPTION_KEY";
 const DEFAULT_WEBHOOK_PROCESS_INTERVAL_MS = 10_000; // every 10 seconds
@@ -35,6 +39,7 @@ interface ShopifyBackgroundWorkerConfig {
   webhookProcessIntervalMs: number;
   reconciliationIntervalMs: number;
   webhookProcessLimit?: number;
+  webhookRetryPolicy: ShopifyWebhookRetryPolicy;
   reconcileOrderLimit?: number;
   reconcileShopLimit?: number;
   runImmediately: boolean;
@@ -81,6 +86,7 @@ function readShopifyBackgroundWorkerConfig(): ShopifyBackgroundWorkerConfig {
     webhookProcessLimit: readOptionalPositiveIntegerEnv(
       "SHOPIFY_WEBHOOK_PROCESS_LIMIT",
     ),
+    webhookRetryPolicy: readShopifyWebhookRetryPolicy(),
     reconcileOrderLimit: readOptionalPositiveIntegerEnv(
       "RECONCILE_ORDER_LIMIT",
     ),
@@ -284,6 +290,7 @@ async function main(): Promise<void> {
         const lockedRun = await runShopifyWebhookProcessingJob(
           {
             limit: config.webhookProcessLimit,
+            retryPolicy: config.webhookRetryPolicy,
           },
           dependencies,
         );
@@ -323,6 +330,7 @@ async function main(): Promise<void> {
     webhookProcessIntervalMs: config.webhookProcessIntervalMs,
     reconciliationIntervalMs: config.reconciliationIntervalMs,
     webhookProcessLimit: config.webhookProcessLimit,
+    webhookRetryPolicy: config.webhookRetryPolicy,
     reconcileOrderLimit: config.reconcileOrderLimit,
     reconcileShopLimit: config.reconcileShopLimit,
     runImmediately: config.runImmediately,

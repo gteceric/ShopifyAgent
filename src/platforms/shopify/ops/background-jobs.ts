@@ -9,6 +9,7 @@ import { createShopifyWebhookWorkerDependencies } from "../webhooks/create-worke
 import {
   processPendingShopifyWebhookEvents,
   type ProcessPendingShopifyWebhookEventsResult,
+  type ShopifyWebhookRetryPolicy,
 } from "../webhooks/process-webhook-events.js";
 
 const SHOPIFY_WEBHOOK_PROCESSING_LOCK_NAMESPACE_ID = 7_412_009;
@@ -29,6 +30,7 @@ export interface ShopifyBackgroundJobDependencies {
 
 export interface ShopifyWebhookProcessingJobInput {
   limit?: number;
+  retryPolicy: ShopifyWebhookRetryPolicy;
 }
 
 export interface ShopifyReconciliationJobInput {
@@ -56,6 +58,7 @@ export async function runShopifyWebhookProcessingJob(
     () => {
       const webhookProcessingInput = {
         limit: input.limit,
+        retryPolicy: input.retryPolicy,
       };
       const webhookProcessingDependencies =
         createShopifyWebhookWorkerDependencies({

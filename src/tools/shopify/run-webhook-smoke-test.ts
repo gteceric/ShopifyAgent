@@ -395,6 +395,11 @@ async function main(): Promise<void> {
     assert.deepEqual(localPlatformEvent.payload, {
       platformOrderId: SHOPIFY_WEBHOOK_SMOKE_PLATFORM_ORDER_ID,
     });
+    assert.equal(localPlatformEvent.status, "pending");
+    assert.equal(localPlatformEvent.attemptCount, 0);
+    assert.equal(localPlatformEvent.lastAttemptAt, null);
+    assert.equal(localPlatformEvent.nextAttemptAt, null);
+    assert.equal(localPlatformEvent.lastError, null);
     assert.equal(localPlatformEvent.processedAt, null);
 
     localPlatformEventId = localPlatformEvent.id;

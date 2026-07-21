@@ -1,11 +1,19 @@
 import { getErrorMessage, normalizePositiveInteger } from "@shopify-agent/core";
 import type { PlatformAccount, PlatformEvent, Prisma } from "@prisma/client";
+import {
+  PlatformEventStatus,
+  type PlatformEventStatusValue,
+} from "../../../persistence/platform-event-status.js";
 import type { PersistOrderSnapshotResult } from "../../../persistence/persist-order-snapshot.js";
 import type { SyncShopifyOrderSnapshotInput } from "../sync/order-snapshot.js";
 import { SUPPORTED_SHOPIFY_ORDER_WEBHOOK_TOPICS } from "./ingest-webhook.js";
 
 const SHOPIFY_PLATFORM = "shopify";
 const DEFAULT_PROCESS_SHOPIFY_WEBHOOK_EVENT_LIMIT = 25;
+
+export const DEFAULT_SHOPIFY_WEBHOOK_MAX_ATTEMPTS = 5;
+export const DEFAULT_SHOPIFY_WEBHOOK_INITIAL_RETRY_DELAY_MS = 60_000;
+export const DEFAULT_SHOPIFY_WEBHOOK_MAX_RETRY_DELAY_MS = 60 * 60 * 1000;
 
 export interface ProcessShopifyWebhookEventsClient {
   platformAccount: {
@@ -21,6 +29,13 @@ export interface ProcessShopifyWebhookEventsClient {
 
 export interface ProcessPendingShopifyWebhookEventsInput {
   limit?: number;
+  retryPolicy: ShopifyWebhookRetryPolicy;
+}
+
+export interface ShopifyWebhookRetryPolicy {
+  maxAttempts: number;
+  initialDelayMs: number;
+  maxDelayMs: number;
 }
 
 export interface ProcessPendingShopifyWebhookEventsDependencies {
@@ -39,15 +54,29 @@ export interface ProcessedShopifyWebhookEvent {
 }
 
 export interface FailedShopifyWebhookEvent {
+  attemptCount: number;
   localPlatformEventId: string;
   message: string;
+  nextAttemptAt?: Date;
   platformOrderId: string;
+  status: PlatformEventStatusValue;
 }
 
 export interface ProcessPendingShopifyWebhookEventsResult {
   candidateEventCount: number;
   processedEvents: ProcessedShopifyWebhookEvent[];
   failedEvents: FailedShopifyWebhookEvent[];
+}
+
+function calculateRetryDelayMs(
+  attemptCount: number,
+  retryPolicy: ShopifyWebhookRetryPolicy,
+): number {
+  const retryExponent = Math.min(attemptCount - 1, 52);
+  const uncappedDelayMs =
+    retryPolicy.initialDelayMs * Math.pow(2, retryExponent);
+
+  return Math.min(uncappedDelayMs, retryPolicy.maxDelayMs);
 }
 
 export async function processPendingShopifyWebhookEvents(
@@ -58,6 +87,31 @@ export async function processPendingShopifyWebhookEvents(
     input.limit ?? DEFAULT_PROCESS_SHOPIFY_WEBHOOK_EVENT_LIMIT,
     "limit",
   );
+  const maxAttempts = normalizePositiveInteger(
+    input.retryPolicy.maxAttempts,
+    "retryPolicy.maxAttempts",
+  );
+  const initialDelayMs = normalizePositiveInteger(
+    input.retryPolicy.initialDelayMs,
+    "retryPolicy.initialDelayMs",
+  );
+  const maxDelayMs = normalizePositiveInteger(
+    input.retryPolicy.maxDelayMs,
+    "retryPolicy.maxDelayMs",
+  );
+
+  if (maxDelayMs < initialDelayMs) {
+    throw new Error(
+      "retryPolicy.maxDelayMs must be greater than or equal to retryPolicy.initialDelayMs.",
+    );
+  }
+
+  const retryPolicy: ShopifyWebhookRetryPolicy = {
+    maxAttempts,
+    initialDelayMs,
+    maxDelayMs,
+  };
+  const processingTime = dependencies.nowFn?.() ?? new Date();
   const pendingShopifyOrderWebhookEventWhere: Prisma.PlatformEventWhereInput = {
     platform: SHOPIFY_PLATFORM,
     eventType: {
@@ -70,7 +124,20 @@ export async function processPendingShopifyWebhookEvents(
     platformAccountId: {
       not: null,
     },
+    status: {
+      in: [PlatformEventStatus.Pending, PlatformEventStatus.Retrying],
+    },
     processedAt: null,
+    OR: [
+      {
+        nextAttemptAt: null,
+      },
+      {
+        nextAttemptAt: {
+          lte: processingTime,
+        },
+      },
+    ],
   };
 
   const localPlatformEvents = await dependencies.prisma.platformEvent.findMany({
@@ -99,6 +166,8 @@ export async function processPendingShopifyWebhookEvents(
       continue;
     }
 
+    const attemptCount = localPlatformEvent.attemptCount + 1;
+
     try {
       const localPlatformAccount =
         await dependencies.prisma.platformAccount.findUnique({
@@ -124,8 +193,6 @@ export async function processPendingShopifyWebhookEvents(
           orderSnapshotInput,
           localPlatformAccount,
         );
-      const processedAt = dependencies.nowFn?.() ?? new Date();
-
       // Mark this webhook event as processed
       await dependencies.prisma.platformEvent.update({
         where: {
@@ -133,7 +200,12 @@ export async function processPendingShopifyWebhookEvents(
         },
         data: {
           platformAccountId: orderSnapshotResult.localPlatformAccountId,
-          processedAt,
+          status: PlatformEventStatus.Processed,
+          attemptCount,
+          lastAttemptAt: processingTime,
+          nextAttemptAt: null,
+          lastError: null,
+          processedAt: processingTime,
         },
       });
 
@@ -143,10 +215,36 @@ export async function processPendingShopifyWebhookEvents(
         platformOrderId,
       });
     } catch (error) {
+      const message = getErrorMessage(error);
+      const isDeadLetter = attemptCount >= retryPolicy.maxAttempts;
+      const status = isDeadLetter
+        ? PlatformEventStatus.DeadLetter
+        : PlatformEventStatus.Retrying;
+      const retryDelayMs = calculateRetryDelayMs(attemptCount, retryPolicy);
+      const nextAttemptAt = isDeadLetter
+        ? undefined
+        : new Date(processingTime.getTime() + retryDelayMs);
+
+      await dependencies.prisma.platformEvent.update({
+        where: {
+          id: localPlatformEvent.id,
+        },
+        data: {
+          status,
+          attemptCount,
+          lastAttemptAt: processingTime,
+          nextAttemptAt: nextAttemptAt ?? null,
+          lastError: message,
+        },
+      });
+
       failedEvents.push({
+        attemptCount,
         localPlatformEventId: localPlatformEvent.id,
-        message: getErrorMessage(error),
+        message,
+        ...(nextAttemptAt ? { nextAttemptAt } : {}),
         platformOrderId,
+        status,
       });
     }
   }

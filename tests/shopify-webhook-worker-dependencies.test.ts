@@ -48,6 +48,11 @@ function makePlatformEvent(
     payload: {
       platformOrderId,
     },
+    status: "pending",
+    attemptCount: 0,
+    lastAttemptAt: null,
+    nextAttemptAt: null,
+    lastError: null,
     processedAt: null,
     createdAt: new Date("2026-06-08T00:00:00.000Z"),
   };
@@ -173,6 +178,11 @@ test("processes each webhook event with its merchant installation credentials", 
   const result = await processPendingShopifyWebhookEvents(
     {
       limit: 2,
+      retryPolicy: {
+        maxAttempts: 5,
+        initialDelayMs: 60_000,
+        maxDelayMs: 3_600_000,
+      },
     },
     dependencies,
   );

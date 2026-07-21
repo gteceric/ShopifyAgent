@@ -54,6 +54,11 @@ function makePlatformEvent(
     resourceType: data.resourceType ?? null,
     resourceId: data.resourceId ?? null,
     payload: data.payload as Prisma.JsonValue,
+    status: data.status ?? "pending",
+    attemptCount: data.attemptCount ?? 0,
+    lastAttemptAt: data.lastAttemptAt ? new Date(data.lastAttemptAt) : null,
+    nextAttemptAt: data.nextAttemptAt ? new Date(data.nextAttemptAt) : null,
+    lastError: data.lastError ?? null,
     processedAt: data.processedAt ? new Date(data.processedAt) : null,
     createdAt: new Date("2026-06-03T00:00:00.000Z"),
   };
@@ -271,6 +276,9 @@ test("marks a Shopify installation inactive when the app is uninstalled", async 
     duplicate: false,
     localPlatformEventId: "local-platform-event-1",
   });
+  const processedAt = client.createdPlatformEventData[0]?.processedAt;
+
+  assert.ok(processedAt instanceof Date);
   assert.deepEqual(client.createdPlatformEventData, [
     {
       platformAccountId: "local-platform-account-1",
@@ -282,6 +290,10 @@ test("marks a Shopify installation inactive when the app is uninstalled", async 
       payload: {
         shopDomain: SHOP_DOMAIN,
       },
+      status: "processed",
+      attemptCount: 1,
+      lastAttemptAt: processedAt,
+      processedAt,
     },
   ]);
   assert.equal(client.shopifyInstallationUpdateArgs.length, 1);

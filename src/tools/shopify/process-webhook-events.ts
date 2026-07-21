@@ -5,12 +5,14 @@ import {
 import { createPrismaClient } from "../../persistence/prisma-client.js";
 import { runShopifyWebhookProcessingJob } from "../../platforms/shopify/ops/background-jobs.js";
 import { readCredentialEncryptionKey } from "../../security/credential-encryption.js";
+import { readShopifyWebhookRetryPolicy } from "./read-webhook-retry-policy.js";
 
 const SHOPIFY_TOKEN_ENCRYPTION_KEY_ENV = "SHOPIFY_TOKEN_ENCRYPTION_KEY";
 
 async function main(): Promise<void> {
   const databaseUrl = readRequiredStringEnv("DATABASE_URL");
   const limit = readOptionalPositiveIntegerEnv("SHOPIFY_WEBHOOK_PROCESS_LIMIT");
+  const retryPolicy = readShopifyWebhookRetryPolicy();
   const appClientId = readRequiredStringEnv("SHOPIFY_APP_CLIENT_ID");
   const appClientSecret = readRequiredStringEnv("SHOPIFY_APP_CLIENT_SECRET");
   const credentialEncryptionKey = readCredentialEncryptionKey(
@@ -24,6 +26,7 @@ async function main(): Promise<void> {
     const lockedRun = await runShopifyWebhookProcessingJob(
       {
         limit,
+        retryPolicy,
       },
       {
         databaseUrl,

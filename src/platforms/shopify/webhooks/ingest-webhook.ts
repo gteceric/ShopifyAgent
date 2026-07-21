@@ -1,6 +1,7 @@
 import { readOptionalStringEnv } from "@shopify-agent/core";
 import { Prisma } from "@prisma/client";
 import type { PlatformAccount, PlatformEvent } from "@prisma/client";
+import { PlatformEventStatus } from "../../../persistence/platform-event-status.js";
 import { z } from "zod";
 import {
   readShopifyWebhookHeader,
@@ -278,6 +279,7 @@ interface CreatePlatformEventInput {
   resourceType: ShopifyWebhookResourceType;
   resourceId: string;
   payload: Prisma.InputJsonValue;
+  processedAt?: Date;
 }
 
 interface CreateOrderPlatformEventInput {
@@ -350,6 +352,14 @@ async function createPlatformEvent(
     resourceType: input.resourceType,
     resourceId: input.resourceId,
     payload: input.payload,
+    ...(input.processedAt
+      ? {
+          status: PlatformEventStatus.Processed,
+          attemptCount: 1,
+          lastAttemptAt: input.processedAt,
+          processedAt: input.processedAt,
+        }
+      : {}),
   };
 
   return prisma.platformEvent.create({
@@ -379,6 +389,7 @@ async function createAppUninstalledPlatformEvent(
   prisma: Pick<IngestShopifyWebhookTransaction, "platformEvent">,
   input: CreateAppUninstalledPlatformEventInput,
 ): Promise<PlatformEvent> {
+  const processedAt = new Date();
   const platformEventInput: CreatePlatformEventInput = {
     localPlatformAccount: input.localPlatformAccount,
     platformEventId: input.platformEventId,
@@ -388,6 +399,7 @@ async function createAppUninstalledPlatformEvent(
     payload: {
       shopDomain: input.receivedShopDomain,
     },
+    processedAt,
   };
 
   return createPlatformEvent(prisma, platformEventInput);

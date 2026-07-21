@@ -190,6 +190,11 @@ model PlatformEvent {
   resourceType      String?   @map("resource_type") @db.VarChar(64)
   resourceId        String?   @map("resource_id")
   payload           Json
+  status            String    @default("pending") @db.VarChar(32)
+  attemptCount      Int       @default(0) @map("attempt_count")
+  lastAttemptAt     DateTime? @map("last_attempt_at")
+  nextAttemptAt     DateTime? @map("next_attempt_at")
+  lastError         String?   @map("last_error")
   processedAt       DateTime? @map("processed_at")
   createdAt         DateTime  @default(now()) @map("created_at")
 
@@ -198,6 +203,7 @@ model PlatformEvent {
   @@unique([platform, platformAccountId, platformEventId])
   @@index([platformAccountId])
   @@index([platform, eventType])
+  @@index([platform, status, nextAttemptAt])
   @@map("platform_events")
 }
 
